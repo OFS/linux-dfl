@@ -1576,6 +1576,9 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	unsigned long flags;
 	u8 ctrl;
 
+	if (ios->power_mode == MMC_POWER_UNDEFINED)
+		return;
+
 	spin_lock_irqsave(&host->lock, flags);
 
 	if (host->flags & SDHCI_DEVICE_DEAD) {
@@ -2018,8 +2021,8 @@ static void sdhci_send_tuning(struct sdhci_host *host, u32 opcode,
 			      unsigned long flags)
 {
 	struct mmc_host *mmc = host->mmc;
-	struct mmc_command cmd = {0};
-	struct mmc_request mrq = {NULL};
+	struct mmc_command cmd = {};
+	struct mmc_request mrq = {};
 
 	cmd.opcode = opcode;
 	cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
@@ -2111,7 +2114,6 @@ int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 	spin_lock_irqsave(&host->lock, flags);
 
 	hs400_tuning = host->flags & SDHCI_HS400_TUNING;
-	host->flags &= ~SDHCI_HS400_TUNING;
 
 	if (host->tuning_mode == SDHCI_TUNING_MODE_1)
 		tuning_count = host->tuning_count;
@@ -2153,7 +2155,9 @@ int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 
 	if (host->ops->platform_execute_tuning) {
 		spin_unlock_irqrestore(&host->lock, flags);
-		return host->ops->platform_execute_tuning(host, opcode);
+		err = host->ops->platform_execute_tuning(host, opcode);
+		spin_lock_irqsave(&host->lock, flags);
+		goto out_unlock;
 	}
 
 	host->mmc->retune_period = tuning_count;
@@ -2164,6 +2168,7 @@ int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 
 	sdhci_end_tuning(host);
 out_unlock:
+	host->flags &= ~SDHCI_HS400_TUNING;
 	spin_unlock_irqrestore(&host->lock, flags);
 
 	return err;
@@ -2730,7 +2735,8 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 		if (intmask & SDHCI_INT_RETUNE)
 			mmc_retune_needed(host->mmc);
 
-		if (intmask & SDHCI_INT_CARD_INT) {
+		if ((intmask & SDHCI_INT_CARD_INT) &&
+		    (host->ier & SDHCI_INT_CARD_INT)) {
 			sdhci_enable_sdio_irq_nolock(host, false);
 			host->thread_isr |= SDHCI_INT_CARD_INT;
 			result = IRQ_WAKE_THREAD;
@@ -2938,22 +2944,24 @@ int sdhci_runtime_resume_host(struct sdhci_host *host)
 
 	sdhci_init(host, 0);
 
-	/* Force clock and power re-program */
-	host->pwr = 0;
-	host->clock = 0;
-	mmc->ops->start_signal_voltage_switch(mmc, &mmc->ios);
-	mmc->ops->set_ios(mmc, &mmc->ios);
+	if (mmc->ios.power_mode != MMC_POWER_UNDEFINED) {
+		/* Force clock and power re-program */
+		host->pwr = 0;
+		host->clock = 0;
+		mmc->ops->start_signal_voltage_switch(mmc, &mmc->ios);
+		mmc->ops->set_ios(mmc, &mmc->ios);
 
-	if ((host_flags & SDHCI_PV_ENABLED) &&
-		!(host->quirks2 & SDHCI_QUIRK2_PRESET_VALUE_BROKEN)) {
-		spin_lock_irqsave(&host->lock, flags);
-		sdhci_enable_preset_value(host, true);
-		spin_unlock_irqrestore(&host->lock, flags);
+		if ((host_flags & SDHCI_PV_ENABLED) &&
+		    !(host->quirks2 & SDHCI_QUIRK2_PRESET_VALUE_BROKEN)) {
+			spin_lock_irqsave(&host->lock, flags);
+			sdhci_enable_preset_value(host, true);
+			spin_unlock_irqrestore(&host->lock, flags);
+		}
+
+		if ((mmc->caps2 & MMC_CAP2_HS400_ES) &&
+		    mmc->ops->hs400_enhanced_strobe)
+			mmc->ops->hs400_enhanced_strobe(mmc, &mmc->ios);
 	}
-
-	if ((mmc->caps2 & MMC_CAP2_HS400_ES) &&
-	    mmc->ops->hs400_enhanced_strobe)
-		mmc->ops->hs400_enhanced_strobe(mmc, &mmc->ios);
 
 	spin_lock_irqsave(&host->lock, flags);
 

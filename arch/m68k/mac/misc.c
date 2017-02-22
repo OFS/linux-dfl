@@ -4,7 +4,6 @@
 
 #include <linux/types.h>
 #include <linux/errno.h>
-#include <linux/miscdevice.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/sched.h>
@@ -16,7 +15,7 @@
 #include <linux/cuda.h>
 #include <linux/pmu.h>
 
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <asm/io.h>
 #include <asm/segment.h>
 #include <asm/setup.h>

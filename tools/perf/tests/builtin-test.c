@@ -186,6 +186,10 @@ static struct test generic_tests[] = {
 		.func = test__thread_map_synthesize,
 	},
 	{
+		.desc = "Remove thread map",
+		.func = test__thread_map_remove,
+	},
+	{
 		.desc = "Synthesize cpu map",
 		.func = test__cpu_map_synthesize,
 	},
@@ -241,6 +245,10 @@ static struct test generic_tests[] = {
 			.get_nr		= test__clang_subtest_get_nr,
 			.get_desc	= test__clang_subtest_get_desc,
 		}
+	},
+	{
+		.desc = "unit_number__scnprintf",
+		.func = test__unit_number__scnprint,
 	},
 	{
 		.func = NULL,

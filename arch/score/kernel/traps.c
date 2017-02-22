@@ -23,13 +23,13 @@
  * 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include <linux/module.h>
+#include <linux/extable.h>
 #include <linux/sched.h>
 
 #include <asm/cacheflush.h>
 #include <asm/irq.h>
 #include <asm/irq_regs.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 
 unsigned long exception_handlers[32];
 

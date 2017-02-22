@@ -1012,6 +1012,8 @@ struct intel_fbc {
 	struct work_struct underrun_work;
 
 	struct intel_fbc_state_cache {
+		struct i915_vma *vma;
+
 		struct {
 			unsigned int mode_flags;
 			uint32_t hsw_bdw_pixel_rate;
@@ -1025,15 +1027,14 @@ struct intel_fbc {
 		} plane;
 
 		struct {
-			u64 ilk_ggtt_offset;
 			uint32_t pixel_format;
 			unsigned int stride;
-			int fence_reg;
-			unsigned int tiling_mode;
 		} fb;
 	} state_cache;
 
 	struct intel_fbc_reg_params {
+		struct i915_vma *vma;
+
 		struct {
 			enum pipe pipe;
 			enum plane plane;
@@ -1041,10 +1042,8 @@ struct intel_fbc {
 		} crtc;
 
 		struct {
-			u64 ggtt_offset;
 			uint32_t pixel_format;
 			unsigned int stride;
-			int fence_reg;
 		} fb;
 
 		int cfb_size;
@@ -1976,6 +1975,11 @@ struct drm_i915_private {
 	struct i915_workarounds workarounds;
 
 	struct i915_frontbuffer_tracking fb_tracking;
+
+	struct intel_atomic_helper {
+		struct llist_head free_list;
+		struct work_struct free_work;
+	} atomic_helper;
 
 	u16 orig_clock;
 
@@ -3163,13 +3167,6 @@ i915_gem_object_to_ggtt(struct drm_i915_gem_object *obj,
 	return i915_gem_obj_to_vma(obj, &to_i915(obj->base.dev)->ggtt.base, view);
 }
 
-static inline unsigned long
-i915_gem_object_ggtt_offset(struct drm_i915_gem_object *o,
-			    const struct i915_ggtt_view *view)
-{
-	return i915_ggtt_offset(i915_gem_object_to_ggtt(o, view));
-}
-
 /* i915_gem_fence_reg.c */
 int __must_check i915_vma_get_fence(struct i915_vma *vma);
 int __must_check i915_vma_put_fence(struct i915_vma *vma);
@@ -3509,6 +3506,8 @@ extern void intel_display_print_error_state(struct drm_i915_error_state_buf *e,
 
 int sandybridge_pcode_read(struct drm_i915_private *dev_priv, u32 mbox, u32 *val);
 int sandybridge_pcode_write(struct drm_i915_private *dev_priv, u32 mbox, u32 val);
+int skl_pcode_request(struct drm_i915_private *dev_priv, u32 mbox, u32 request,
+		      u32 reply_mask, u32 reply, int timeout_base_ms);
 
 /* intel_sideband.c */
 u32 vlv_punit_read(struct drm_i915_private *dev_priv, u32 addr);

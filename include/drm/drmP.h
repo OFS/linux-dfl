@@ -61,7 +61,7 @@
 
 #include <asm/mman.h>
 #include <asm/pgalloc.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 
 #include <uapi/drm/drm.h>
 #include <uapi/drm/drm_mode.h>
@@ -517,6 +517,7 @@ struct drm_device {
 	struct drm_minor *control;		/**< Control node */
 	struct drm_minor *primary;		/**< Primary node */
 	struct drm_minor *render;		/**< Render node */
+	bool registered;
 
 	/* currently active master for this device. Protected by master_mutex */
 	struct drm_master *master;

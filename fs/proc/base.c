@@ -47,7 +47,7 @@
  *  Overall revision about smaps.
  */
 
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 
 #include <linux/errno.h>
 #include <linux/time.h>
@@ -2179,7 +2179,7 @@ static const struct file_operations proc_map_files_operations = {
 	.llseek		= generic_file_llseek,
 };
 
-#ifdef CONFIG_CHECKPOINT_RESTORE
+#if defined(CONFIG_CHECKPOINT_RESTORE) && defined(CONFIG_POSIX_TIMERS)
 struct timers_private {
 	struct pid *pid;
 	struct task_struct *task;
@@ -2488,6 +2488,12 @@ static ssize_t proc_pid_attr_write(struct file * file, const char __user * buf,
 	length = -ESRCH;
 	if (!task)
 		goto out_no_task;
+
+	/* A task may only write its own attributes. */
+	length = -EACCES;
+	if (current != task)
+		goto out;
+
 	if (count > PAGE_SIZE)
 		count = PAGE_SIZE;
 
@@ -2503,14 +2509,13 @@ static ssize_t proc_pid_attr_write(struct file * file, const char __user * buf,
 	}
 
 	/* Guard against adverse ptrace interaction */
-	length = mutex_lock_interruptible(&task->signal->cred_guard_mutex);
+	length = mutex_lock_interruptible(&current->signal->cred_guard_mutex);
 	if (length < 0)
 		goto out_free;
 
-	length = security_setprocattr(task,
-				      (char*)file->f_path.dentry->d_name.name,
+	length = security_setprocattr(file->f_path.dentry->d_name.name,
 				      page, count);
-	mutex_unlock(&task->signal->cred_guard_mutex);
+	mutex_unlock(&current->signal->cred_guard_mutex);
 out_free:
 	kfree(page);
 out:
@@ -2936,7 +2941,7 @@ static const struct pid_entry tgid_base_stuff[] = {
 	REG("projid_map", S_IRUGO|S_IWUSR, proc_projid_map_operations),
 	REG("setgroups",  S_IRUGO|S_IWUSR, proc_setgroups_operations),
 #endif
-#ifdef CONFIG_CHECKPOINT_RESTORE
+#if defined(CONFIG_CHECKPOINT_RESTORE) && defined(CONFIG_POSIX_TIMERS)
 	REG("timers",	  S_IRUGO, proc_timers_operations),
 #endif
 	REG("timerslack_ns", S_IRUGO|S_IWUGO, proc_pid_set_timerslack_ns_operations),
@@ -3179,6 +3184,8 @@ int proc_pid_readdir(struct file *file, struct dir_context *ctx)
 	     iter.tgid += 1, iter = next_tgid(ns, iter)) {
 		char name[PROC_NUMBUF];
 		int len;
+
+		cond_resched();
 		if (!has_pid_permissions(ns, iter.task, 2))
 			continue;
 

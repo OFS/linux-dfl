@@ -177,16 +177,14 @@ TRACE_EVENT(hrtimer_start,
 	TP_fast_assign(
 		__entry->hrtimer	= hrtimer;
 		__entry->function	= hrtimer->function;
-		__entry->expires	= hrtimer_get_expires(hrtimer).tv64;
-		__entry->softexpires	= hrtimer_get_softexpires(hrtimer).tv64;
+		__entry->expires	= hrtimer_get_expires(hrtimer);
+		__entry->softexpires	= hrtimer_get_softexpires(hrtimer);
 	),
 
 	TP_printk("hrtimer=%p function=%pf expires=%llu softexpires=%llu",
 		  __entry->hrtimer, __entry->function,
-		  (unsigned long long)ktime_to_ns((ktime_t) {
-				  .tv64 = __entry->expires }),
-		  (unsigned long long)ktime_to_ns((ktime_t) {
-				  .tv64 = __entry->softexpires }))
+		  (unsigned long long) __entry->expires,
+		  (unsigned long long) __entry->softexpires)
 );
 
 /**
@@ -211,13 +209,13 @@ TRACE_EVENT(hrtimer_expire_entry,
 
 	TP_fast_assign(
 		__entry->hrtimer	= hrtimer;
-		__entry->now		= now->tv64;
+		__entry->now		= *now;
 		__entry->function	= hrtimer->function;
 	),
 
 	TP_printk("hrtimer=%p function=%pf now=%llu", __entry->hrtimer, __entry->function,
-		  (unsigned long long)ktime_to_ns((ktime_t) { .tv64 = __entry->now }))
- );
+		  (unsigned long long) __entry->now)
+);
 
 DECLARE_EVENT_CLASS(hrtimer_class,
 
@@ -271,17 +269,17 @@ DEFINE_EVENT(hrtimer_class, hrtimer_cancel,
 TRACE_EVENT(itimer_state,
 
 	TP_PROTO(int which, const struct itimerval *const value,
-		 cputime_t expires),
+		 unsigned long long expires),
 
 	TP_ARGS(which, value, expires),
 
 	TP_STRUCT__entry(
-		__field(	int,		which		)
-		__field(	cputime_t,	expires		)
-		__field(	long,		value_sec	)
-		__field(	long,		value_usec	)
-		__field(	long,		interval_sec	)
-		__field(	long,		interval_usec	)
+		__field(	int,			which		)
+		__field(	unsigned long long,	expires		)
+		__field(	long,			value_sec	)
+		__field(	long,			value_usec	)
+		__field(	long,			interval_sec	)
+		__field(	long,			interval_usec	)
 	),
 
 	TP_fast_assign(
@@ -294,7 +292,7 @@ TRACE_EVENT(itimer_state,
 	),
 
 	TP_printk("which=%d expires=%llu it_value=%ld.%ld it_interval=%ld.%ld",
-		  __entry->which, (unsigned long long)__entry->expires,
+		  __entry->which, __entry->expires,
 		  __entry->value_sec, __entry->value_usec,
 		  __entry->interval_sec, __entry->interval_usec)
 );
@@ -307,14 +305,14 @@ TRACE_EVENT(itimer_state,
  */
 TRACE_EVENT(itimer_expire,
 
-	TP_PROTO(int which, struct pid *pid, cputime_t now),
+	TP_PROTO(int which, struct pid *pid, unsigned long long now),
 
 	TP_ARGS(which, pid, now),
 
 	TP_STRUCT__entry(
-		__field( int ,		which	)
-		__field( pid_t,		pid	)
-		__field( cputime_t,	now	)
+		__field( int ,			which	)
+		__field( pid_t,			pid	)
+		__field( unsigned long long,	now	)
 	),
 
 	TP_fast_assign(
@@ -324,7 +322,7 @@ TRACE_EVENT(itimer_expire,
 	),
 
 	TP_printk("which=%d pid=%d now=%llu", __entry->which,
-		  (int) __entry->pid, (unsigned long long)__entry->now)
+		  (int) __entry->pid, __entry->now)
 );
 
 #ifdef CONFIG_NO_HZ_COMMON

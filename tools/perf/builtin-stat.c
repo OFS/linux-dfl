@@ -533,7 +533,7 @@ static int store_counter_ids(struct perf_evsel *counter)
 static int __run_perf_stat(int argc, const char **argv)
 {
 	int interval = stat_config.interval;
-	char msg[512];
+	char msg[BUFSIZ];
 	unsigned long long t0, t1;
 	struct perf_evsel *counter;
 	struct timespec ts;
@@ -2195,7 +2195,7 @@ static int process_stat_round_event(struct perf_tool *tool __maybe_unused,
 }
 
 static
-int process_stat_config_event(struct perf_tool *tool __maybe_unused,
+int process_stat_config_event(struct perf_tool *tool,
 			      union perf_event *event,
 			      struct perf_session *session __maybe_unused)
 {
@@ -2238,7 +2238,7 @@ static int set_maps(struct perf_stat *st)
 }
 
 static
-int process_thread_map_event(struct perf_tool *tool __maybe_unused,
+int process_thread_map_event(struct perf_tool *tool,
 			     union perf_event *event,
 			     struct perf_session *session __maybe_unused)
 {
@@ -2257,7 +2257,7 @@ int process_thread_map_event(struct perf_tool *tool __maybe_unused,
 }
 
 static
-int process_cpu_map_event(struct perf_tool *tool __maybe_unused,
+int process_cpu_map_event(struct perf_tool *tool,
 			  union perf_event *event,
 			  struct perf_session *session __maybe_unused)
 {

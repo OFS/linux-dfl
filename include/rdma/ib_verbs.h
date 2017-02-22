@@ -59,7 +59,7 @@
 #include <linux/if_link.h>
 #include <linux/atomic.h>
 #include <linux/mmu_notifier.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 
 extern struct workqueue_struct *ib_wq;
 extern struct workqueue_struct *ib_comp_wq;
@@ -350,6 +350,20 @@ static inline int ib_mtu_enum_to_int(enum ib_mtu mtu)
 	case IB_MTU_4096: return 4096;
 	default: 	  return -1;
 	}
+}
+
+static inline enum ib_mtu ib_mtu_int_to_enum(int mtu)
+{
+	if (mtu >= 4096)
+		return IB_MTU_4096;
+	else if (mtu >= 2048)
+		return IB_MTU_2048;
+	else if (mtu >= 1024)
+		return IB_MTU_1024;
+	else if (mtu >= 512)
+		return IB_MTU_512;
+	else
+		return IB_MTU_256;
 }
 
 enum ib_port_state {

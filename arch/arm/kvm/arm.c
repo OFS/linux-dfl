@@ -33,7 +33,7 @@
 #define CREATE_TRACE_POINTS
 #include "trace.h"
 
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <asm/ptrace.h>
 #include <asm/mman.h>
 #include <asm/tlbflush.h>
@@ -1098,6 +1098,9 @@ static void cpu_init_hyp_mode(void *dummy)
 
 	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
 	__cpu_init_stage2();
+
+	if (is_kernel_in_hyp_mode())
+		kvm_timer_init_vhe();
 
 	kvm_arm_init_debug();
 }

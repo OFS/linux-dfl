@@ -455,8 +455,7 @@ static int send(struct rxe_dev *rxe, struct rxe_pkt_info *pkt,
 		return -EAGAIN;
 	}
 
-	if (pkt->qp)
-		atomic_inc(&pkt->qp->skb_out);
+	atomic_inc(&pkt->qp->skb_out);
 	kfree_skb(skb);
 
 	return 0;
@@ -556,7 +555,7 @@ struct rxe_dev *rxe_net_add(struct net_device *ndev)
 	}
 
 	spin_lock_bh(&dev_list_lock);
-	list_add_tail(&rxe_dev_list, &rxe->list);
+	list_add_tail(&rxe->list, &rxe_dev_list);
 	spin_unlock_bh(&dev_list_lock);
 	return rxe;
 }
