@@ -30,6 +30,7 @@
 #include "xfs_bmap.h"
 #include "xfs_refcount_btree.h"
 #include "xfs_alloc.h"
+#include "xfs_errortag.h"
 #include "xfs_error.h"
 #include "xfs_trace.h"
 #include "xfs_cksum.h"
@@ -784,14 +785,6 @@ xfs_refcount_merge_extents(
 }
 
 /*
- * While we're adjusting the refcounts records of an extent, we have
- * to keep an eye on the number of extents we're dirtying -- run too
- * many in a single transaction and we'll exceed the transaction's
- * reservation and crash the fs.  Each record adds 12 bytes to the
- * log (plus any key updates) so we'll conservatively assume 24 bytes
- * per record.  We must also leave space for btree splits on both ends
- * of the range and space for the CUD and a new CUI.
- *
  * XXX: This is a pretty hand-wavy estimate.  The penalty for guessing
  * true incorrectly is a shutdown FS; the penalty for guessing false
  * incorrectly is more transaction rolls than might be necessary.
@@ -813,8 +806,7 @@ xfs_refcount_still_have_space(
 	 */
 	if (cur->bc_private.a.priv.refc.nr_ops > 2 &&
 	    XFS_TEST_ERROR(false, cur->bc_mp,
-			XFS_ERRTAG_REFCOUNT_CONTINUE_UPDATE,
-			XFS_RANDOM_REFCOUNT_CONTINUE_UPDATE))
+			XFS_ERRTAG_REFCOUNT_CONTINUE_UPDATE))
 		return false;
 
 	if (cur->bc_private.a.priv.refc.nr_ops == 0)
@@ -822,7 +814,7 @@ xfs_refcount_still_have_space(
 	else if (overhead > cur->bc_tp->t_log_res)
 		return false;
 	return  cur->bc_tp->t_log_res - overhead >
-		cur->bc_private.a.priv.refc.nr_ops * 32;
+		cur->bc_private.a.priv.refc.nr_ops * XFS_REFCOUNT_ITEM_OVERHEAD;
 }
 
 /*
@@ -1076,8 +1068,7 @@ xfs_refcount_finish_one(
 			blockcount);
 
 	if (XFS_TEST_ERROR(false, mp,
-			XFS_ERRTAG_REFCOUNT_FINISH_ONE,
-			XFS_RANDOM_REFCOUNT_FINISH_ONE))
+			XFS_ERRTAG_REFCOUNT_FINISH_ONE))
 		return -EIO;
 
 	/*
@@ -1497,27 +1488,12 @@ __xfs_refcount_cow_alloc(
 	xfs_extlen_t		aglen,
 	struct xfs_defer_ops	*dfops)
 {
-	int			error;
-
 	trace_xfs_refcount_cow_increase(rcur->bc_mp, rcur->bc_private.a.agno,
 			agbno, aglen);
 
 	/* Add refcount btree reservation */
-	error = xfs_refcount_adjust_cow(rcur, agbno, aglen,
+	return xfs_refcount_adjust_cow(rcur, agbno, aglen,
 			XFS_REFCOUNT_ADJUST_COW_ALLOC, dfops);
-	if (error)
-		return error;
-
-	/* Add rmap entry */
-	if (xfs_sb_version_hasrmapbt(&rcur->bc_mp->m_sb)) {
-		error = xfs_rmap_alloc_extent(rcur->bc_mp, dfops,
-				rcur->bc_private.a.agno,
-				agbno, aglen, XFS_RMAP_OWN_COW);
-		if (error)
-			return error;
-	}
-
-	return error;
 }
 
 /*
@@ -1530,27 +1506,12 @@ __xfs_refcount_cow_free(
 	xfs_extlen_t		aglen,
 	struct xfs_defer_ops	*dfops)
 {
-	int			error;
-
 	trace_xfs_refcount_cow_decrease(rcur->bc_mp, rcur->bc_private.a.agno,
 			agbno, aglen);
 
 	/* Remove refcount btree reservation */
-	error = xfs_refcount_adjust_cow(rcur, agbno, aglen,
+	return xfs_refcount_adjust_cow(rcur, agbno, aglen,
 			XFS_REFCOUNT_ADJUST_COW_FREE, dfops);
-	if (error)
-		return error;
-
-	/* Remove rmap entry */
-	if (xfs_sb_version_hasrmapbt(&rcur->bc_mp->m_sb)) {
-		error = xfs_rmap_free_extent(rcur->bc_mp, dfops,
-				rcur->bc_private.a.agno,
-				agbno, aglen, XFS_RMAP_OWN_COW);
-		if (error)
-			return error;
-	}
-
-	return error;
 }
 
 /* Record a CoW staging extent in the refcount btree. */
@@ -1561,11 +1522,19 @@ xfs_refcount_alloc_cow_extent(
 	xfs_fsblock_t			fsb,
 	xfs_extlen_t			len)
 {
+	int				error;
+
 	if (!xfs_sb_version_hasreflink(&mp->m_sb))
 		return 0;
 
-	return __xfs_refcount_add(mp, dfops, XFS_REFCOUNT_ALLOC_COW,
+	error = __xfs_refcount_add(mp, dfops, XFS_REFCOUNT_ALLOC_COW,
 			fsb, len);
+	if (error)
+		return error;
+
+	/* Add rmap entry */
+	return xfs_rmap_alloc_extent(mp, dfops, XFS_FSB_TO_AGNO(mp, fsb),
+			XFS_FSB_TO_AGBNO(mp, fsb), len, XFS_RMAP_OWN_COW);
 }
 
 /* Forget a CoW staging event in the refcount btree. */
@@ -1576,8 +1545,16 @@ xfs_refcount_free_cow_extent(
 	xfs_fsblock_t			fsb,
 	xfs_extlen_t			len)
 {
+	int				error;
+
 	if (!xfs_sb_version_hasreflink(&mp->m_sb))
 		return 0;
+
+	/* Remove rmap entry */
+	error = xfs_rmap_free_extent(mp, dfops, XFS_FSB_TO_AGNO(mp, fsb),
+			XFS_FSB_TO_AGBNO(mp, fsb), len, XFS_RMAP_OWN_COW);
+	if (error)
+		return error;
 
 	return __xfs_refcount_add(mp, dfops, XFS_REFCOUNT_FREE_COW,
 			fsb, len);
@@ -1629,13 +1606,32 @@ xfs_refcount_recover_cow_leftovers(
 	if (mp->m_sb.sb_agblocks >= XFS_REFC_COW_START)
 		return -EOPNOTSUPP;
 
-	error = xfs_alloc_read_agf(mp, NULL, agno, 0, &agbp);
+	INIT_LIST_HEAD(&debris);
+
+	/*
+	 * In this first part, we use an empty transaction to gather up
+	 * all the leftover CoW extents so that we can subsequently
+	 * delete them.  The empty transaction is used to avoid
+	 * a buffer lock deadlock if there happens to be a loop in the
+	 * refcountbt because we're allowed to re-grab a buffer that is
+	 * already attached to our transaction.  When we're done
+	 * recording the CoW debris we cancel the (empty) transaction
+	 * and everything goes away cleanly.
+	 */
+	error = xfs_trans_alloc_empty(mp, &tp);
 	if (error)
 		return error;
-	cur = xfs_refcountbt_init_cursor(mp, NULL, agbp, agno, NULL);
+
+	error = xfs_alloc_read_agf(mp, tp, agno, 0, &agbp);
+	if (error)
+		goto out_trans;
+	if (!agbp) {
+		error = -ENOMEM;
+		goto out_trans;
+	}
+	cur = xfs_refcountbt_init_cursor(mp, tp, agbp, agno, NULL);
 
 	/* Find all the leftover CoW staging extents. */
-	INIT_LIST_HEAD(&debris);
 	memset(&low, 0, sizeof(low));
 	memset(&high, 0, sizeof(high));
 	low.rc.rc_startblock = XFS_REFC_COW_START;
@@ -1645,10 +1641,11 @@ xfs_refcount_recover_cow_leftovers(
 	if (error)
 		goto out_cursor;
 	xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
-	xfs_buf_relse(agbp);
+	xfs_trans_brelse(tp, agbp);
+	xfs_trans_cancel(tp);
 
 	/* Now iterate the list to free the leftovers */
-	list_for_each_entry(rr, &debris, rr_list) {
+	list_for_each_entry_safe(rr, n, &debris, rr_list) {
 		/* Set up transaction. */
 		error = xfs_trans_alloc(mp, &M_RES(mp)->tr_write, 0, 0, 0, &tp);
 		if (error)
@@ -1669,15 +1666,23 @@ xfs_refcount_recover_cow_leftovers(
 		xfs_bmap_add_free(mp, &dfops, fsb,
 				rr->rr_rrec.rc_blockcount, NULL);
 
-		error = xfs_defer_finish(&tp, &dfops, NULL);
+		error = xfs_defer_finish(&tp, &dfops);
 		if (error)
 			goto out_defer;
 
 		error = xfs_trans_commit(tp);
 		if (error)
 			goto out_free;
+
+		list_del(&rr->rr_list);
+		kmem_free(rr);
 	}
 
+	return error;
+out_defer:
+	xfs_defer_cancel(&dfops);
+out_trans:
+	xfs_trans_cancel(tp);
 out_free:
 	/* Free the leftover list */
 	list_for_each_entry_safe(rr, n, &debris, rr_list) {
@@ -1688,11 +1693,6 @@ out_free:
 
 out_cursor:
 	xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
-	xfs_buf_relse(agbp);
-	goto out_free;
-
-out_defer:
-	xfs_defer_cancel(&dfops);
-	xfs_trans_cancel(tp);
-	goto out_free;
+	xfs_trans_brelse(tp, agbp);
+	goto out_trans;
 }

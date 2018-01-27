@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * USB Networking Link Interface
  *
@@ -81,6 +82,7 @@ struct usbnet {
 #		define EVENT_RX_KILL	10
 #		define EVENT_LINK_CHANGE	11
 #		define EVENT_SET_RX_MODE	12
+#		define EVENT_NO_IP_ALIGN	13
 };
 
 static inline struct usb_driver *driver_of(struct usb_interface *intf)
@@ -206,6 +208,7 @@ struct cdc_state {
 };
 
 extern int usbnet_generic_cdc_bind(struct usbnet *, struct usb_interface *);
+extern int usbnet_ether_cdc_bind(struct usbnet *dev, struct usb_interface *intf);
 extern int usbnet_cdc_bind(struct usbnet *, struct usb_interface *);
 extern void usbnet_cdc_unbind(struct usbnet *, struct usb_interface *);
 extern void usbnet_cdc_status(struct usbnet *, struct urb *);

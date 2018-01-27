@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  *  Copyright (C) 1991,1992  Linus Torvalds
  *
@@ -43,6 +44,7 @@
 #include <asm/asm.h>
 #include <asm/smap.h>
 #include <asm/frame.h>
+#include <asm/nospec-branch.h>
 
 	.section .entry.text, "ax"
 
@@ -176,7 +178,7 @@
 /*
  * This is a sneaky trick to help the unwinder find pt_regs on the stack.  The
  * frame pointer is replaced with an encoded pointer to pt_regs.  The encoding
- * is just setting the LSB, which makes it an invalid stack address and is also
+ * is just clearing the MSB, which makes it an invalid stack address and is also
  * a signal to the unwinder that it's a pt_regs pointer in disguise.
  *
  * NOTE: This macro must be used *after* SAVE_ALL because it corrupts the
@@ -185,7 +187,7 @@
 .macro ENCODE_FRAME_POINTER
 #ifdef CONFIG_FRAME_POINTER
 	mov %esp, %ebp
-	orl $0x1, %ebp
+	andl $0x7fffffff, %ebp
 #endif
 .endm
 
@@ -242,6 +244,17 @@ ENTRY(__switch_to_asm)
 	movl	%ebx, PER_CPU_VAR(stack_canary)+stack_canary_offset
 #endif
 
+#ifdef CONFIG_RETPOLINE
+	/*
+	 * When switching from a shallower to a deeper call stack
+	 * the RSB may either underflow or use entries populated
+	 * with userspace addresses. On CPUs where those concerns
+	 * exist, overwrite the RSB with entries which capture
+	 * speculative execution to prevent attack.
+	 */
+	FILL_RETURN_BUFFER %ebx, RSB_CLEAR_LOOPS, X86_FEATURE_RSB_CTXSW
+#endif
+
 	/* restore callee-saved registers */
 	popl	%esi
 	popl	%edi
@@ -252,6 +265,23 @@ ENTRY(__switch_to_asm)
 END(__switch_to_asm)
 
 /*
+ * The unwinder expects the last frame on the stack to always be at the same
+ * offset from the end of the page, which allows it to validate the stack.
+ * Calling schedule_tail() directly would break that convention because its an
+ * asmlinkage function so its argument has to be pushed on the stack.  This
+ * wrapper creates a proper "end of stack" frame header before the call.
+ */
+ENTRY(schedule_tail_wrapper)
+	FRAME_BEGIN
+
+	pushl	%eax
+	call	schedule_tail
+	popl	%eax
+
+	FRAME_END
+	ret
+ENDPROC(schedule_tail_wrapper)
+/*
  * A newly forked process directly context switches into this address.
  *
  * eax: prev task we switched from
@@ -259,29 +289,20 @@ END(__switch_to_asm)
  * edi: kernel thread arg
  */
 ENTRY(ret_from_fork)
-	FRAME_BEGIN		/* help unwinder find end of stack */
-
-	/*
-	 * schedule_tail() is asmlinkage so we have to put its 'prev' argument
-	 * on the stack.
-	 */
-	pushl	%eax
-	call	schedule_tail
-	popl	%eax
+	call	schedule_tail_wrapper
 
 	testl	%ebx, %ebx
 	jnz	1f		/* kernel threads are uncommon */
 
 2:
 	/* When we fork, we trace the syscall return in the child, too. */
-	leal	FRAME_OFFSET(%esp), %eax
+	movl    %esp, %eax
 	call    syscall_return_slowpath
-	FRAME_END
 	jmp     restore_all
 
 	/* kernel thread */
 1:	movl	%edi, %eax
-	call	*%ebx
+	CALL_NOSPEC %ebx
 	/*
 	 * A kernel thread is allowed to return here after successfully
 	 * calling do_execve().  Exit to userspace to complete the execve()
@@ -665,16 +686,8 @@ ENTRY(name)				\
 	jmp	ret_from_intr;		\
 ENDPROC(name)
 
-
-#ifdef CONFIG_TRACING
-# define TRACE_BUILD_INTERRUPT(name, nr)	BUILD_INTERRUPT3(trace_##name, nr, smp_trace_##name)
-#else
-# define TRACE_BUILD_INTERRUPT(name, nr)
-#endif
-
 #define BUILD_INTERRUPT(name, nr)		\
 	BUILD_INTERRUPT3(name, nr, smp_##name);	\
-	TRACE_BUILD_INTERRUPT(name, nr)
 
 /* The include is where all of the SMP etc. interrupts come from */
 #include <asm/entry_arch.h>
@@ -872,24 +885,16 @@ ENTRY(xen_failsafe_callback)
 ENDPROC(xen_failsafe_callback)
 
 BUILD_INTERRUPT3(xen_hvm_callback_vector, HYPERVISOR_CALLBACK_VECTOR,
-		xen_evtchn_do_upcall)
+		 xen_evtchn_do_upcall)
 
 #endif /* CONFIG_XEN */
 
 #if IS_ENABLED(CONFIG_HYPERV)
 
 BUILD_INTERRUPT3(hyperv_callback_vector, HYPERVISOR_CALLBACK_VECTOR,
-	hyperv_vector_handler)
+		 hyperv_vector_handler)
 
 #endif /* CONFIG_HYPERV */
-
-#ifdef CONFIG_TRACING
-ENTRY(trace_page_fault)
-	ASM_CLAC
-	pushl	$trace_do_page_fault
-	jmp	common_exception
-END(trace_page_fault)
-#endif
 
 ENTRY(page_fault)
 	ASM_CLAC
@@ -926,7 +931,7 @@ common_exception:
 	movl	%ecx, %es
 	TRACE_IRQS_OFF
 	movl	%esp, %eax			# pt_regs pointer
-	call	*%edi
+	CALL_NOSPEC %edi
 	jmp	ret_from_exception
 END(common_exception)
 
@@ -948,9 +953,10 @@ ENTRY(debug)
 	movl	%esp, %eax			# pt_regs pointer
 
 	/* Are we currently on the SYSENTER stack? */
-	PER_CPU(cpu_tss + CPU_TSS_SYSENTER_stack + SIZEOF_SYSENTER_stack, %ecx)
-	subl	%eax, %ecx	/* ecx = (end of SYSENTER_stack) - esp */
-	cmpl	$SIZEOF_SYSENTER_stack, %ecx
+	movl	PER_CPU_VAR(cpu_entry_area), %ecx
+	addl	$CPU_ENTRY_AREA_entry_stack + SIZEOF_entry_stack, %ecx
+	subl	%eax, %ecx	/* ecx = (end of entry_stack) - esp */
+	cmpl	$SIZEOF_entry_stack, %ecx
 	jb	.Ldebug_from_sysenter_stack
 
 	TRACE_IRQS_OFF
@@ -991,9 +997,10 @@ ENTRY(nmi)
 	movl	%esp, %eax			# pt_regs pointer
 
 	/* Are we currently on the SYSENTER stack? */
-	PER_CPU(cpu_tss + CPU_TSS_SYSENTER_stack + SIZEOF_SYSENTER_stack, %ecx)
-	subl	%eax, %ecx	/* ecx = (end of SYSENTER_stack) - esp */
-	cmpl	$SIZEOF_SYSENTER_stack, %ecx
+	movl	PER_CPU_VAR(cpu_entry_area), %ecx
+	addl	$CPU_ENTRY_AREA_entry_stack + SIZEOF_entry_stack, %ecx
+	subl	%eax, %ecx	/* ecx = (end of entry_stack) - esp */
+	cmpl	$SIZEOF_entry_stack, %ecx
 	jb	.Lnmi_from_sysenter_stack
 
 	/* Not on SYSENTER stack. */
