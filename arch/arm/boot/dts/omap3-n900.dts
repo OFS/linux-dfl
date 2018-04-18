@@ -673,6 +673,7 @@
 	bq27200: bq27200@55 {
 		compatible = "ti,bq27200";
 		reg = <0x55>;
+		power-supplies = <&bq24150a>;
 	};
 
 	/* Stereo headphone amplifier */
@@ -779,6 +780,8 @@
 		clock-frequency = <9600000>;
 
 		reset-gpio = <&gpio4 6 GPIO_ACTIVE_HIGH>; /* 102 */
+
+		lens-focus = <&ad5820>;
 
 		port {
 			csi_cam1: endpoint {

@@ -39,9 +39,6 @@
 #define KBL_FW_MAJOR 9
 #define KBL_FW_MINOR 39
 
-#define GLK_FW_MAJOR 10
-#define GLK_FW_MINOR 56
-
 #define GUC_FW_PATH(platform, major, minor) \
        "i915/" __stringify(platform) "_guc_ver" __stringify(major) "_" __stringify(minor) ".bin"
 
@@ -53,8 +50,6 @@ MODULE_FIRMWARE(I915_BXT_GUC_UCODE);
 
 #define I915_KBL_GUC_UCODE GUC_FW_PATH(kbl, KBL_FW_MAJOR, KBL_FW_MINOR)
 MODULE_FIRMWARE(I915_KBL_GUC_UCODE);
-
-#define I915_GLK_GUC_UCODE GUC_FW_PATH(glk, GLK_FW_MAJOR, GLK_FW_MINOR)
 
 static void guc_fw_select(struct intel_uc_fw *guc_fw)
 {
@@ -82,10 +77,6 @@ static void guc_fw_select(struct intel_uc_fw *guc_fw)
 		guc_fw->path = I915_KBL_GUC_UCODE;
 		guc_fw->major_ver_wanted = KBL_FW_MAJOR;
 		guc_fw->minor_ver_wanted = KBL_FW_MINOR;
-	} else if (IS_GEMINILAKE(dev_priv)) {
-		guc_fw->path = I915_GLK_GUC_UCODE;
-		guc_fw->major_ver_wanted = GLK_FW_MAJOR;
-		guc_fw->minor_ver_wanted = GLK_FW_MINOR;
 	} else {
 		DRM_WARN("%s: No firmware known for this platform!\n",
 			 intel_uc_fw_type_repr(guc_fw->type));
@@ -278,15 +269,15 @@ static int guc_fw_xfer(struct intel_uc_fw *guc_fw, struct i915_vma *vma)
 }
 
 /**
- * intel_guc_fw_upload() - finish preparing the GuC for activity
+ * intel_guc_fw_upload() - load GuC uCode to device
  * @guc: intel_guc structure
  *
- * Called during driver loading and also after a GPU reset.
+ * Called from intel_uc_init_hw() during driver load, resume from sleep and
+ * after a GPU reset.
  *
- * The main action required here it to load the GuC uCode into the device.
  * The firmware image should have already been fetched into memory by the
- * earlier call to intel_guc_init(), so here we need only check that
- * worked, and then transfer the image to the h/w.
+ * earlier call to intel_uc_init_fw(), so here we need to only check that
+ * fetch succeeded, and then transfer the image to the h/w.
  *
  * Return:	non-zero code on error
  */

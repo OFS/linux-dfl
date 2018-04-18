@@ -126,7 +126,8 @@ static struct ip6_tnl *ip6gre_tunnel_lookup(struct net_device *dev,
 	struct ip6_tnl *t, *cand = NULL;
 	struct ip6gre_net *ign = net_generic(net, ip6gre_net_id);
 	int dev_type = (gre_proto == htons(ETH_P_TEB) ||
-			gre_proto == htons(ETH_P_ERSPAN)) ?
+			gre_proto == htons(ETH_P_ERSPAN) ||
+			gre_proto == htons(ETH_P_ERSPAN2)) ?
 		       ARPHRD_ETHER : ARPHRD_IP6GRE;
 	int score, cand_score = 4;
 
@@ -236,7 +237,7 @@ static struct ip6_tnl *ip6gre_tunnel_lookup(struct net_device *dev,
 		return t;
 
 	dev = ign->fb_tunnel_dev;
-	if (dev->flags & IFF_UP)
+	if (dev && dev->flags & IFF_UP)
 		return netdev_priv(dev);
 
 	return NULL;
@@ -334,11 +335,13 @@ static struct ip6_tnl *ip6gre_tunnel_locate(struct net *net,
 	if (t || !create)
 		return t;
 
-	if (parms->name[0])
+	if (parms->name[0]) {
+		if (!dev_valid_name(parms->name))
+			return NULL;
 		strlcpy(name, parms->name, IFNAMSIZ);
-	else
+	} else {
 		strcpy(name, "ip6gre%d");
-
+	}
 	dev = alloc_netdev(sizeof(*t), name, NET_NAME_UNKNOWN,
 			   ip6gre_tunnel_setup);
 	if (!dev)
@@ -505,6 +508,7 @@ static int ip6erspan_rcv(struct sk_buff *skb, int gre_hdr_len,
 	struct erspan_base_hdr *ershdr;
 	struct erspan_metadata *pkt_md;
 	const struct ipv6hdr *ipv6h;
+	struct erspan_md2 *md2;
 	struct ip6_tnl *tunnel;
 	u8 ver;
 
@@ -551,24 +555,16 @@ static int ip6erspan_rcv(struct sk_buff *skb, int gre_hdr_len,
 
 			info = &tun_dst->u.tun_info;
 			md = ip_tunnel_info_opts(info);
-
-			memcpy(md, pkt_md, sizeof(*md));
 			md->version = ver;
+			md2 = &md->u.md2;
+			memcpy(md2, pkt_md, ver == 1 ? ERSPAN_V1_MDSIZE :
+						       ERSPAN_V2_MDSIZE);
 			info->key.tun_flags |= TUNNEL_ERSPAN_OPT;
 			info->options_len = sizeof(*md);
 
 			ip6_tnl_rcv(tunnel, skb, tpi, tun_dst, log_ecn_error);
 
 		} else {
-			tunnel->parms.erspan_ver = ver;
-
-			if (ver == 1) {
-				tunnel->parms.index = ntohl(pkt_md->u.index);
-			} else {
-				tunnel->parms.dir = pkt_md->u.md2.dir;
-				tunnel->parms.hwid = get_hwid(&pkt_md->u.md2);
-			}
-
 			ip6_tnl_rcv(tunnel, skb, tpi, NULL, log_ecn_error);
 		}
 
@@ -702,9 +698,6 @@ static netdev_tx_t __gre6_xmit(struct sk_buff *skb,
 	else
 		fl6->daddr = tunnel->parms.raddr;
 
-	if (tunnel->parms.o_flags & TUNNEL_SEQ)
-		tunnel->o_seqno++;
-
 	/* Push GRE header. */
 	protocol = (dev->type == ARPHRD_ETHER) ? htons(ETH_P_TEB) : proto;
 
@@ -727,14 +720,20 @@ static netdev_tx_t __gre6_xmit(struct sk_buff *skb,
 		fl6->flowi6_uid = sock_net_uid(dev_net(dev), NULL);
 
 		dsfield = key->tos;
-		flags = key->tun_flags & (TUNNEL_CSUM | TUNNEL_KEY);
+		flags = key->tun_flags &
+			(TUNNEL_CSUM | TUNNEL_KEY | TUNNEL_SEQ);
 		tunnel->tun_hlen = gre_calc_hlen(flags);
 
 		gre_build_header(skb, tunnel->tun_hlen,
 				 flags, protocol,
-				 tunnel_id_to_key32(tun_info->key.tun_id), 0);
+				 tunnel_id_to_key32(tun_info->key.tun_id),
+				 (flags & TUNNEL_SEQ) ? htonl(tunnel->o_seqno++)
+						      : 0);
 
 	} else {
+		if (tunnel->parms.o_flags & TUNNEL_SEQ)
+			tunnel->o_seqno++;
+
 		gre_build_header(skb, tunnel->tun_hlen, tunnel->parms.o_flags,
 				 protocol, tunnel->parms.o_key,
 				 htonl(tunnel->o_seqno));
@@ -909,6 +908,9 @@ static netdev_tx_t ip6erspan_tunnel_xmit(struct sk_buff *skb,
 		truncate = true;
 	}
 
+	if (skb_cow_head(skb, dev->needed_headroom))
+		goto tx_err;
+
 	t->parms.o_flags &= ~TUNNEL_KEY;
 	IPCB(skb)->flags = 0;
 
@@ -951,6 +953,8 @@ static netdev_tx_t ip6erspan_tunnel_xmit(struct sk_buff *skb,
 					       md->u.md2.dir,
 					       get_hwid(&md->u.md2),
 					       truncate, false);
+		} else {
+			goto tx_err;
 		}
 	} else {
 		switch (skb->protocol) {
@@ -1060,7 +1064,7 @@ static void ip6gre_tnl_link_config(struct ip6_tnl *t, int set_mtu)
 
 		struct rt6_info *rt = rt6_lookup(t->net,
 						 &p->raddr, &p->laddr,
-						 p->link, strict);
+						 p->link, NULL, strict);
 
 		if (!rt)
 			return;
@@ -1476,6 +1480,8 @@ static int __net_init ip6gre_init_net(struct net *net)
 	struct ip6gre_net *ign = net_generic(net, ip6gre_net_id);
 	int err;
 
+	if (!net_has_fallback_tunnels(net))
+		return 0;
 	ign->fb_tunnel_dev = alloc_netdev(sizeof(struct ip6_tnl), "ip6gre0",
 					  NET_NAME_UNKNOWN,
 					  ip6gre_tunnel_setup);
@@ -1758,7 +1764,6 @@ static int ip6erspan_tap_init(struct net_device *dev)
 		dev->mtu -= 8;
 
 	dev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
-	tunnel = netdev_priv(dev);
 	ip6gre_tnl_link_config(tunnel, 1);
 
 	return 0;
@@ -1790,6 +1795,12 @@ static void ip6gre_tap_setup(struct net_device *dev)
 	dev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
 	netif_keep_dst(dev);
 }
+
+bool is_ip6gretap_dev(const struct net_device *dev)
+{
+	return dev->netdev_ops == &ip6gre_tap_netdev_ops;
+}
+EXPORT_SYMBOL_GPL(is_ip6gretap_dev);
 
 static bool ip6gre_netlink_encap_parms(struct nlattr *data[],
 				       struct ip_tunnel_encap *ipencap)

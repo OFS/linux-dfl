@@ -258,6 +258,8 @@ void intel_gvt_destroy_vgpu(struct intel_vgpu *vgpu)
 
 	intel_gvt_debugfs_remove_vgpu(vgpu);
 	idr_remove(&gvt->vgpu_idr, vgpu->id);
+	if (idr_is_empty(&gvt->vgpu_idr))
+		intel_gvt_clean_irq(gvt);
 	intel_vgpu_clean_sched_policy(vgpu);
 	intel_vgpu_clean_submission(vgpu);
 	intel_vgpu_clean_display(vgpu);
@@ -352,6 +354,7 @@ static struct intel_vgpu *__intel_gvt_create_vgpu(struct intel_gvt *gvt,
 	vgpu->gvt = gvt;
 	vgpu->sched_ctl.weight = param->weight;
 	INIT_LIST_HEAD(&vgpu->dmabuf_obj_list_head);
+	INIT_RADIX_TREE(&vgpu->page_track_tree, GFP_KERNEL);
 	idr_init(&vgpu->object_idr);
 	intel_vgpu_init_cfg_space(vgpu, param->primary);
 
@@ -518,8 +521,8 @@ void intel_gvt_reset_vgpu_locked(struct intel_vgpu *vgpu, bool dmlr,
 	intel_vgpu_reset_submission(vgpu, resetting_eng);
 	/* full GPU reset or device model level reset */
 	if (engine_mask == ALL_ENGINES || dmlr) {
-		intel_vgpu_select_submission_ops(vgpu, 0);
-
+		intel_vgpu_select_submission_ops(vgpu, ALL_ENGINES, 0);
+		intel_vgpu_invalidate_ppgtt(vgpu);
 		/*fence will not be reset during virtual reset */
 		if (dmlr) {
 			intel_vgpu_reset_gtt(vgpu);

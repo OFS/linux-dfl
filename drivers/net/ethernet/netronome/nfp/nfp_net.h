@@ -193,7 +193,8 @@ struct nfp_net_tx_desc {
 
 /**
  * struct nfp_net_tx_buf - software TX buffer descriptor
- * @skb:	sk_buff associated with this buffer
+ * @skb:	normal ring, sk_buff associated with this buffer
+ * @frag:	XDP ring, page frag associated with this buffer
  * @dma_addr:	DMA mapping address of the buffer
  * @fidx:	Fragment index (-1 for the head and [0..nr_frags-1] for frags)
  * @pkt_cnt:	Number of packets to be produced out of the skb associated
@@ -377,6 +378,9 @@ struct nfp_net_rx_ring {
  * struct nfp_net_r_vector - Per ring interrupt vector configuration
  * @nfp_net:        Backpointer to nfp_net structure
  * @napi:           NAPI structure for this ring vec
+ * @tasklet:        ctrl vNIC, tasklet for servicing the r_vec
+ * @queue:          ctrl vNIC, send queue
+ * @lock:           ctrl vNIC, r_vec lock protects @queue
  * @tx_ring:        Pointer to TX ring
  * @rx_ring:        Pointer to RX ring
  * @xdp_ring:	    Pointer to an extra TX ring for XDP
@@ -387,6 +391,7 @@ struct nfp_net_rx_ring {
  * @rx_drops:	    Number of packets dropped on RX due to lack of resources
  * @hw_csum_rx_ok:  Counter of packets where the HW checksum was OK
  * @hw_csum_rx_inner_ok: Counter of packets where the inner HW checksum was OK
+ * @hw_csum_rx_complete: Counter of packets with CHECKSUM_COMPLETE reported
  * @hw_csum_rx_error:	 Counter of packets with bad checksums
  * @tx_sync:	    Seqlock for atomic updates of TX stats
  * @tx_pkts:	    Number of Transmitted packets
@@ -430,7 +435,7 @@ struct nfp_net_r_vector {
 	u64 rx_drops;
 	u64 hw_csum_rx_ok;
 	u64 hw_csum_rx_inner_ok;
-	u64 hw_csum_rx_error;
+	u64 hw_csum_rx_complete;
 
 	struct nfp_net_tx_ring *xdp_ring;
 
@@ -442,6 +447,7 @@ struct nfp_net_r_vector {
 	u64 tx_gather;
 	u64 tx_lso;
 
+	u64 hw_csum_rx_error;
 	u64 rx_replace_buf_alloc_fail;
 	u64 tx_errors;
 	u64 tx_busy;

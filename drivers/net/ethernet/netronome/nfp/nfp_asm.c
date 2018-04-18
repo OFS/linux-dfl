@@ -48,6 +48,8 @@ const struct cmd_tgt_act cmd_tgt_act[__CMD_TGT_MAP_SIZE] = {
 	[CMD_TGT_READ32_SWAP] =		{ 0x02, 0x5c },
 	[CMD_TGT_READ_LE] =		{ 0x01, 0x40 },
 	[CMD_TGT_READ_SWAP_LE] =	{ 0x03, 0x40 },
+	[CMD_TGT_ADD] =			{ 0x00, 0x47 },
+	[CMD_TGT_ADD_IMM] =		{ 0x02, 0x47 },
 };
 
 static bool unreg_is_imm(u16 reg)
@@ -107,7 +109,7 @@ u16 immed_get_value(u64 instr)
 	if (!unreg_is_imm(reg))
 		reg = FIELD_GET(OP_IMMED_B_SRC, instr);
 
-	return (reg & 0xff) | FIELD_GET(OP_IMMED_IMM, instr);
+	return (reg & 0xff) | FIELD_GET(OP_IMMED_IMM, instr) << 8;
 }
 
 void immed_set_value(u64 *instr, u16 immed)

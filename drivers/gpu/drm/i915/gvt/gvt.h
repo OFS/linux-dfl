@@ -48,6 +48,7 @@
 #include "cmd_parser.h"
 #include "fb_decoder.h"
 #include "dmabuf.h"
+#include "page_track.h"
 
 #define GVT_MAX_VGPU 8
 
@@ -82,7 +83,6 @@ struct intel_gvt_device_info {
 struct intel_vgpu_gm {
 	u64 aperture_sz;
 	u64 hidden_sz;
-	void *aperture_va;
 	struct drm_mm_node low_gm_node;
 	struct drm_mm_node high_gm_node;
 };
@@ -127,17 +127,14 @@ struct intel_vgpu_irq {
 struct intel_vgpu_opregion {
 	bool mapped;
 	void *va;
-	void *va_gopregion;
 	u32 gfn[INTEL_GVT_OPREGION_PAGES];
 };
 
 #define vgpu_opregion(vgpu) (&(vgpu->opregion))
 
-#define INTEL_GVT_MAX_PORT 5
-
 struct intel_vgpu_display {
 	struct intel_vgpu_i2c_edid i2c_edid;
-	struct intel_vgpu_port ports[INTEL_GVT_MAX_PORT];
+	struct intel_vgpu_port ports[I915_MAX_PORTS];
 	struct intel_vgpu_sbi sbi;
 };
 
@@ -152,8 +149,8 @@ enum {
 
 struct intel_vgpu_submission_ops {
 	const char *name;
-	int (*init)(struct intel_vgpu *vgpu);
-	void (*clean)(struct intel_vgpu *vgpu);
+	int (*init)(struct intel_vgpu *vgpu, unsigned long engine_mask);
+	void (*clean)(struct intel_vgpu *vgpu, unsigned long engine_mask);
 	void (*reset)(struct intel_vgpu *vgpu, unsigned long engine_mask);
 };
 
@@ -192,6 +189,7 @@ struct intel_vgpu {
 	struct intel_vgpu_opregion opregion;
 	struct intel_vgpu_display display;
 	struct intel_vgpu_submission submission;
+	struct radix_tree_root page_track_tree;
 	u32 hws_pga[I915_NUM_ENGINES];
 
 	struct dentry *debugfs;
@@ -203,8 +201,16 @@ struct intel_vgpu {
 		int num_regions;
 		struct eventfd_ctx *intx_trigger;
 		struct eventfd_ctx *msi_trigger;
-		struct rb_root cache;
+
+		/*
+		 * Two caches are used to avoid mapping duplicated pages (eg.
+		 * scratch pages). This help to reduce dma setup overhead.
+		 */
+		struct rb_root gfn_cache;
+		struct rb_root dma_addr_cache;
+		unsigned long nr_cache_entries;
 		struct mutex cache_lock;
+
 		struct notifier_block iommu_notifier;
 		struct notifier_block group_notifier;
 		struct kvm *kvm;
@@ -310,7 +316,10 @@ struct intel_gvt {
 	wait_queue_head_t service_thread_wq;
 	unsigned long service_request;
 
-	struct engine_mmio *engine_mmio_list;
+	struct {
+		struct engine_mmio *mmio;
+		int ctx_mmio_count[I915_NUM_ENGINES];
+	} engine_mmio_list;
 
 	struct dentry *debugfs_root;
 };

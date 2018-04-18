@@ -630,6 +630,7 @@ struct mt76x2_dev *mt76x2_alloc_device(struct device *pdev)
 		.tx_complete_skb = mt76x2_tx_complete_skb,
 		.rx_skb = mt76x2_queue_rx_skb,
 		.rx_poll_complete = mt76x2_rx_poll_complete,
+		.sta_ps = mt76x2_sta_ps,
 	};
 	struct ieee80211_hw *hw;
 	struct mt76x2_dev *dev;
@@ -855,6 +856,9 @@ int mt76x2_register_device(struct mt76x2_dev *dev)
 	/* init led callbacks */
 	dev->mt76.led_cdev.brightness_set = mt76x2_led_set_brightness;
 	dev->mt76.led_cdev.blink_set = mt76x2_led_set_blink;
+
+	/* init antenna configuration */
+	dev->mt76.antenna_mask = 3;
 
 	ret = mt76_register_device(&dev->mt76, true, mt76x2_rates,
 				   ARRAY_SIZE(mt76x2_rates));

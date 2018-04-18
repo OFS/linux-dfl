@@ -127,7 +127,7 @@ no_mainmenu_stmt: /* empty */
 	 * later regardless of whether it comes from the 'prompt' in
 	 * mainmenu_stmt or here
 	 */
-	menu_add_prompt(P_MENU, strdup("Linux Kernel Configuration"), NULL);
+	menu_add_prompt(P_MENU, xstrdup("Linux Kernel Configuration"), NULL);
 };
 
 
@@ -276,6 +276,7 @@ choice: T_CHOICE word_opt T_EOL
 	sym->flags |= SYMBOL_AUTO;
 	menu_add_entry(sym);
 	menu_add_expr(P_CHOICE, NULL, NULL);
+	free($2);
 	printd(DEBUG_PARSE, "%s:%d:choice\n", zconf_curname(), zconf_lineno());
 };
 
@@ -436,6 +437,12 @@ help: help_start T_HELPTEXT
 		zconfprint("warning: '%s' defined with more than one help text -- only the last one will be used",
 			   current_entry->sym->name ?: "<choice>");
 	}
+
+	/* Is the help text empty or all whitespace? */
+	if ($2[strspn($2, " \f\n\r\t\v")] == '\0')
+		zconfprint("warning: '%s' defined with blank help text",
+			   current_entry->sym->name ?: "<choice>");
+
 	current_entry->help = $2;
 };
 

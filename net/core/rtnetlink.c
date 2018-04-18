@@ -75,6 +75,12 @@ void rtnl_lock(void)
 }
 EXPORT_SYMBOL(rtnl_lock);
 
+int rtnl_lock_killable(void)
+{
+	return mutex_lock_killable(&rtnl_mutex);
+}
+EXPORT_SYMBOL(rtnl_lock_killable);
+
 static struct sk_buff *defer_kfree_skb_list;
 void rtnl_kfree_skbs(struct sk_buff *head, struct sk_buff *tail)
 {
@@ -406,7 +412,9 @@ static void __rtnl_kill_links(struct net *net, struct rtnl_link_ops *ops)
  * __rtnl_link_unregister - Unregister rtnl_link_ops from rtnetlink.
  * @ops: struct rtnl_link_ops * to unregister
  *
- * The caller must hold the rtnl_mutex.
+ * The caller must hold the rtnl_mutex and guarantee net_namespace_list
+ * integrity (hold pernet_ops_rwsem for writing to close the race
+ * with setup_net() and cleanup_net()).
  */
 void __rtnl_link_unregister(struct rtnl_link_ops *ops)
 {
@@ -432,6 +440,9 @@ static void rtnl_lock_unregistering_all(void)
 	for (;;) {
 		unregistering = false;
 		rtnl_lock();
+		/* We held write locked pernet_ops_rwsem, and parallel
+		 * setup_net() and cleanup_net() are not possible.
+		 */
 		for_each_net(net) {
 			if (net->dev_unreg_count > 0) {
 				unregistering = true;
@@ -453,12 +464,12 @@ static void rtnl_lock_unregistering_all(void)
  */
 void rtnl_link_unregister(struct rtnl_link_ops *ops)
 {
-	/* Close the race with cleanup_net() */
-	mutex_lock(&net_mutex);
+	/* Close the race with setup_net() and cleanup_net() */
+	down_write(&pernet_ops_rwsem);
 	rtnl_lock_unregistering_all();
 	__rtnl_link_unregister(ops);
 	rtnl_unlock();
-	mutex_unlock(&net_mutex);
+	up_write(&pernet_ops_rwsem);
 }
 EXPORT_SYMBOL_GPL(rtnl_link_unregister);
 
@@ -1951,6 +1962,38 @@ static struct net *rtnl_link_get_net_capable(const struct sk_buff *skb,
 	return net;
 }
 
+/* Verify that rtnetlink requests do not pass additional properties
+ * potentially referring to different network namespaces.
+ */
+static int rtnl_ensure_unique_netns(struct nlattr *tb[],
+				    struct netlink_ext_ack *extack,
+				    bool netns_id_only)
+{
+
+	if (netns_id_only) {
+		if (!tb[IFLA_NET_NS_PID] && !tb[IFLA_NET_NS_FD])
+			return 0;
+
+		NL_SET_ERR_MSG(extack, "specified netns attribute not supported");
+		return -EOPNOTSUPP;
+	}
+
+	if (tb[IFLA_IF_NETNSID] && (tb[IFLA_NET_NS_PID] || tb[IFLA_NET_NS_FD]))
+		goto invalid_attr;
+
+	if (tb[IFLA_NET_NS_PID] && (tb[IFLA_IF_NETNSID] || tb[IFLA_NET_NS_FD]))
+		goto invalid_attr;
+
+	if (tb[IFLA_NET_NS_FD] && (tb[IFLA_IF_NETNSID] || tb[IFLA_NET_NS_PID]))
+		goto invalid_attr;
+
+	return 0;
+
+invalid_attr:
+	NL_SET_ERR_MSG(extack, "multiple netns identifying attributes specified");
+	return -EINVAL;
+}
+
 static int validate_linkmsg(struct net_device *dev, struct nlattr *tb[])
 {
 	if (dev) {
@@ -2553,6 +2596,10 @@ static int rtnl_setlink(struct sk_buff *skb, struct nlmsghdr *nlh,
 	if (err < 0)
 		goto errout;
 
+	err = rtnl_ensure_unique_netns(tb, extack, false);
+	if (err < 0)
+		goto errout;
+
 	if (tb[IFLA_IFNAME])
 		nla_strlcpy(ifname, tb[IFLA_IFNAME], IFNAMSIZ);
 	else
@@ -2646,6 +2693,10 @@ static int rtnl_dellink(struct sk_buff *skb, struct nlmsghdr *nlh,
 	int netnsid = -1;
 
 	err = nlmsg_parse(nlh, sizeof(*ifm), tb, IFLA_MAX, ifla_policy, extack);
+	if (err < 0)
+		return err;
+
+	err = rtnl_ensure_unique_netns(tb, extack, true);
 	if (err < 0)
 		return err;
 
@@ -2799,6 +2850,10 @@ static int rtnl_newlink(struct sk_buff *skb, struct nlmsghdr *nlh,
 replay:
 #endif
 	err = nlmsg_parse(nlh, sizeof(*ifm), tb, IFLA_MAX, ifla_policy, extack);
+	if (err < 0)
+		return err;
+
+	err = rtnl_ensure_unique_netns(tb, extack, false);
 	if (err < 0)
 		return err;
 
@@ -3042,6 +3097,10 @@ static int rtnl_getlink(struct sk_buff *skb, struct nlmsghdr *nlh,
 	u32 ext_filter_mask = 0;
 
 	err = nlmsg_parse(nlh, sizeof(*ifm), tb, IFLA_MAX, ifla_policy, extack);
+	if (err < 0)
+		return err;
+
+	err = rtnl_ensure_unique_netns(tb, extack, true);
 	if (err < 0)
 		return err;
 

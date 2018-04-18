@@ -296,13 +296,14 @@ static inline void *__ptr_ring_consume(struct ptr_ring *r)
 {
 	void *ptr;
 
+	/* The READ_ONCE in __ptr_ring_peek guarantees that anyone
+	 * accessing data through the pointer is up to date. Pairs
+	 * with smp_wmb in __ptr_ring_produce.
+	 */
 	ptr = __ptr_ring_peek(r);
 	if (ptr)
 		__ptr_ring_discard_one(r);
 
-	/* Make sure anyone accessing data through the pointer is up to date. */
-	/* Pairs with smp_wmb in __ptr_ring_produce. */
-	smp_read_barrier_depends();
 	return ptr;
 }
 
@@ -464,9 +465,14 @@ static inline int ptr_ring_consume_batched_bh(struct ptr_ring *r,
 	__PTR_RING_PEEK_CALL_v; \
 })
 
+/* Not all gfp_t flags (besides GFP_KERNEL) are allowed. See
+ * documentation for vmalloc for which of them are legal.
+ */
 static inline void **__ptr_ring_init_queue_alloc(unsigned int size, gfp_t gfp)
 {
-	return kcalloc(size, sizeof(void *), gfp);
+	if (size > KMALLOC_MAX_SIZE / sizeof(void *))
+		return NULL;
+	return kvmalloc_array(size, sizeof(void *), gfp | __GFP_ZERO);
 }
 
 static inline void __ptr_ring_set_size(struct ptr_ring *r, int size)
@@ -601,7 +607,7 @@ static inline int ptr_ring_resize(struct ptr_ring *r, int size, gfp_t gfp,
 	spin_unlock(&(r)->producer_lock);
 	spin_unlock_irqrestore(&(r)->consumer_lock, flags);
 
-	kfree(old);
+	kvfree(old);
 
 	return 0;
 }
@@ -641,7 +647,7 @@ static inline int ptr_ring_resize_multiple(struct ptr_ring **rings,
 	}
 
 	for (i = 0; i < nrings; ++i)
-		kfree(queues[i]);
+		kvfree(queues[i]);
 
 	kfree(queues);
 
@@ -649,7 +655,7 @@ static inline int ptr_ring_resize_multiple(struct ptr_ring **rings,
 
 nomem:
 	while (--i >= 0)
-		kfree(queues[i]);
+		kvfree(queues[i]);
 
 	kfree(queues);
 
@@ -664,7 +670,7 @@ static inline void ptr_ring_cleanup(struct ptr_ring *r, void (*destroy)(void *))
 	if (destroy)
 		while ((ptr = ptr_ring_consume(r)))
 			destroy(ptr);
-	kfree(r->queue);
+	kvfree(r->queue);
 }
 
 #endif /* _LINUX_PTR_RING_H  */

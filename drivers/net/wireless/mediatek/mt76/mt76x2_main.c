@@ -282,6 +282,9 @@ mt76x2_sta_add(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	for (i = 0; i < ARRAY_SIZE(sta->txq); i++)
 		mt76x2_txq_init(dev, sta->txq[i]);
 
+	if (vif->type == NL80211_IFTYPE_AP)
+		set_bit(MT_WCID_FLAG_CHECK_PS, &msta->wcid.flags);
+
 	rcu_assign_pointer(dev->wcid[idx], &msta->wcid);
 
 out:
@@ -311,23 +314,14 @@ mt76x2_sta_remove(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	return 0;
 }
 
-static void
-mt76x2_sta_notify(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
-		  enum sta_notify_cmd cmd, struct ieee80211_sta *sta)
+void
+mt76x2_sta_ps(struct mt76_dev *mdev, struct ieee80211_sta *sta, bool ps)
 {
 	struct mt76x2_sta *msta = (struct mt76x2_sta *) sta->drv_priv;
-	struct mt76x2_dev *dev = hw->priv;
+	struct mt76x2_dev *dev = container_of(mdev, struct mt76x2_dev, mt76);
 	int idx = msta->wcid.idx;
 
-	switch (cmd) {
-	case STA_NOTIFY_SLEEP:
-		mt76x2_mac_wcid_set_drop(dev, idx, true);
-		mt76_stop_tx_queues(&dev->mt76, sta, true);
-		break;
-	case STA_NOTIFY_AWAKE:
-		mt76x2_mac_wcid_set_drop(dev, idx, false);
-		break;
-	}
+	mt76x2_mac_wcid_set_drop(dev, idx, ps);
 }
 
 static int
@@ -341,6 +335,17 @@ mt76x2_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 	struct mt76_wcid *wcid;
 	int idx = key->keyidx;
 	int ret;
+
+	/* fall back to sw encryption for unsupported ciphers */
+	switch (key->cipher) {
+	case WLAN_CIPHER_SUITE_WEP40:
+	case WLAN_CIPHER_SUITE_WEP104:
+	case WLAN_CIPHER_SUITE_TKIP:
+	case WLAN_CIPHER_SUITE_CCMP:
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
 
 	/*
 	 * The hardware does not support per-STA RX GTK, fall back
@@ -549,6 +554,46 @@ static void mt76x2_set_coverage_class(struct ieee80211_hw *hw,
 	mutex_unlock(&dev->mutex);
 }
 
+static int
+mt76x2_set_tim(struct ieee80211_hw *hw, struct ieee80211_sta *sta, bool set)
+{
+	return 0;
+}
+
+static int mt76x2_set_antenna(struct ieee80211_hw *hw, u32 tx_ant,
+			      u32 rx_ant)
+{
+	struct mt76x2_dev *dev = hw->priv;
+
+	if (!tx_ant || tx_ant > 3 || tx_ant != rx_ant)
+		return -EINVAL;
+
+	mutex_lock(&dev->mutex);
+
+	dev->chainmask = (tx_ant == 3) ? 0x202 : 0x101;
+	dev->mt76.antenna_mask = tx_ant;
+
+	mt76_set_stream_caps(&dev->mt76, true);
+	mt76x2_phy_set_antenna(dev);
+
+	mutex_unlock(&dev->mutex);
+
+	return 0;
+}
+
+static int mt76x2_get_antenna(struct ieee80211_hw *hw, u32 *tx_ant,
+			      u32 *rx_ant)
+{
+	struct mt76x2_dev *dev = hw->priv;
+
+	mutex_lock(&dev->mutex);
+	*tx_ant = dev->mt76.antenna_mask;
+	*rx_ant = dev->mt76.antenna_mask;
+	mutex_unlock(&dev->mutex);
+
+	return 0;
+}
+
 const struct ieee80211_ops mt76x2_ops = {
 	.tx = mt76x2_tx,
 	.start = mt76x2_start,
@@ -560,7 +605,6 @@ const struct ieee80211_ops mt76x2_ops = {
 	.bss_info_changed = mt76x2_bss_info_changed,
 	.sta_add = mt76x2_sta_add,
 	.sta_remove = mt76x2_sta_remove,
-	.sta_notify = mt76x2_sta_notify,
 	.set_key = mt76x2_set_key,
 	.conf_tx = mt76x2_conf_tx,
 	.sw_scan_start = mt76x2_sw_scan,
@@ -573,5 +617,8 @@ const struct ieee80211_ops mt76x2_ops = {
 	.release_buffered_frames = mt76_release_buffered_frames,
 	.set_coverage_class = mt76x2_set_coverage_class,
 	.get_survey = mt76_get_survey,
+	.set_tim = mt76x2_set_tim,
+	.set_antenna = mt76x2_set_antenna,
+	.get_antenna = mt76x2_get_antenna,
 };
 

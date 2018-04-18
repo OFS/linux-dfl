@@ -204,7 +204,9 @@
 #define OPAL_NPU_SPA_SETUP			159
 #define OPAL_NPU_SPA_CLEAR_CACHE		160
 #define OPAL_NPU_TL_SET				161
-#define OPAL_LAST				161
+#define OPAL_PCI_GET_PBCQ_TUNNEL_BAR		164
+#define OPAL_PCI_SET_PBCQ_TUNNEL_BAR		165
+#define OPAL_LAST				165
 
 /* Device tree flags */
 
@@ -1076,6 +1078,7 @@ enum {
 /* Flags for OPAL_XIVE_GET/SET_VP_INFO */
 enum {
 	OPAL_XIVE_VP_ENABLED		= 0x00000001,
+	OPAL_XIVE_VP_SINGLE_ESCALATION	= 0x00000002,
 };
 
 /* "Any chip" replacement for chip ID for allocation functions */

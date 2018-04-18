@@ -233,8 +233,6 @@ static inline int qeth_is_ipa_enabled(struct qeth_ipa_info *ipa,
 #define QETH_IDX_FUNC_LEVEL_OSD		 0x0101
 #define QETH_IDX_FUNC_LEVEL_IQD		 0x4108
 
-#define QETH_REAL_CARD		1
-#define QETH_VLAN_CARD		2
 #define QETH_BUFSIZE		4096
 
 /**
@@ -556,12 +554,6 @@ enum qeth_prot_versions {
 	QETH_PROT_IPV6 = 0x0006,
 };
 
-enum qeth_ip_types {
-	QETH_IP_TYPE_NORMAL,
-	QETH_IP_TYPE_VIPA,
-	QETH_IP_TYPE_RXIP,
-};
-
 enum qeth_cmd_buffer_state {
 	BUF_STATE_FREE,
 	BUF_STATE_LOCKED,
@@ -590,6 +582,11 @@ struct qeth_cmd_buffer {
 	int rc;
 	void (*callback) (struct qeth_channel *, struct qeth_cmd_buffer *);
 };
+
+static inline struct qeth_ipa_cmd *__ipa_cmd(struct qeth_cmd_buffer *iob)
+{
+	return (struct qeth_ipa_cmd *)(iob->data + IPA_PDU_HEADER_SIZE);
+}
 
 /**
  * definition of a qeth channel, used for read and write
@@ -846,7 +843,7 @@ struct qeth_trap_id {
  */
 static inline int qeth_get_elements_for_range(addr_t start, addr_t end)
 {
-	return PFN_UP(end - 1) - PFN_DOWN(start);
+	return PFN_UP(end) - PFN_DOWN(start);
 }
 
 static inline int qeth_get_micros(void)

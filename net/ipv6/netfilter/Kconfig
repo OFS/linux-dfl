@@ -34,7 +34,7 @@ config NF_SOCKET_IPV6
 if NF_TABLES
 
 config NF_TABLES_IPV6
-	tristate "IPv6 nf_tables support"
+	bool "IPv6 nf_tables support"
 	help
 	  This option enables the IPv6 support for nf_tables.
 
@@ -73,8 +73,7 @@ endif # NF_TABLES
 
 config NF_FLOW_TABLE_IPV6
 	tristate "Netfilter flow table IPv6 module"
-	depends on NF_CONNTRACK && NF_TABLES
-	select NF_FLOW_TABLE
+	depends on NF_FLOW_TABLE
 	help
 	  This option adds the flow table IPv6 support.
 

@@ -121,10 +121,17 @@ struct mt76_queue_ops {
 	void (*kick)(struct mt76_dev *dev, struct mt76_queue *q);
 };
 
+enum mt76_wcid_flags {
+	MT_WCID_FLAG_CHECK_PS,
+	MT_WCID_FLAG_PS,
+};
+
 struct mt76_wcid {
 	struct mt76_rx_tid __rcu *aggr[IEEE80211_NUM_TIDS];
 
 	struct work_struct aggr_work;
+
+	unsigned long flags;
 
 	u8 idx;
 	u8 hw_key_idx;
@@ -206,6 +213,9 @@ struct mt76_driver_ops {
 		       struct sk_buff *skb);
 
 	void (*rx_poll_complete)(struct mt76_dev *dev, enum mt76_rxq_id q);
+
+	void (*sta_ps)(struct mt76_dev *dev, struct ieee80211_sta *sta,
+		       bool ps);
 };
 
 struct mt76_channel_state {
@@ -242,6 +252,8 @@ struct mt76_dev {
 	u8 macaddr[ETH_ALEN];
 	u32 rev;
 	unsigned long state;
+
+	u8 antenna_mask;
 
 	struct mt76_sband sband_2g;
 	struct mt76_sband sband_5g;
@@ -413,6 +425,7 @@ void mt76_release_buffered_frames(struct ieee80211_hw *hw,
 void mt76_set_channel(struct mt76_dev *dev);
 int mt76_get_survey(struct ieee80211_hw *hw, int idx,
 		    struct survey_info *survey);
+void mt76_set_stream_caps(struct mt76_dev *dev, bool vht);
 
 int mt76_rx_aggr_start(struct mt76_dev *dev, struct mt76_wcid *wcid, u8 tid,
 		       u16 ssn, u8 size);

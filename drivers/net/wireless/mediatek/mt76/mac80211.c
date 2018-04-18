@@ -119,6 +119,52 @@ static int mt76_led_init(struct mt76_dev *dev)
 	return devm_led_classdev_register(dev->dev, &dev->led_cdev);
 }
 
+static void mt76_init_stream_cap(struct mt76_dev *dev,
+				 struct ieee80211_supported_band *sband,
+				 bool vht)
+{
+	struct ieee80211_sta_ht_cap *ht_cap = &sband->ht_cap;
+	int i, nstream = __sw_hweight8(dev->antenna_mask);
+	struct ieee80211_sta_vht_cap *vht_cap;
+	u16 mcs_map = 0;
+
+	if (nstream > 1)
+		ht_cap->cap |= IEEE80211_HT_CAP_TX_STBC;
+	else
+		ht_cap->cap &= ~IEEE80211_HT_CAP_TX_STBC;
+
+	for (i = 0; i < IEEE80211_HT_MCS_MASK_LEN; i++)
+		ht_cap->mcs.rx_mask[i] = i < nstream ? 0xff : 0;
+
+	if (!vht)
+		return;
+
+	vht_cap = &sband->vht_cap;
+	if (nstream > 1)
+		vht_cap->cap |= IEEE80211_VHT_CAP_TXSTBC;
+	else
+		vht_cap->cap &= ~IEEE80211_VHT_CAP_TXSTBC;
+
+	for (i = 0; i < 8; i++) {
+		if (i < nstream)
+			mcs_map |= (IEEE80211_VHT_MCS_SUPPORT_0_9 << (i * 2));
+		else
+			mcs_map |=
+				(IEEE80211_VHT_MCS_NOT_SUPPORTED << (i * 2));
+	}
+	vht_cap->vht_mcs.rx_mcs_map = cpu_to_le16(mcs_map);
+	vht_cap->vht_mcs.tx_mcs_map = cpu_to_le16(mcs_map);
+}
+
+void mt76_set_stream_caps(struct mt76_dev *dev, bool vht)
+{
+	if (dev->cap.has_2ghz)
+		mt76_init_stream_cap(dev, &dev->sband_2g.sband, false);
+	if (dev->cap.has_5ghz)
+		mt76_init_stream_cap(dev, &dev->sband_5g.sband, vht);
+}
+EXPORT_SYMBOL_GPL(mt76_set_stream_caps);
+
 static int
 mt76_init_sband(struct mt76_dev *dev, struct mt76_sband *msband,
 		const struct ieee80211_channel *chan, int n_chan,
@@ -128,7 +174,6 @@ mt76_init_sband(struct mt76_dev *dev, struct mt76_sband *msband,
 	struct ieee80211_sta_ht_cap *ht_cap;
 	struct ieee80211_sta_vht_cap *vht_cap;
 	void *chanlist;
-	u16 mcs_map;
 	int size;
 
 	size = n_chan * sizeof(*chan);
@@ -153,34 +198,20 @@ mt76_init_sband(struct mt76_dev *dev, struct mt76_sband *msband,
 		       IEEE80211_HT_CAP_GRN_FLD |
 		       IEEE80211_HT_CAP_SGI_20 |
 		       IEEE80211_HT_CAP_SGI_40 |
-		       IEEE80211_HT_CAP_TX_STBC |
 		       (1 << IEEE80211_HT_CAP_RX_STBC_SHIFT);
 
-	ht_cap->mcs.rx_mask[0] = 0xff;
-	ht_cap->mcs.rx_mask[1] = 0xff;
 	ht_cap->mcs.tx_params = IEEE80211_HT_MCS_TX_DEFINED;
 	ht_cap->ampdu_factor = IEEE80211_HT_MAX_AMPDU_64K;
 	ht_cap->ampdu_density = IEEE80211_HT_MPDU_DENSITY_4;
+
+	mt76_init_stream_cap(dev, sband, vht);
 
 	if (!vht)
 		return 0;
 
 	vht_cap = &sband->vht_cap;
 	vht_cap->vht_supported = true;
-
-	mcs_map = (IEEE80211_VHT_MCS_SUPPORT_0_9 << (0 * 2)) |
-		  (IEEE80211_VHT_MCS_SUPPORT_0_9 << (1 * 2)) |
-		  (IEEE80211_VHT_MCS_NOT_SUPPORTED << (2 * 2)) |
-		  (IEEE80211_VHT_MCS_NOT_SUPPORTED << (3 * 2)) |
-		  (IEEE80211_VHT_MCS_NOT_SUPPORTED << (4 * 2)) |
-		  (IEEE80211_VHT_MCS_NOT_SUPPORTED << (5 * 2)) |
-		  (IEEE80211_VHT_MCS_NOT_SUPPORTED << (6 * 2)) |
-		  (IEEE80211_VHT_MCS_NOT_SUPPORTED << (7 * 2));
-
-	vht_cap->vht_mcs.rx_mcs_map = cpu_to_le16(mcs_map);
-	vht_cap->vht_mcs.tx_mcs_map = cpu_to_le16(mcs_map);
 	vht_cap->cap |= IEEE80211_VHT_CAP_RXLDPC |
-			IEEE80211_VHT_CAP_TXSTBC |
 			IEEE80211_VHT_CAP_RXSTBC_1 |
 			IEEE80211_VHT_CAP_SHORT_GI_80;
 
@@ -262,6 +293,9 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
 
 	wiphy->features |= NL80211_FEATURE_ACTIVE_MONITOR;
 
+	wiphy->available_antennas_tx = dev->antenna_mask;
+	wiphy->available_antennas_rx = dev->antenna_mask;
+
 	hw->txq_data_size = sizeof(struct mt76_txq);
 	hw->max_tx_fragments = 16;
 
@@ -276,6 +310,7 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
 	ieee80211_hw_set(hw, TX_AMSDU);
 	ieee80211_hw_set(hw, TX_FRAG_LIST);
 	ieee80211_hw_set(hw, MFP_CAPABLE);
+	ieee80211_hw_set(hw, AP_LINK_PS);
 
 	wiphy->flags |= WIPHY_FLAG_IBSS_RSN;
 
@@ -470,6 +505,53 @@ mt76_check_ccmp_pn(struct sk_buff *skb)
 	return 0;
 }
 
+static void
+mt76_check_ps(struct mt76_dev *dev, struct sk_buff *skb)
+{
+	struct mt76_rx_status *status = (struct mt76_rx_status *) skb->cb;
+	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
+	struct ieee80211_sta *sta;
+	struct mt76_wcid *wcid = status->wcid;
+	bool ps;
+
+	if (!wcid || !wcid->sta)
+		return;
+
+	sta = container_of((void *) wcid, struct ieee80211_sta, drv_priv);
+
+	if (!test_bit(MT_WCID_FLAG_CHECK_PS, &wcid->flags))
+		return;
+
+	if (ieee80211_is_pspoll(hdr->frame_control)) {
+		ieee80211_sta_pspoll(sta);
+		return;
+	}
+
+	if (ieee80211_has_morefrags(hdr->frame_control) ||
+		!(ieee80211_is_mgmt(hdr->frame_control) ||
+		  ieee80211_is_data(hdr->frame_control)))
+		return;
+
+	ps = ieee80211_has_pm(hdr->frame_control);
+
+	if (ps && (ieee80211_is_data_qos(hdr->frame_control) ||
+		   ieee80211_is_qos_nullfunc(hdr->frame_control)))
+		ieee80211_sta_uapsd_trigger(sta, status->tid);
+
+	if (!!test_bit(MT_WCID_FLAG_PS, &wcid->flags) == ps)
+		return;
+
+	if (ps) {
+		set_bit(MT_WCID_FLAG_PS, &wcid->flags);
+		mt76_stop_tx_queues(dev, sta, true);
+	} else {
+		clear_bit(MT_WCID_FLAG_PS, &wcid->flags);
+	}
+
+	ieee80211_sta_ps_transition(sta, ps);
+	dev->drv->sta_ps(dev, sta, ps);
+}
+
 void mt76_rx_complete(struct mt76_dev *dev, struct sk_buff_head *frames,
 		      int queue)
 {
@@ -498,8 +580,10 @@ void mt76_rx_poll_complete(struct mt76_dev *dev, enum mt76_rxq_id q)
 
 	__skb_queue_head_init(&frames);
 
-	while ((skb = __skb_dequeue(&dev->rx_skb[q])) != NULL)
+	while ((skb = __skb_dequeue(&dev->rx_skb[q])) != NULL) {
+		mt76_check_ps(dev, skb);
 		mt76_rx_aggr_reorder(skb, &frames);
+	}
 
 	mt76_rx_complete(dev, &frames, q);
 }

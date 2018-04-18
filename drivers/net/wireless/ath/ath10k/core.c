@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2005-2011 Atheros Communications Inc.
  * Copyright (c) 2011-2017 Qualcomm Atheros, Inc.
+ * Copyright (c) 2018, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -65,6 +66,35 @@ static const struct ath10k_hw_params ath10k_hw_params_list[] = {
 		.id = QCA988X_HW_2_0_VERSION,
 		.dev_id = QCA988X_2_0_DEVICE_ID,
 		.name = "qca988x hw2.0",
+		.patch_load_addr = QCA988X_HW_2_0_PATCH_LOAD_ADDR,
+		.uart_pin = 7,
+		.cc_wraparound_type = ATH10K_HW_CC_WRAP_SHIFTED_ALL,
+		.otp_exe_param = 0,
+		.channel_counters_freq_hz = 88000,
+		.max_probe_resp_desc_thres = 0,
+		.cal_data_len = 2116,
+		.fw = {
+			.dir = QCA988X_HW_2_0_FW_DIR,
+			.board = QCA988X_HW_2_0_BOARD_DATA_FILE,
+			.board_size = QCA988X_BOARD_DATA_SZ,
+			.board_ext_size = QCA988X_BOARD_EXT_DATA_SZ,
+		},
+		.hw_ops = &qca988x_ops,
+		.decap_align_bytes = 4,
+		.spectral_bin_discard = 0,
+		.vht160_mcs_rx_highest = 0,
+		.vht160_mcs_tx_highest = 0,
+		.n_cipher_suites = 8,
+		.num_peers = TARGET_TLV_NUM_PEERS,
+		.ast_skid_limit = 0x10,
+		.num_wds_entries = 0x20,
+		.target_64bit = false,
+		.rx_ring_fill_level = HTT_RX_RING_FILL_LEVEL,
+	},
+	{
+		.id = QCA988X_HW_2_0_VERSION,
+		.dev_id = QCA988X_2_0_DEVICE_ID_UBNT,
+		.name = "qca988x hw2.0 ubiquiti",
 		.patch_load_addr = QCA988X_HW_2_0_PATCH_LOAD_ADDR,
 		.uart_pin = 7,
 		.cc_wraparound_type = ATH10K_HW_CC_WRAP_SHIFTED_ALL,
@@ -1276,10 +1306,7 @@ static int ath10k_core_fetch_board_data_api_n(struct ath10k *ar,
 		len -= sizeof(*hdr);
 		data = hdr->data;
 
-		/* jump over the padding */
-		ie_len = ALIGN(ie_len, 4);
-
-		if (len < ie_len) {
+		if (len < ALIGN(ie_len, 4)) {
 			ath10k_err(ar, "invalid length for board ie_id %d ie_len %zu len %zu\n",
 				   ie_id, ie_len, len);
 			ret = -EINVAL;
@@ -1317,6 +1344,9 @@ static int ath10k_core_fetch_board_data_api_n(struct ath10k *ar,
 			/* board data found */
 			goto out;
 		}
+
+		/* jump over the padding */
+		ie_len = ALIGN(ie_len, 4);
 
 		len -= ie_len;
 		data += ie_len;
@@ -1448,9 +1478,6 @@ int ath10k_core_fetch_firmware_api_n(struct ath10k *ar, const char *name,
 		len -= sizeof(*hdr);
 		data += sizeof(*hdr);
 
-		/* jump over the padding */
-		ie_len = ALIGN(ie_len, 4);
-
 		if (len < ie_len) {
 			ath10k_err(ar, "invalid length for FW IE %d (%zu < %zu)\n",
 				   ie_id, len, ie_len);
@@ -1555,6 +1582,9 @@ int ath10k_core_fetch_firmware_api_n(struct ath10k *ar, const char *name,
 				    le32_to_cpu(hdr->id));
 			break;
 		}
+
+		/* jump over the padding */
+		ie_len = ALIGN(ie_len, 4);
 
 		len -= ie_len;
 		data += ie_len;
@@ -2011,7 +2041,8 @@ static int ath10k_core_init_firmware_features(struct ath10k *ar)
 		ar->max_num_vdevs = TARGET_10_4_NUM_VDEVS;
 		ar->num_tids = TARGET_10_4_TGT_NUM_TIDS;
 		ar->fw_stats_req_mask = WMI_10_4_STAT_PEER |
-					WMI_10_4_STAT_PEER_EXTD;
+					WMI_10_4_STAT_PEER_EXTD |
+					WMI_10_4_STAT_VDEV_EXTD;
 		ar->max_spatial_stream = ar->hw_params.max_spatial_stream;
 		ar->max_num_tdls_vdevs = TARGET_10_4_NUM_TDLS_VDEVS;
 
@@ -2252,6 +2283,9 @@ int ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode,
 		if (ath10k_peer_stats_enabled(ar))
 			val = WMI_10_4_PEER_STATS;
 
+		/* Enable vdev stats by default */
+		val |= WMI_10_4_VDEV_STATS;
+
 		if (test_bit(WMI_SERVICE_BSS_CHANNEL_INFO_64, ar->wmi.svc_map))
 			val |= WMI_10_4_BSS_CHANNEL_INFO_64;
 
@@ -2410,7 +2444,7 @@ static int ath10k_core_probe_fw(struct ath10k *ar)
 
 	ret = ath10k_hif_power_up(ar);
 	if (ret) {
-		ath10k_err(ar, "could not start pci hif (%d)\n", ret);
+		ath10k_err(ar, "could not power on hif bus (%d)\n", ret);
 		return ret;
 	}
 

@@ -23,7 +23,8 @@ function config_device {
 function add_gre_tunnel {
 	# in namespace
 	ip netns exec at_ns0 \
-		ip link add dev $DEV_NS type $TYPE key 2 local 172.16.1.100 remote 172.16.1.200
+        ip link add dev $DEV_NS type $TYPE seq key 2 \
+		local 172.16.1.100 remote 172.16.1.200
 	ip netns exec at_ns0 ip link set dev $DEV_NS up
 	ip netns exec at_ns0 ip addr add dev $DEV_NS 10.1.1.100/24
 
@@ -43,7 +44,7 @@ function add_ip6gretap_tunnel {
 
 	# in namespace
 	ip netns exec at_ns0 \
-		ip link add dev $DEV_NS type $TYPE flowlabel 0xbcdef key 2 \
+		ip link add dev $DEV_NS type $TYPE seq flowlabel 0xbcdef key 2 \
 		local ::11 remote ::22
 
 	ip netns exec at_ns0 ip addr add dev $DEV_NS 10.1.1.100/24
@@ -68,7 +69,7 @@ function add_erspan_tunnel {
 		ip netns exec at_ns0 \
 		ip link add dev $DEV_NS type $TYPE seq key 2 \
 		local 172.16.1.100 remote 172.16.1.200 \
-		erspan_ver 2 erspan_dir 1 erspan_hwid 3
+		erspan_ver 2 erspan_dir egress erspan_hwid 3
 	fi
 	ip netns exec at_ns0 ip link set dev $DEV_NS up
 	ip netns exec at_ns0 ip addr add dev $DEV_NS 10.1.1.100/24
@@ -97,7 +98,7 @@ function add_ip6erspan_tunnel {
 		ip netns exec at_ns0 \
 		ip link add dev $DEV_NS type $TYPE seq key 2 \
 		local ::11 remote ::22 \
-		erspan_ver 2 erspan_dir 1 erspan_hwid 7
+		erspan_ver 2 erspan_dir egress erspan_hwid 7
 	fi
 	ip netns exec at_ns0 ip addr add dev $DEV_NS 10.1.1.100/24
 	ip netns exec at_ns0 ip link set dev $DEV_NS up
