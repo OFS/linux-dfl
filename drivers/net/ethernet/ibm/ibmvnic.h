@@ -865,6 +865,7 @@ struct ibmvnic_crq_queue {
 	int size, cur;
 	dma_addr_t msg_token;
 	spinlock_t lock;
+	bool active;
 };
 
 union sub_crq {
@@ -1035,7 +1036,6 @@ struct ibmvnic_adapter {
 
 	struct ibmvnic_sub_crq_queue **tx_scrq;
 	struct ibmvnic_sub_crq_queue **rx_scrq;
-	bool renegotiate;
 
 	/* rx structs */
 	struct napi_struct *napi;
@@ -1109,6 +1109,7 @@ struct ibmvnic_adapter {
 
 	bool mac_change_pending;
 	bool failover_pending;
+	bool force_reset_recovery;
 
 	struct ibmvnic_tunables desired;
 	struct ibmvnic_tunables fallback;

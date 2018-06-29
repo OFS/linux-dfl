@@ -512,8 +512,6 @@ static int __register_trace_kprobe(struct trace_kprobe *tk)
 	if (ret == 0)
 		tk->tp.flags |= TP_FLAG_REGISTERED;
 	else {
-		pr_warn("Could not insert probe at %s+%lu: %d\n",
-			trace_kprobe_symbol(tk), trace_kprobe_offset(tk), ret);
 		if (ret == -ENOENT && trace_kprobe_is_on_module(tk)) {
 			pr_warn("This probe might be able to register after target module is loaded. Continue.\n");
 			ret = 0;
@@ -1289,6 +1287,35 @@ kretprobe_perf_func(struct trace_kprobe *tk, struct kretprobe_instance *ri,
 			      head, NULL);
 }
 NOKPROBE_SYMBOL(kretprobe_perf_func);
+
+int bpf_get_kprobe_info(const struct perf_event *event, u32 *fd_type,
+			const char **symbol, u64 *probe_offset,
+			u64 *probe_addr, bool perf_type_tracepoint)
+{
+	const char *pevent = trace_event_name(event->tp_event);
+	const char *group = event->tp_event->class->system;
+	struct trace_kprobe *tk;
+
+	if (perf_type_tracepoint)
+		tk = find_trace_kprobe(pevent, group);
+	else
+		tk = event->tp_event->data;
+	if (!tk)
+		return -EINVAL;
+
+	*fd_type = trace_kprobe_is_return(tk) ? BPF_FD_TYPE_KRETPROBE
+					      : BPF_FD_TYPE_KPROBE;
+	if (tk->symbol) {
+		*symbol = tk->symbol;
+		*probe_offset = tk->rp.kp.offset;
+		*probe_addr = 0;
+	} else {
+		*symbol = NULL;
+		*probe_offset = 0;
+		*probe_addr = (unsigned long)tk->rp.kp.addr;
+	}
+	return 0;
+}
 #endif	/* CONFIG_PERF_EVENTS */
 
 /*
