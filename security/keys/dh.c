@@ -300,7 +300,7 @@ long __keyctl_dh_compute(struct keyctl_dh_params __user *params,
 	}
 	dh_inputs.g_size = dlen;
 
-	dlen = dh_data_from_key(pcopy.private, &dh_inputs.key);
+	dlen = dh_data_from_key(pcopy.dh_private, &dh_inputs.key);
 	if (dlen < 0) {
 		ret = dlen;
 		goto out2;
@@ -317,7 +317,7 @@ long __keyctl_dh_compute(struct keyctl_dh_params __user *params,
 	if (ret)
 		goto out3;
 
-	tfm = crypto_alloc_kpp("dh", CRYPTO_ALG_TYPE_KPP, 0);
+	tfm = crypto_alloc_kpp("dh", 0, 0);
 	if (IS_ERR(tfm)) {
 		ret = PTR_ERR(tfm);
 		goto out3;
