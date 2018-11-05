@@ -431,14 +431,14 @@ static int pkt_phy_rx_parse(struct device *dev,
 {
 	char *b, *p;
 
-	b = phy_buf;
 	p = trans_buf;
 
-	/* Find the SOP */
-	while (b < phy_buf + phy_len && *b != PKT_SOP)
-		b++;
+	/* Find the last SOP */
+	b = (phy_buf + phy_len) - 1;
+	while (b >= phy_buf && *b != PKT_SOP)
+		b--;
 
-	if (b >= phy_buf + phy_len) {
+	if (b < phy_buf) {
 		dev_err(dev, "%s no SOP\n", __func__);
 		return -EINVAL;
 	}
