@@ -40,9 +40,9 @@
 #define SKB_TMP_LEN(SKB) \
 	(((SKB)->transport_header - (SKB)->mac_header) + tcp_hdrlen(SKB))
 
-static void fill_v2_desc(struct hnae_ring *ring, void *priv,
-			 int size, dma_addr_t dma, int frag_end,
-			 int buf_num, enum hns_desc_type type, int mtu)
+static void fill_v2_desc_hw(struct hnae_ring *ring, void *priv, int size,
+			    int send_sz, dma_addr_t dma, int frag_end,
+			    int buf_num, enum hns_desc_type type, int mtu)
 {
 	struct hnae_desc *desc = &ring->desc[ring->next_to_use];
 	struct hnae_desc_cb *desc_cb = &ring->desc_cb[ring->next_to_use];
@@ -64,7 +64,7 @@ static void fill_v2_desc(struct hnae_ring *ring, void *priv,
 	desc_cb->type = type;
 
 	desc->addr = cpu_to_le64(dma);
-	desc->tx.send_size = cpu_to_le16((u16)size);
+	desc->tx.send_size = cpu_to_le16((u16)send_sz);
 
 	/* config bd buffer end */
 	hnae_set_bit(rrcfv, HNSV2_TXD_VLD_B, 1);
@@ -131,6 +131,14 @@ static void fill_v2_desc(struct hnae_ring *ring, void *priv,
 	desc->tx.ra_ri_cs_fe_vld = rrcfv;
 
 	ring_ptr_move_fw(ring, next_to_use);
+}
+
+static void fill_v2_desc(struct hnae_ring *ring, void *priv,
+			 int size, dma_addr_t dma, int frag_end,
+			 int buf_num, enum hns_desc_type type, int mtu)
+{
+	fill_v2_desc_hw(ring, priv, size, size, dma, frag_end,
+			buf_num, type, mtu);
 }
 
 static const struct acpi_device_id hns_enet_acpi_match[] = {
@@ -289,15 +297,15 @@ static void fill_tso_desc(struct hnae_ring *ring, void *priv,
 
 	/* when the frag size is bigger than hardware, split this frag */
 	for (k = 0; k < frag_buf_num; k++)
-		fill_v2_desc(ring, priv,
-			     (k == frag_buf_num - 1) ?
+		fill_v2_desc_hw(ring, priv, k == 0 ? size : 0,
+				(k == frag_buf_num - 1) ?
 					sizeoflast : BD_MAX_SEND_SIZE,
-			     dma + BD_MAX_SEND_SIZE * k,
-			     frag_end && (k == frag_buf_num - 1) ? 1 : 0,
-			     buf_num,
-			     (type == DESC_TYPE_SKB && !k) ?
+				dma + BD_MAX_SEND_SIZE * k,
+				frag_end && (k == frag_buf_num - 1) ? 1 : 0,
+				buf_num,
+				(type == DESC_TYPE_SKB && !k) ?
 					DESC_TYPE_SKB : DESC_TYPE_PAGE,
-			     mtu);
+				mtu);
 }
 
 netdev_tx_t hns_nic_net_xmit_hw(struct net_device *ndev,
@@ -1155,11 +1163,19 @@ static void hns_nic_adjust_link(struct net_device *ndev)
  */
 int hns_nic_init_phy(struct net_device *ndev, struct hnae_handle *h)
 {
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(supported) = { 0, };
 	struct phy_device *phy_dev = h->phy_dev;
 	int ret;
 
 	if (!h->phy_dev)
 		return 0;
+
+	ethtool_convert_legacy_u32_to_link_mode(supported, h->if_support);
+	linkmode_and(phy_dev->supported, phy_dev->supported, supported);
+	linkmode_copy(phy_dev->advertising, phy_dev->supported);
+
+	if (h->phy_if == PHY_INTERFACE_MODE_XGMII)
+		phy_dev->autoneg = false;
 
 	if (h->phy_if != PHY_INTERFACE_MODE_XGMII) {
 		phy_dev->dev_flags = 0;
@@ -1171,12 +1187,6 @@ int hns_nic_init_phy(struct net_device *ndev, struct hnae_handle *h)
 	}
 	if (unlikely(ret))
 		return -ENODEV;
-
-	phy_dev->supported &= h->if_support;
-	phy_dev->advertising = phy_dev->supported;
-
-	if (h->phy_if == PHY_INTERFACE_MODE_XGMII)
-		phy_dev->autoneg = false;
 
 	return 0;
 }
@@ -1273,6 +1283,22 @@ static int hns_nic_init_affinity_mask(int q_num, int ring_idx,
 	return cpu;
 }
 
+static void hns_nic_free_irq(int q_num, struct hns_nic_priv *priv)
+{
+	int i;
+
+	for (i = 0; i < q_num * 2; i++) {
+		if (priv->ring_data[i].ring->irq_init_flag == RCB_IRQ_INITED) {
+			irq_set_affinity_hint(priv->ring_data[i].ring->irq,
+					      NULL);
+			free_irq(priv->ring_data[i].ring->irq,
+				 &priv->ring_data[i]);
+			priv->ring_data[i].ring->irq_init_flag =
+				RCB_IRQ_NOT_INITED;
+		}
+	}
+}
+
 static int hns_nic_init_irq(struct hns_nic_priv *priv)
 {
 	struct hnae_handle *h = priv->ae_handle;
@@ -1298,7 +1324,7 @@ static int hns_nic_init_irq(struct hns_nic_priv *priv)
 		if (ret) {
 			netdev_err(priv->netdev, "request irq(%d) fail\n",
 				   rd->ring->irq);
-			return ret;
+			goto out_free_irq;
 		}
 		disable_irq(rd->ring->irq);
 
@@ -1313,6 +1339,10 @@ static int hns_nic_init_irq(struct hns_nic_priv *priv)
 	}
 
 	return 0;
+
+out_free_irq:
+	hns_nic_free_irq(h->q_num, priv);
+	return ret;
 }
 
 static int hns_nic_net_up(struct net_device *ndev)
@@ -1321,6 +1351,9 @@ static int hns_nic_net_up(struct net_device *ndev)
 	struct hnae_handle *h = priv->ae_handle;
 	int i, j;
 	int ret;
+
+	if (!test_bit(NIC_STATE_DOWN, &priv->state))
+		return 0;
 
 	ret = hns_nic_init_irq(priv);
 	if (ret != 0) {
@@ -1357,6 +1390,7 @@ out_has_some_queues:
 	for (j = i - 1; j >= 0; j--)
 		hns_nic_ring_close(ndev, j);
 
+	hns_nic_free_irq(h->q_num, priv);
 	set_bit(NIC_STATE_DOWN, &priv->state);
 
 	return ret;
@@ -1474,11 +1508,19 @@ static int hns_nic_net_stop(struct net_device *ndev)
 }
 
 static void hns_tx_timeout_reset(struct hns_nic_priv *priv);
+#define HNS_TX_TIMEO_LIMIT (40 * HZ)
 static void hns_nic_net_timeout(struct net_device *ndev)
 {
 	struct hns_nic_priv *priv = netdev_priv(ndev);
 
-	hns_tx_timeout_reset(priv);
+	if (ndev->watchdog_timeo < HNS_TX_TIMEO_LIMIT) {
+		ndev->watchdog_timeo *= 2;
+		netdev_info(ndev, "watchdog_timo changed to %d.\n",
+			    ndev->watchdog_timeo);
+	} else {
+		ndev->watchdog_timeo = HNS_NIC_TX_TIMEOUT;
+		hns_tx_timeout_reset(priv);
+	}
 }
 
 static int hns_nic_do_ioctl(struct net_device *netdev, struct ifreq *ifr,
@@ -1494,21 +1536,6 @@ static int hns_nic_do_ioctl(struct net_device *netdev, struct ifreq *ifr,
 
 	return phy_mii_ioctl(phy_dev, ifr, cmd);
 }
-
-/* use only for netconsole to poll with the device without interrupt */
-#ifdef CONFIG_NET_POLL_CONTROLLER
-static void hns_nic_poll_controller(struct net_device *ndev)
-{
-	struct hns_nic_priv *priv = netdev_priv(ndev);
-	unsigned long flags;
-	int i;
-
-	local_irq_save(flags);
-	for (i = 0; i < priv->ae_handle->q_num * 2; i++)
-		napi_schedule(&priv->ring_data[i].napi);
-	local_irq_restore(flags);
-}
-#endif
 
 static netdev_tx_t hns_nic_net_xmit(struct sk_buff *skb,
 				    struct net_device *ndev)
@@ -1962,9 +1989,6 @@ static const struct net_device_ops hns_nic_netdev_ops = {
 	.ndo_set_features = hns_nic_set_features,
 	.ndo_fix_features = hns_nic_fix_features,
 	.ndo_get_stats64 = hns_nic_get_stats64,
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	.ndo_poll_controller = hns_nic_poll_controller,
-#endif
 	.ndo_set_rx_mode = hns_nic_set_rx_mode,
 	.ndo_select_queue = hns_nic_select_queue,
 };
@@ -2059,11 +2083,11 @@ static void hns_nic_service_task(struct work_struct *work)
 		= container_of(work, struct hns_nic_priv, service_task);
 	struct hnae_handle *h = priv->ae_handle;
 
+	hns_nic_reset_subtask(priv);
 	hns_nic_update_link_status(priv->netdev);
 	h->dev->ops->update_led_status(h);
 	hns_nic_update_stats(priv->netdev);
 
-	hns_nic_reset_subtask(priv);
 	hns_nic_service_event_complete(priv);
 }
 
@@ -2349,7 +2373,7 @@ static int hns_nic_dev_probe(struct platform_device *pdev)
 	ndev->min_mtu = MAC_MIN_MTU;
 	switch (priv->enet_ver) {
 	case AE_VERSION_2:
-		ndev->features |= NETIF_F_TSO | NETIF_F_TSO6;
+		ndev->features |= NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_NTUPLE;
 		ndev->hw_features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
 			NETIF_F_RXCSUM | NETIF_F_SG | NETIF_F_GSO |
 			NETIF_F_GRO | NETIF_F_TSO | NETIF_F_TSO6;

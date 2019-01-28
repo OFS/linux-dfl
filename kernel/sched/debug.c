@@ -73,7 +73,7 @@ static int sched_feat_show(struct seq_file *m, void *v)
 	return 0;
 }
 
-#ifdef HAVE_JUMP_LABEL
+#ifdef CONFIG_JUMP_LABEL
 
 #define jump_label_key__true  STATIC_KEY_INIT_TRUE
 #define jump_label_key__false STATIC_KEY_INIT_FALSE
@@ -89,17 +89,17 @@ struct static_key sched_feat_keys[__SCHED_FEAT_NR] = {
 
 static void sched_feat_disable(int i)
 {
-	static_key_disable(&sched_feat_keys[i]);
+	static_key_disable_cpuslocked(&sched_feat_keys[i]);
 }
 
 static void sched_feat_enable(int i)
 {
-	static_key_enable(&sched_feat_keys[i]);
+	static_key_enable_cpuslocked(&sched_feat_keys[i]);
 }
 #else
 static void sched_feat_disable(int i) { };
 static void sched_feat_enable(int i) { };
-#endif /* HAVE_JUMP_LABEL */
+#endif /* CONFIG_JUMP_LABEL */
 
 static int sched_feat_set(char *cmp)
 {
@@ -146,9 +146,11 @@ sched_feat_write(struct file *filp, const char __user *ubuf,
 
 	/* Ensure the static_key remains in a consistent state */
 	inode = file_inode(filp);
+	cpus_read_lock();
 	inode_lock(inode);
 	ret = sched_feat_set(cmp);
 	inode_unlock(inode);
+	cpus_read_unlock();
 	if (ret < 0)
 		return ret;
 
@@ -972,7 +974,7 @@ void proc_sched_show_task(struct task_struct *p, struct pid_namespace *ns,
 #endif
 	P(policy);
 	P(prio);
-	if (p->policy == SCHED_DEADLINE) {
+	if (task_has_dl_policy(p)) {
 		P(dl.runtime);
 		P(dl.deadline);
 	}

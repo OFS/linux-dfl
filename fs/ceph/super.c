@@ -165,6 +165,8 @@ enum {
 	Opt_noacl,
 	Opt_quotadf,
 	Opt_noquotadf,
+	Opt_copyfrom,
+	Opt_nocopyfrom,
 };
 
 static match_table_t fsopt_tokens = {
@@ -203,6 +205,8 @@ static match_table_t fsopt_tokens = {
 	{Opt_noacl, "noacl"},
 	{Opt_quotadf, "quotadf"},
 	{Opt_noquotadf, "noquotadf"},
+	{Opt_copyfrom, "copyfrom"},
+	{Opt_nocopyfrom, "nocopyfrom"},
 	{-1, NULL}
 };
 
@@ -354,6 +358,12 @@ static int parse_fsopt_token(char *c, void *private)
 		break;
 	case Opt_noquotadf:
 		fsopt->flags |= CEPH_MOUNT_OPT_NOQUOTADF;
+		break;
+	case Opt_copyfrom:
+		fsopt->flags &= ~CEPH_MOUNT_OPT_NOCOPYFROM;
+		break;
+	case Opt_nocopyfrom:
+		fsopt->flags |= CEPH_MOUNT_OPT_NOCOPYFROM;
 		break;
 #ifdef CONFIG_CEPH_FS_POSIX_ACL
 	case Opt_acl:
@@ -520,7 +530,7 @@ static int ceph_show_options(struct seq_file *m, struct dentry *root)
 	seq_putc(m, ',');
 	pos = m->count;
 
-	ret = ceph_print_client_options(m, fsc->client);
+	ret = ceph_print_client_options(m, fsc->client, false);
 	if (ret)
 		return ret;
 
@@ -552,6 +562,9 @@ static int ceph_show_options(struct seq_file *m, struct dentry *root)
 	else
 		seq_puts(m, ",noacl");
 #endif
+
+	if ((fsopt->flags & CEPH_MOUNT_OPT_NOCOPYFROM) == 0)
+		seq_puts(m, ",copyfrom");
 
 	if (fsopt->mds_namespace)
 		seq_show_option(m, "mds_namespace", fsopt->mds_namespace);
@@ -602,6 +615,8 @@ static int extra_mon_dispatch(struct ceph_client *client, struct ceph_msg *msg)
 
 /*
  * create a new fs client
+ *
+ * Success or not, this function consumes @fsopt and @opt.
  */
 static struct ceph_fs_client *create_fs_client(struct ceph_mount_options *fsopt,
 					struct ceph_options *opt)
@@ -609,20 +624,23 @@ static struct ceph_fs_client *create_fs_client(struct ceph_mount_options *fsopt,
 	struct ceph_fs_client *fsc;
 	int page_count;
 	size_t size;
-	int err = -ENOMEM;
+	int err;
 
 	fsc = kzalloc(sizeof(*fsc), GFP_KERNEL);
-	if (!fsc)
-		return ERR_PTR(-ENOMEM);
+	if (!fsc) {
+		err = -ENOMEM;
+		goto fail;
+	}
 
 	fsc->client = ceph_create_client(opt, fsc);
 	if (IS_ERR(fsc->client)) {
 		err = PTR_ERR(fsc->client);
 		goto fail;
 	}
+	opt = NULL; /* fsc->client now owns this */
 
 	fsc->client->extra_mon_dispatch = extra_mon_dispatch;
-	fsc->client->osdc.abort_on_full = true;
+	ceph_set_opt(fsc->client, ABORT_ON_FULL);
 
 	if (!fsopt->mds_namespace) {
 		ceph_monc_want_map(&fsc->client->monc, CEPH_SUB_MDSMAP,
@@ -677,6 +695,9 @@ fail_client:
 	ceph_destroy_client(fsc->client);
 fail:
 	kfree(fsc);
+	if (opt)
+		ceph_destroy_options(opt);
+	destroy_mount_options(fsopt);
 	return ERR_PTR(err);
 }
 
@@ -1042,8 +1063,6 @@ static struct dentry *ceph_mount(struct file_system_type *fs_type,
 	fsc = create_fs_client(fsopt, opt);
 	if (IS_ERR(fsc)) {
 		res = ERR_CAST(fsc);
-		destroy_mount_options(fsopt);
-		ceph_destroy_options(opt);
 		goto out_final;
 	}
 

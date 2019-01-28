@@ -32,6 +32,7 @@
 #include <linux/device.h>
 #include <linux/mm.h>
 #include <linux/mmu_context.h>
+#include <linux/sched/mm.h>
 #include <linux/types.h>
 #include <linux/list.h>
 #include <linux/rbtree.h>
@@ -995,7 +996,7 @@ static int intel_vgpu_mmap(struct mdev_device *mdev, struct vm_area_struct *vma)
 {
 	unsigned int index;
 	u64 virtaddr;
-	unsigned long req_size, pgoff = 0;
+	unsigned long req_size, pgoff, req_start;
 	pgprot_t pg_prot;
 	struct intel_vgpu *vgpu = mdev_get_drvdata(mdev);
 
@@ -1013,7 +1014,17 @@ static int intel_vgpu_mmap(struct mdev_device *mdev, struct vm_area_struct *vma)
 	pg_prot = vma->vm_page_prot;
 	virtaddr = vma->vm_start;
 	req_size = vma->vm_end - vma->vm_start;
-	pgoff = vgpu_aperture_pa_base(vgpu) >> PAGE_SHIFT;
+	pgoff = vma->vm_pgoff &
+		((1U << (VFIO_PCI_OFFSET_SHIFT - PAGE_SHIFT)) - 1);
+	req_start = pgoff << PAGE_SHIFT;
+
+	if (!intel_vgpu_in_aperture(vgpu, req_start))
+		return -EINVAL;
+	if (req_start + req_size >
+	    vgpu_aperture_offset(vgpu) + vgpu_aperture_sz(vgpu))
+		return -EINVAL;
+
+	pgoff = (gvt_aperture_pa_base(vgpu->gvt) >> PAGE_SHIFT) + pgoff;
 
 	return remap_pfn_range(vma, virtaddr, pgoff, req_size, pg_prot);
 }
@@ -1661,9 +1672,21 @@ static int kvmgt_attach_vgpu(void *vgpu, unsigned long *handle)
 	return 0;
 }
 
-static void kvmgt_detach_vgpu(unsigned long handle)
+static void kvmgt_detach_vgpu(void *p_vgpu)
 {
-	/* nothing to do here */
+	int i;
+	struct intel_vgpu *vgpu = (struct intel_vgpu *)p_vgpu;
+
+	if (!vgpu->vdev.region)
+		return;
+
+	for (i = 0; i < vgpu->vdev.num_regions; i++)
+		if (vgpu->vdev.region[i].ops->release)
+			vgpu->vdev.region[i].ops->release(vgpu,
+					&vgpu->vdev.region[i]);
+	vgpu->vdev.num_regions = 0;
+	kfree(vgpu->vdev.region);
+	vgpu->vdev.region = NULL;
 }
 
 static int kvmgt_inject_msi(unsigned long handle, u32 addr, u16 data)
@@ -1712,7 +1735,7 @@ static unsigned long kvmgt_gfn_to_pfn(unsigned long handle, unsigned long gfn)
 	return pfn;
 }
 
-int kvmgt_dma_map_guest_page(unsigned long handle, unsigned long gfn,
+static int kvmgt_dma_map_guest_page(unsigned long handle, unsigned long gfn,
 		unsigned long size, dma_addr_t *dma_addr)
 {
 	struct kvmgt_guest_info *info;
@@ -1761,7 +1784,7 @@ static void __gvt_dma_release(struct kref *ref)
 	__gvt_cache_remove_entry(entry->vgpu, entry);
 }
 
-void kvmgt_dma_unmap_guest_page(unsigned long handle, dma_addr_t dma_addr)
+static void kvmgt_dma_unmap_guest_page(unsigned long handle, dma_addr_t dma_addr)
 {
 	struct kvmgt_guest_info *info;
 	struct gvt_dma *entry;
@@ -1792,16 +1815,21 @@ static int kvmgt_rw_gpa(unsigned long handle, unsigned long gpa,
 	info = (struct kvmgt_guest_info *)handle;
 	kvm = info->kvm;
 
-	if (kthread)
+	if (kthread) {
+		if (!mmget_not_zero(kvm->mm))
+			return -EFAULT;
 		use_mm(kvm->mm);
+	}
 
 	idx = srcu_read_lock(&kvm->srcu);
 	ret = write ? kvm_write_guest(kvm, gpa, buf, len) :
 		      kvm_read_guest(kvm, gpa, buf, len);
 	srcu_read_unlock(&kvm->srcu, idx);
 
-	if (kthread)
+	if (kthread) {
 		unuse_mm(kvm->mm);
+		mmput(kvm->mm);
+	}
 
 	return ret;
 }
@@ -1827,6 +1855,8 @@ static bool kvmgt_is_valid_gfn(unsigned long handle, unsigned long gfn)
 {
 	struct kvmgt_guest_info *info;
 	struct kvm *kvm;
+	int idx;
+	bool ret;
 
 	if (!handle_valid(handle))
 		return false;
@@ -1834,8 +1864,11 @@ static bool kvmgt_is_valid_gfn(unsigned long handle, unsigned long gfn)
 	info = (struct kvmgt_guest_info *)handle;
 	kvm = info->kvm;
 
-	return kvm_is_visible_gfn(kvm, gfn);
+	idx = srcu_read_lock(&kvm->srcu);
+	ret = kvm_is_visible_gfn(kvm, gfn);
+	srcu_read_unlock(&kvm->srcu, idx);
 
+	return ret;
 }
 
 struct intel_gvt_mpt kvmgt_mpt = {

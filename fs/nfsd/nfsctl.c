@@ -1126,6 +1126,8 @@ static ssize_t write_v4_end_grace(struct file *file, char *buf, size_t size)
 		case 'Y':
 		case 'y':
 		case '1':
+			if (nn->nfsd_serv)
+				return -EBUSY;
 			nfsd4_end_grace(nn);
 			break;
 		default:
@@ -1242,6 +1244,7 @@ static __net_init int nfsd_init_net(struct net *net)
 	nn->somebody_reclaimed = false;
 	nn->clverifier_counter = prandom_u32();
 	nn->clientid_counter = prandom_u32();
+	nn->s2s_cp_cl_id = nn->clientid_counter++;
 
 	atomic_set(&nn->ntf_refcnt, 0);
 	init_waitqueue_head(&nn->ntf_wq);

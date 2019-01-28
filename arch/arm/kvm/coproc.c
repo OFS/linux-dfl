@@ -478,15 +478,15 @@ static const struct coproc_reg cp15_regs[] = {
 
 	/* ICC_SGI1R */
 	{ CRm64(12), Op1( 0), is64, access_gic_sgi},
-	/* ICC_ASGI1R */
-	{ CRm64(12), Op1( 1), is64, access_gic_sgi},
-	/* ICC_SGI0R */
-	{ CRm64(12), Op1( 2), is64, access_gic_sgi},
 
 	/* VBAR: swapped by interrupt.S. */
 	{ CRn(12), CRm( 0), Op1( 0), Op2( 0), is32,
 			NULL, reset_val, c12_VBAR, 0x00000000 },
 
+	/* ICC_ASGI1R */
+	{ CRm64(12), Op1( 1), is64, access_gic_sgi},
+	/* ICC_SGI0R */
+	{ CRm64(12), Op1( 2), is64, access_gic_sgi},
 	/* ICC_SRE */
 	{ CRn(12), CRm(12), Op1( 0), Op2(5), is32, access_gic_sre },
 
@@ -602,8 +602,8 @@ static int emulate_cp15(struct kvm_vcpu *vcpu,
 		}
 	} else {
 		/* If access function fails, it should complain. */
-		kvm_err("Unsupported guest CP15 access at: %08lx\n",
-			*vcpu_pc(vcpu));
+		kvm_err("Unsupported guest CP15 access at: %08lx [%08lx]\n",
+			*vcpu_pc(vcpu), *vcpu_cpsr(vcpu));
 		print_cp_instr(params);
 		kvm_inject_undefined(vcpu);
 	}

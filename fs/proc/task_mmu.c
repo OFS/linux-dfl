@@ -521,7 +521,7 @@ static void smaps_pte_entry(pte_t *pte, unsigned long addr,
 		if (!page)
 			return;
 
-		if (radix_tree_exceptional_entry(page))
+		if (xa_is_value(page))
 			mss->swap += PAGE_SIZE;
 		else
 			put_page(page);
@@ -713,6 +713,8 @@ static void smap_gather_stats(struct vm_area_struct *vma,
 	smaps_walk.private = mss;
 
 #ifdef CONFIG_SHMEM
+	/* In case of smaps_rollup, reset the value from previous vma */
+	mss->check_shmem_swap = false;
 	if (vma->vm_file && shmem_mapping(vma->vm_file->f_mapping)) {
 		/*
 		 * For shared or readonly shmem mappings we know that all
@@ -728,7 +730,7 @@ static void smap_gather_stats(struct vm_area_struct *vma,
 
 		if (!shmem_swapped || (vma->vm_flags & VM_SHARED) ||
 					!(vma->vm_flags & VM_WRITE)) {
-			mss->swap = shmem_swapped;
+			mss->swap += shmem_swapped;
 		} else {
 			mss->check_shmem_swap = true;
 			smaps_walk.pte_hole = smaps_pte_hole;
@@ -787,6 +789,8 @@ static int show_smap(struct seq_file *m, void *v)
 	seq_puts(m, " kB\n");
 
 	__show_smap(m, &mss);
+
+	seq_printf(m, "THPeligible:    %d\n", transparent_hugepage_enabled(vma));
 
 	if (arch_pkeys_enabled())
 		seq_printf(m, "ProtectionKey:  %8u\n", vma_pkey(vma));
@@ -1094,6 +1098,7 @@ static ssize_t clear_refs_write(struct file *file, const char __user *buf,
 		return -ESRCH;
 	mm = get_task_mm(task);
 	if (mm) {
+		struct mmu_notifier_range range;
 		struct clear_refs_private cp = {
 			.type = type,
 		};
@@ -1137,11 +1142,13 @@ static ssize_t clear_refs_write(struct file *file, const char __user *buf,
 				downgrade_write(&mm->mmap_sem);
 				break;
 			}
-			mmu_notifier_invalidate_range_start(mm, 0, -1);
+
+			mmu_notifier_range_init(&range, mm, 0, -1UL);
+			mmu_notifier_invalidate_range_start(&range);
 		}
 		walk_page_range(0, mm->highest_vm_end, &clear_refs_walk);
 		if (type == CLEAR_REFS_SOFT_DIRTY)
-			mmu_notifier_invalidate_range_end(mm, 0, -1);
+			mmu_notifier_invalidate_range_end(&range);
 		tlb_finish_mmu(&tlb, 0, -1);
 		up_read(&mm->mmap_sem);
 out_mm:

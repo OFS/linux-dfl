@@ -31,7 +31,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/rculist.h>
-#include <linux/bootmem.h>
+#include <linux/memblock.h>
 #include <linux/hash.h>
 #include <linux/pid_namespace.h>
 #include <linux/init_task.h>
@@ -195,7 +195,7 @@ struct pid *alloc_pid(struct pid_namespace *ns)
 		idr_preload_end();
 
 		if (nr < 0) {
-			retval = nr;
+			retval = (nr == -ENOSPC) ? -EAGAIN : nr;
 			goto out_free;
 		}
 
@@ -233,8 +233,10 @@ out_unlock:
 
 out_free:
 	spin_lock_irq(&pidmap_lock);
-	while (++i <= ns->level)
-		idr_remove(&ns->idr, (pid->numbers + i)->nr);
+	while (++i <= ns->level) {
+		upid = pid->numbers + i;
+		idr_remove(&upid->ns->idr, upid->nr);
+	}
 
 	/* On failure to allocate the first pid, reset the state */
 	if (ns->pid_allocated == PIDNS_ADDING)

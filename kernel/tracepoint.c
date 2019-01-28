@@ -28,8 +28,8 @@
 #include <linux/sched/task.h>
 #include <linux/static_key.h>
 
-extern struct tracepoint * const __start___tracepoints_ptrs[];
-extern struct tracepoint * const __stop___tracepoints_ptrs[];
+extern tracepoint_ptr_t __start___tracepoints_ptrs[];
+extern tracepoint_ptr_t __stop___tracepoints_ptrs[];
 
 DEFINE_SRCU(tracepoint_srcu);
 EXPORT_SYMBOL_GPL(tracepoint_srcu);
@@ -92,7 +92,7 @@ static __init int release_early_probes(void)
 	while (early_probes) {
 		tmp = early_probes;
 		early_probes = tmp->next;
-		call_rcu_sched(tmp, rcu_free_old_probes);
+		call_rcu(tmp, rcu_free_old_probes);
 	}
 
 	return 0;
@@ -123,7 +123,7 @@ static inline void release_probes(struct tracepoint_func *old)
 		 * cover both cases. So let us chain the SRCU and sched RCU
 		 * callbacks to wait for both grace periods.
 		 */
-		call_rcu_sched(&tp_probes->rcu, rcu_free_old_probes);
+		call_rcu(&tp_probes->rcu, rcu_free_old_probes);
 	}
 }
 
@@ -371,25 +371,17 @@ int tracepoint_probe_unregister(struct tracepoint *tp, void *probe, void *data)
 }
 EXPORT_SYMBOL_GPL(tracepoint_probe_unregister);
 
-static void for_each_tracepoint_range(struct tracepoint * const *begin,
-		struct tracepoint * const *end,
+static void for_each_tracepoint_range(
+		tracepoint_ptr_t *begin, tracepoint_ptr_t *end,
 		void (*fct)(struct tracepoint *tp, void *priv),
 		void *priv)
 {
+	tracepoint_ptr_t *iter;
+
 	if (!begin)
 		return;
-
-	if (IS_ENABLED(CONFIG_HAVE_ARCH_PREL32_RELOCATIONS)) {
-		const int *iter;
-
-		for (iter = (const int *)begin; iter < (const int *)end; iter++)
-			fct(offset_to_ptr(iter), priv);
-	} else {
-		struct tracepoint * const *iter;
-
-		for (iter = begin; iter < end; iter++)
-			fct(*iter, priv);
-	}
+	for (iter = begin; iter < end; iter++)
+		fct(tracepoint_ptr_deref(iter), priv);
 }
 
 #ifdef CONFIG_MODULES

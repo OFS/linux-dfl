@@ -134,13 +134,19 @@ static int arch__associate_ins_ops(struct arch* arch, const char *name, struct i
 	return 0;
 }
 
+#include "arch/arc/annotate/instructions.c"
 #include "arch/arm/annotate/instructions.c"
 #include "arch/arm64/annotate/instructions.c"
 #include "arch/x86/annotate/instructions.c"
 #include "arch/powerpc/annotate/instructions.c"
 #include "arch/s390/annotate/instructions.c"
+#include "arch/sparc/annotate/instructions.c"
 
 static struct arch architectures[] = {
+	{
+		.name = "arc",
+		.init = arc__annotate_init,
+	},
 	{
 		.name = "arm",
 		.init = arm__annotate_init,
@@ -167,6 +173,13 @@ static struct arch architectures[] = {
 		.name = "s390",
 		.init = s390__annotate_init,
 		.objdump =  {
+			.comment_char = '#',
+		},
+	},
+	{
+		.name = "sparc",
+		.init = sparc__annotate_init,
+		.objdump = {
 			.comment_char = '#',
 		},
 	},
@@ -246,8 +259,14 @@ find_target:
 
 indirect_call:
 	tok = strchr(endptr, '*');
-	if (tok != NULL)
-		ops->target.addr = strtoull(tok + 1, NULL, 16);
+	if (tok != NULL) {
+		endptr++;
+
+		/* Indirect call can use a non-rip register and offset: callq  *0x8(%rbx).
+		 * Do not parse such instruction.  */
+		if (strstr(endptr, "(%r") == NULL)
+			ops->target.addr = strtoull(endptr, NULL, 16);
+	}
 	goto find_target;
 }
 
@@ -276,7 +295,19 @@ bool ins__is_call(const struct ins *ins)
 	return ins->ops == &call_ops || ins->ops == &s390_call_ops;
 }
 
-static int jump__parse(struct arch *arch __maybe_unused, struct ins_operands *ops, struct map_symbol *ms)
+/*
+ * Prevents from matching commas in the comment section, e.g.:
+ * ffff200008446e70:       b.cs    ffff2000084470f4 <generic_exec_single+0x314>  // b.hs, b.nlast
+ */
+static inline const char *validate_comma(const char *c, struct ins_operands *ops)
+{
+	if (ops->raw_comment && c > ops->raw_comment)
+		return NULL;
+
+	return c;
+}
+
+static int jump__parse(struct arch *arch, struct ins_operands *ops, struct map_symbol *ms)
 {
 	struct map *map = ms->map;
 	struct symbol *sym = ms->sym;
@@ -285,6 +316,10 @@ static int jump__parse(struct arch *arch __maybe_unused, struct ins_operands *op
 	};
 	const char *c = strchr(ops->raw, ',');
 	u64 start, end;
+
+	ops->raw_comment = strchr(ops->raw, arch->objdump.comment_char);
+	c = validate_comma(c, ops);
+
 	/*
 	 * Examples of lines to parse for the _cpp_lex_token@@Base
 	 * function:
@@ -304,6 +339,7 @@ static int jump__parse(struct arch *arch __maybe_unused, struct ins_operands *op
 		ops->target.addr = strtoull(c, NULL, 16);
 		if (!ops->target.addr) {
 			c = strchr(c, ',');
+			c = validate_comma(c, ops);
 			if (c++ != NULL)
 				ops->target.addr = strtoull(c, NULL, 16);
 		}
@@ -361,9 +397,12 @@ static int jump__scnprintf(struct ins *ins, char *bf, size_t size,
 		return scnprintf(bf, size, "%-6s %s", ins->name, ops->target.sym->name);
 
 	c = strchr(ops->raw, ',');
+	c = validate_comma(c, ops);
+
 	if (c != NULL) {
 		const char *c2 = strchr(c + 1, ',');
 
+		c2 = validate_comma(c2, ops);
 		/* check for 3-op insn */
 		if (c2 != NULL)
 			c = c2;
@@ -966,6 +1005,7 @@ static unsigned annotation__count_insn(struct annotation *notes, u64 start, u64 
 static void annotation__count_and_fill(struct annotation *notes, u64 start, u64 end, struct cyc_hist *ch)
 {
 	unsigned n_insn;
+	unsigned int cover_insn = 0;
 	u64 offset;
 
 	n_insn = annotation__count_insn(notes, start, end);
@@ -979,21 +1019,34 @@ static void annotation__count_and_fill(struct annotation *notes, u64 start, u64 
 		for (offset = start; offset <= end; offset++) {
 			struct annotation_line *al = notes->offsets[offset];
 
-			if (al)
+			if (al && al->ipc == 0.0) {
 				al->ipc = ipc;
+				cover_insn++;
+			}
+		}
+
+		if (cover_insn) {
+			notes->hit_cycles += ch->cycles;
+			notes->hit_insn += n_insn * ch->num;
+			notes->cover_insn += cover_insn;
 		}
 	}
 }
 
 void annotation__compute_ipc(struct annotation *notes, size_t size)
 {
-	u64 offset;
+	s64 offset;
 
 	if (!notes->src || !notes->src->cycles_hist)
 		return;
 
+	notes->total_insn = annotation__count_insn(notes, 0, size - 1);
+	notes->hit_cycles = 0;
+	notes->hit_insn = 0;
+	notes->cover_insn = 0;
+
 	pthread_mutex_lock(&notes->lock);
-	for (offset = 0; offset < size; ++offset) {
+	for (offset = size - 1; offset >= 0; --offset) {
 		struct cyc_hist *ch;
 
 		ch = &notes->src->cycles_hist[offset];
@@ -1670,15 +1723,14 @@ static int symbol__disassemble(struct symbol *sym, struct annotate_args *args)
 	err = asprintf(&command,
 		 "%s %s%s --start-address=0x%016" PRIx64
 		 " --stop-address=0x%016" PRIx64
-		 " -l -d %s %s -C \"%s\" 2>/dev/null|grep -v \"%s:\"|expand",
+		 " -l -d %s %s -C \"$1\" 2>/dev/null|grep -v \"$1:\"|expand",
 		 opts->objdump_path ?: "objdump",
 		 opts->disassembler_style ? "-M " : "",
 		 opts->disassembler_style ?: "",
 		 map__rip_2objdump(map, sym->start),
 		 map__rip_2objdump(map, sym->end),
 		 opts->show_asm_raw ? "" : "--no-show-raw",
-		 opts->annotate_src ? "-S" : "",
-		 symfs_filename, symfs_filename);
+		 opts->annotate_src ? "-S" : "");
 
 	if (err < 0) {
 		pr_err("Failure allocating memory for the command to run\n");
@@ -1703,7 +1755,8 @@ static int symbol__disassemble(struct symbol *sym, struct annotate_args *args)
 		close(stdout_fd[0]);
 		dup2(stdout_fd[1], 1);
 		close(stdout_fd[1]);
-		execl("/bin/sh", "sh", "-c", command, NULL);
+		execl("/bin/sh", "sh", "-c", command, "--", symfs_filename,
+		      NULL);
 		perror(command);
 		exit(-1);
 	}
@@ -1724,7 +1777,7 @@ static int symbol__disassemble(struct symbol *sym, struct annotate_args *args)
 	while (!feof(file)) {
 		/*
 		 * The source code line number (lineno) needs to be kept in
-		 * accross calls to symbol__parse_objdump_line(), so that it
+		 * across calls to symbol__parse_objdump_line(), so that it
 		 * can associate it with the instructions till the next one.
 		 * See disasm_line__new() and struct disasm_line::line_nr.
 		 */
@@ -2529,6 +2582,22 @@ call_like:
 	disasm_line__scnprintf(dl, bf, size, !notes->options->use_offset);
 }
 
+static void ipc_coverage_string(char *bf, int size, struct annotation *notes)
+{
+	double ipc = 0.0, coverage = 0.0;
+
+	if (notes->hit_cycles)
+		ipc = notes->hit_insn / ((double)notes->hit_cycles);
+
+	if (notes->total_insn) {
+		coverage = notes->cover_insn * 100.0 /
+			((double)notes->total_insn);
+	}
+
+	scnprintf(bf, size, "(Average IPC: %.2f, IPC Coverage: %.1f%%)",
+		  ipc, coverage);
+}
+
 static void __annotation_line__write(struct annotation_line *al, struct annotation *notes,
 				     bool first_line, bool current_entry, bool change_color, int width,
 				     void *obj, unsigned int percent_type,
@@ -2623,6 +2692,11 @@ static void __annotation_line__write(struct annotation_line *al, struct annotati
 				obj__printf(obj, "%*s ",
 					    ANNOTATION__MINMAX_CYCLES_WIDTH - 1,
 					    "Cycle(min/max)");
+		}
+
+		if (show_title && !*al->line) {
+			ipc_coverage_string(bf, sizeof(bf), notes);
+			obj__printf(obj, "%*s", ANNOTATION__AVG_IPC_WIDTH, bf);
 		}
 	}
 
@@ -2729,6 +2803,7 @@ int symbol__annotate2(struct symbol *sym, struct map *map, struct perf_evsel *ev
 	notes->nr_events = nr_pcnt;
 
 	annotation__update_column_widths(notes);
+	sym->annotate2 = true;
 
 	return 0;
 
