@@ -739,12 +739,6 @@ struct task_struct {
 	unsigned			use_memdelay:1;
 #endif
 
-	/*
-	 * May usercopy functions fault on kernel addresses?
-	 * This is not just a single bit because this can potentially nest.
-	 */
-	unsigned int			kernel_uaccess_faults_ok;
-
 	unsigned long			atomic_flags; /* Flags requiring atomic access. */
 
 	struct restart_block		restart_block;
@@ -995,7 +989,7 @@ struct task_struct {
 	/* cg_list protected by css_set_lock and tsk->alloc_lock: */
 	struct list_head		cg_list;
 #endif
-#ifdef CONFIG_X86_RESCTRL
+#ifdef CONFIG_X86_CPU_RESCTRL
 	u32				closid;
 	u32				rmid;
 #endif
