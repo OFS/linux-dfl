@@ -2223,7 +2223,9 @@ void per_cpu_trap_init(bool is_boot_cpu)
 		cp0_fdc_irq = -1;
 	}
 
-	if (!cpu_data[cpu].asid_cache)
+	if (cpu_has_mmid)
+		cpu_data[cpu].asid_cache = 0;
+	else if (!cpu_data[cpu].asid_cache)
 		cpu_data[cpu].asid_cache = asid_first_version(cpu);
 
 	mmgrab(&init_mm);
@@ -2291,7 +2293,10 @@ void __init trap_init(void)
 		phys_addr_t ebase_pa;
 
 		ebase = (unsigned long)
-			memblock_alloc_from(size, 1 << fls(size), 0);
+			memblock_alloc(size, 1 << fls(size));
+		if (!ebase)
+			panic("%s: Failed to allocate %lu bytes align=0x%x\n",
+			      __func__, size, 1 << fls(size));
 
 		/*
 		 * Try to ensure ebase resides in KSeg0 if possible.
