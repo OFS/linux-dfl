@@ -83,7 +83,7 @@ static int fme_pr(struct platform_device *pdev, unsigned long arg)
 	if (copy_from_user(&port_pr, argp, minsz))
 		return -EFAULT;
 
-	if (port_pr.argsz < minsz || port_pr.flags)
+	if (port_pr.argsz < minsz || port_pr.flags || !port_pr.buffer_size)
 		return -EINVAL;
 
 	/* get fme header region */
@@ -101,15 +101,25 @@ static int fme_pr(struct platform_device *pdev, unsigned long arg)
 		       port_pr.buffer_size))
 		return -EFAULT;
 
+	mutex_lock(&pdata->lock);
+	fme = dfl_fpga_pdata_get_private(pdata);
+	/* fme device has been unregistered. */
+	if (!fme) {
+		ret = -EINVAL;
+		goto unlock_exit;
+	}
+
 	/*
 	 * align PR buffer per PR bandwidth, as HW ignores the extra padding
 	 * data automatically.
 	 */
-	length = ALIGN(port_pr.buffer_size, 4);
+	length = ALIGN(port_pr.buffer_size, fme->pr_datawidth);
 
 	buf = vmalloc(length);
-	if (!buf)
-		return -ENOMEM;
+	if (!buf) {
+		ret = -ENOMEM;
+		goto unlock_exit;
+	}
 
 	if (copy_from_user(buf,
 			   (void __user *)(unsigned long)port_pr.buffer_address,
@@ -127,18 +137,10 @@ static int fme_pr(struct platform_device *pdev, unsigned long arg)
 
 	info->flags |= FPGA_MGR_PARTIAL_RECONFIG;
 
-	mutex_lock(&pdata->lock);
-	fme = dfl_fpga_pdata_get_private(pdata);
-	/* fme device has been unregistered. */
-	if (!fme) {
-		ret = -EINVAL;
-		goto unlock_exit;
-	}
-
 	region = dfl_fme_region_find(fme, port_pr.port_id);
 	if (!region) {
 		ret = -EINVAL;
-		goto unlock_exit;
+		goto free_exit;
 	}
 
 	fpga_image_info_free(region->info);
@@ -159,10 +161,10 @@ static int fme_pr(struct platform_device *pdev, unsigned long arg)
 		fpga_bridges_put(&region->bridge_list);
 
 	put_device(&region->dev);
-unlock_exit:
-	mutex_unlock(&pdata->lock);
 free_exit:
 	vfree(buf);
+unlock_exit:
+	mutex_unlock(&pdata->lock);
 	return ret;
 }
 
@@ -387,6 +389,17 @@ static int pr_mgmt_init(struct platform_device *pdev,
 
 	mutex_lock(&pdata->lock);
 	priv = dfl_fpga_pdata_get_private(pdata);
+
+	/*
+	 * Initialize PR data width.
+	 * Only revision 2 supports 512bit datawidth for better performance,
+	 * other revisions use default 32bit datawidth. This is used for
+	 * buffer alignment.
+	 */
+	if (dfl_feature_revision(feature->ioaddr) == 2)
+		priv->pr_datawidth = 64;
+	else
+		priv->pr_datawidth = 4;
 
 	/* Initialize the region and bridge sub device list */
 	INIT_LIST_HEAD(&priv->region_list);
