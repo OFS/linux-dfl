@@ -22,6 +22,7 @@
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <linux/fpga/fpga-mgr.h>
 
+#include "dfl.h"
 #include "dfl-fme-pr.h"
 
 /* FME Partial Reconfiguration Sub Feature Register Set */
@@ -30,6 +31,7 @@
 #define FME_PR_STS		0x10
 #define FME_PR_DATA		0x18
 #define FME_PR_ERR		0x20
+#define FME_PR_512_DATA		0x40 /* Data Register for 512bit datawidth PR */
 #define FME_PR_INTFC_ID_L	0xA8
 #define FME_PR_INTFC_ID_H	0xB0
 
@@ -67,8 +69,43 @@
 #define PR_WAIT_TIMEOUT   8000000
 #define PR_HOST_STATUS_IDLE	0
 
+#if defined(CONFIG_X86) && defined(CONFIG_AS_AVX512)
+
+#include <linux/cpufeature.h>
+#include <asm/fpu/api.h>
+
+static inline int is_cpu_avx512_enabled(void)
+{
+	return cpu_feature_enabled(X86_FEATURE_AVX512F);
+}
+
+static inline void copy512(const void *src, void __iomem *dst)
+{
+	kernel_fpu_begin();
+
+	asm volatile("vmovdqu64 (%0), %%zmm0;"
+		     "vmovntdq %%zmm0, (%1);"
+		     :
+		     : "r"(src), "r"(dst)
+		     : "memory");
+
+	kernel_fpu_end();
+}
+#else
+static inline int is_cpu_avx512_enabled(void)
+{
+	return 0;
+}
+
+static inline void copy512(const void *src, void __iomem *dst)
+{
+	WARN_ON_ONCE(1);
+}
+#endif
+
 struct fme_mgr_priv {
 	void __iomem *ioaddr;
+	unsigned int pr_datawidth;
 	u64 pr_error;
 };
 
@@ -169,7 +206,7 @@ static int fme_mgr_write(struct fpga_manager *mgr,
 	struct fme_mgr_priv *priv = mgr->priv;
 	void __iomem *fme_pr = priv->ioaddr;
 	u64 pr_ctrl, pr_status, pr_data;
-	int delay = 0, pr_credit, i = 0;
+	int ret = 0, delay = 0, pr_credit;
 
 	dev_dbg(dev, "start request\n");
 
@@ -181,9 +218,9 @@ static int fme_mgr_write(struct fpga_manager *mgr,
 
 	/*
 	 * driver can push data to PR hardware using PR_DATA register once HW
-	 * has enough pr_credit (> 1), pr_credit reduces one for every 32bit
-	 * pr data write to PR_DATA register. If pr_credit <= 1, driver needs
-	 * to wait for enough pr_credit from hardware by polling.
+	 * has enough pr_credit (> 1), pr_credit reduces one for every pr data
+	 * width write to PR_DATA register. If pr_credit <= 1, driver needs to
+	 * wait for enough pr_credit from hardware by polling.
 	 */
 	pr_status = readq(fme_pr + FME_PR_STS);
 	pr_credit = FIELD_GET(FME_PR_STS_PR_CREDIT, pr_status);
@@ -192,7 +229,8 @@ static int fme_mgr_write(struct fpga_manager *mgr,
 		while (pr_credit <= 1) {
 			if (delay++ > PR_WAIT_TIMEOUT) {
 				dev_err(dev, "PR_CREDIT timeout\n");
-				return -ETIMEDOUT;
+				ret = -ETIMEDOUT;
+				goto done;
 			}
 			udelay(1);
 
@@ -200,21 +238,27 @@ static int fme_mgr_write(struct fpga_manager *mgr,
 			pr_credit = FIELD_GET(FME_PR_STS_PR_CREDIT, pr_status);
 		}
 
-		if (count < 4) {
-			dev_err(dev, "Invalid PR bitstream size\n");
-			return -EINVAL;
-		}
+		WARN_ON(count < priv->pr_datawidth);
 
-		pr_data = 0;
-		pr_data |= FIELD_PREP(FME_PR_DATA_PR_DATA_RAW,
-				      *(((u32 *)buf) + i));
-		writeq(pr_data, fme_pr + FME_PR_DATA);
-		count -= 4;
+		switch (priv->pr_datawidth) {
+		case 4:
+			pr_data = FIELD_PREP(FME_PR_DATA_PR_DATA_RAW,
+					     *(u32 *)buf);
+			writeq(pr_data, fme_pr + FME_PR_DATA);
+			break;
+		case 64:
+			copy512(buf, fme_pr + FME_PR_512_DATA);
+			break;
+		default:
+			WARN_ON_ONCE(1);
+		}
+		buf += priv->pr_datawidth;
+		count -= priv->pr_datawidth;
 		pr_credit--;
-		i++;
 	}
 
-	return 0;
+done:
+	return ret;
 }
 
 static int fme_mgr_write_complete(struct fpga_manager *mgr,
@@ -279,6 +323,36 @@ static void fme_mgr_get_compat_id(void __iomem *fme_pr,
 	id->id_h = readq(fme_pr + FME_PR_INTFC_ID_H);
 }
 
+static u8 fme_mgr_get_pr_datawidth(struct device *dev, void __iomem *fme_pr)
+{
+	u8 revision = dfl_feature_revision(fme_pr);
+
+	if (revision < 2) {
+		/*
+		 * revision 0 and 1 only support 32bit data width partial
+		 * reconfiguration, so pr_datawidth is 4 (Byte).
+		 */
+		return 4;
+	} else if (revision == 2) {
+		/*
+		 * revision 2 hardware has optimization to support 512bit data
+		 * width partial reconfiguration with AVX512 instructions. So
+		 * pr_datawidth is 64 (Byte). As revision 2 hardware is only
+		 * used in integrated solution, CPU supports AVX512 instructions
+		 * for sure, but it still needs to check here as AVX512 could be
+		 * disabled in kernel (e.g. using clearcpuid boot option).
+		 */
+		if (is_cpu_avx512_enabled())
+			return 64;
+
+		dev_err(dev, "revision 2: AVX512 is disabled\n");
+		return 0;
+	}
+
+	dev_err(dev, "revision %d is not supported yet\n", revision);
+	return 0;
+}
+
 static int fme_mgr_probe(struct platform_device *pdev)
 {
 	struct dfl_fme_mgr_pdata *pdata = dev_get_platdata(&pdev->dev);
@@ -301,6 +375,10 @@ static int fme_mgr_probe(struct platform_device *pdev)
 		if (IS_ERR(priv->ioaddr))
 			return PTR_ERR(priv->ioaddr);
 	}
+
+	priv->pr_datawidth = fme_mgr_get_pr_datawidth(dev, priv->ioaddr);
+	if (!priv->pr_datawidth)
+		return -ENODEV;
 
 	compat_id = devm_kzalloc(dev, sizeof(*compat_id), GFP_KERNEL);
 	if (!compat_id)

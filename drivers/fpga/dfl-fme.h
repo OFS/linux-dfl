@@ -21,12 +21,14 @@
 /**
  * struct dfl_fme - dfl fme private data
  *
+ * @pr_datawidth: data width for partial reconfiguration.
  * @mgr: FME's FPGA manager platform device.
  * @region_list: linked list of FME's FPGA regions.
  * @bridge_list: linked list of FME's FPGA bridges.
  * @pdata: fme platform device's pdata.
  */
 struct dfl_fme {
+	int pr_datawidth;
 	struct platform_device *mgr;
 	struct list_head region_list;
 	struct list_head bridge_list;
