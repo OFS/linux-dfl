@@ -24,6 +24,8 @@
 #include <linux/slab.h>
 #include <linux/uuid.h>
 #include <linux/fpga/fpga-region.h>
+#include <linux/interrupt.h>
+#include <linux/eventfd.h>
 
 /* maximum supported number of ports */
 #define MAX_DFL_FPGA_PORT_NUM 4
@@ -213,14 +215,19 @@ struct dfl_feature_driver {
  * struct dfl_feature_irq_ctx - dfl private feature interrupt context
  *
  * @irq: Linux IRQ number of this interrupt.
+ * @trigger: eventfd context to signal when interrupt happens.
+ * @name: irq name needed when requesting irq.
  */
 struct dfl_feature_irq_ctx {
 	int irq;
+	struct eventfd_ctx *trigger;
+	char *name;
 };
 
 /**
  * struct dfl_feature - sub feature of the feature devices
  *
+ * @dev: ptr to pdev of the feature device which has the sub feature.
  * @id: sub feature id.
  * @resource_index: each sub feature has one mmio resource for its registers.
  *		    this index is used to find its mmio resource from the
@@ -232,6 +239,7 @@ struct dfl_feature_irq_ctx {
  * @priv: priv data of this feature.
  */
 struct dfl_feature {
+	struct platform_device *dev;
 	u64 id;
 	int resource_index;
 	void __iomem *ioaddr;
@@ -508,4 +516,7 @@ int dfl_fpga_cdev_release_port(struct dfl_fpga_cdev *cdev, int port_id);
 int dfl_fpga_cdev_assign_port(struct dfl_fpga_cdev *cdev, int port_id);
 void dfl_fpga_cdev_config_ports_pf(struct dfl_fpga_cdev *cdev);
 int dfl_fpga_cdev_config_ports_vf(struct dfl_fpga_cdev *cdev, int num_vf);
+
+int dfl_fpga_set_irq_triggers(struct dfl_feature *feature, unsigned int start,
+			      unsigned int count, int32_t *fds);
 #endif /* __FPGA_DFL_H */

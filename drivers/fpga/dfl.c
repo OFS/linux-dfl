@@ -535,6 +535,7 @@ static int build_info_commit_dev(struct build_feature_devs_info *binfo)
 		int i;
 
 		/* save resource information for each feature */
+		feature->dev = fdev;
 		feature->id = finfo->fid;
 		feature->resource_index = index;
 		feature->ioaddr = finfo->ioaddr;
@@ -1384,6 +1385,100 @@ done:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(dfl_fpga_cdev_config_ports_vf);
+
+static irqreturn_t dfl_irq_handler(int irq, void *arg)
+{
+	struct eventfd_ctx *trigger = arg;
+
+	eventfd_signal(trigger, 1);
+	return IRQ_HANDLED;
+}
+
+static int do_set_irq_trigger(struct dfl_feature *feature, unsigned int idx,
+			      int fd)
+{
+	struct platform_device *pdev = feature->dev;
+	struct eventfd_ctx *trigger;
+	int irq, ret;
+
+	if (idx >= feature->nr_irqs)
+		return -EINVAL;
+
+	irq = feature->irq_ctx[idx].irq;
+
+	if (feature->irq_ctx[idx].trigger) {
+		free_irq(irq, feature->irq_ctx[idx].trigger);
+		kfree(feature->irq_ctx[idx].name);
+		eventfd_ctx_put(feature->irq_ctx[idx].trigger);
+		feature->irq_ctx[idx].trigger = NULL;
+	}
+
+	if (fd < 0)
+		return 0;
+
+	feature->irq_ctx[idx].name =
+		kasprintf(GFP_KERNEL, "fpga-irq[%u](%s-%llx)", idx,
+			  dev_name(&pdev->dev),
+			  (unsigned long long)feature->id);
+	if (!feature->irq_ctx[idx].name)
+		return -ENOMEM;
+
+	trigger = eventfd_ctx_fdget(fd);
+	if (IS_ERR(trigger)) {
+		ret = PTR_ERR(trigger);
+		goto free_name;
+	}
+
+	ret = request_irq(irq, dfl_irq_handler, 0,
+			  feature->irq_ctx[idx].name, trigger);
+	if (!ret) {
+		feature->irq_ctx[idx].trigger = trigger;
+		return ret;
+	}
+
+	eventfd_ctx_put(trigger);
+free_name:
+	kfree(feature->irq_ctx[idx].name);
+
+	return ret;
+}
+
+/**
+ * dfl_fpga_set_irq_triggers - set eventfd triggers for dfl feature interrupts
+ *
+ * @feature: dfl sub feature.
+ * @start: start of irq index in this dfl sub feature.
+ * @count: number of irqs.
+ * @fds: eventfds to bind with irqs.
+ *
+ * Bind given eventfds with irqs in this dfl sub feature. Use NULL or negative
+ * fds as parameter to unbind irqs.
+ *
+ * Return: 0 on success, negative error code otherwise.
+ */
+int dfl_fpga_set_irq_triggers(struct dfl_feature *feature, unsigned int start,
+			      unsigned int count, int32_t *fds)
+{
+	unsigned int i, j;
+	int ret = 0;
+
+	if (start + count < start || start + count > feature->nr_irqs)
+		return -EINVAL;
+
+	for (i = 0, j = start; i < count && !ret; i++, j++) {
+		int fd = fds ? fds[i] : -1;
+
+		ret = do_set_irq_trigger(feature, j, fd);
+	}
+
+	if (ret) {
+		for (--j; j >= start; j--)
+			do_set_irq_trigger(feature, j, -1);
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(dfl_fpga_set_irq_triggers);
 
 static void __exit dfl_fpga_exit(void)
 {
