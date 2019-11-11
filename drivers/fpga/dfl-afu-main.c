@@ -529,6 +529,76 @@ static const struct dfl_feature_ops port_stp_ops = {
 	.init = port_stp_init,
 };
 
+static long
+port_uint_get_num_irqs(struct platform_device *pdev,
+		       struct dfl_feature *feature, unsigned long arg)
+{
+	if (copy_to_user((void __user *)arg, &feature->nr_irqs,
+			 sizeof(feature->nr_irqs)))
+		return -EFAULT;
+
+	return 0;
+}
+
+static long port_uint_set_irq(struct platform_device *pdev,
+			      struct dfl_feature *feature, unsigned long arg)
+{
+	struct dfl_feature_platform_data *pdata = dev_get_platdata(&pdev->dev);
+	struct dfl_fpga_irq_set hdr;
+	s32 *fds;
+	long ret;
+
+	if (!feature->nr_irqs)
+		return -ENOENT;
+
+	if (copy_from_user(&hdr, (void __user *)arg, sizeof(hdr)))
+		return -EFAULT;
+
+	if (!hdr.count || (hdr.start + hdr.count > feature->nr_irqs) ||
+	    (hdr.start + hdr.count < hdr.start))
+		return -EINVAL;
+
+	fds = memdup_user((void __user *)(arg + sizeof(hdr)),
+			  hdr.count * sizeof(s32));
+	if (IS_ERR(fds))
+		return PTR_ERR(fds);
+
+	mutex_lock(&pdata->lock);
+	ret = dfl_fpga_set_irq_triggers(feature, hdr.start, hdr.count, fds);
+	mutex_unlock(&pdata->lock);
+
+	kfree(fds);
+	return ret;
+}
+
+static long
+port_uint_ioctl(struct platform_device *pdev, struct dfl_feature *feature,
+		unsigned int cmd, unsigned long arg)
+{
+	long ret = -ENODEV;
+
+	switch (cmd) {
+	case DFL_FPGA_PORT_UINT_GET_IRQ_NUM:
+		ret = port_uint_get_num_irqs(pdev, feature, arg);
+		break;
+	case DFL_FPGA_PORT_UINT_SET_IRQ:
+		ret = port_uint_set_irq(pdev, feature, arg);
+		break;
+	default:
+		dev_dbg(&pdev->dev, "%x cmd not handled", cmd);
+	}
+	return ret;
+}
+
+static const struct dfl_feature_id port_uint_id_table[] = {
+	{.id = PORT_FEATURE_ID_UINT,},
+	{0,}
+};
+
+static const struct dfl_feature_ops port_uint_ops = {
+	.ioctl = port_uint_ioctl,
+};
+
 static struct dfl_feature_driver port_feature_drvs[] = {
 	{
 		.id_table = port_hdr_id_table,
@@ -545,6 +615,10 @@ static struct dfl_feature_driver port_feature_drvs[] = {
 	{
 		.id_table = port_stp_id_table,
 		.ops = &port_stp_ops,
+	},
+	{
+		.id_table = port_uint_id_table,
+		.ops = &port_uint_ops,
 	},
 	{
 		.ops = NULL,
