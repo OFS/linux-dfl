@@ -39,6 +39,11 @@ static void __iomem *cci_pci_ioremap_bar(struct pci_dev *pcidev, int bar)
 	return pcim_iomap_table(pcidev)[bar];
 }
 
+static void cci_pci_iounmap_bars(struct pci_dev *pcidev, int mapped_bars)
+{
+	pcim_iounmap_regions(pcidev, mapped_bars);
+}
+
 static int cci_pci_alloc_irq(struct pci_dev *pcidev)
 {
 	int ret, nvec = pci_msix_vec_count(pcidev);
@@ -125,7 +130,7 @@ static void cci_pci_free_irq_table(int *table)
 static int cci_enumerate_feature_devs(struct pci_dev *pcidev)
 {
 	struct cci_drvdata *drvdata = pci_get_drvdata(pcidev);
-	int port_num, bar, i, nvec, ret = 0;
+	int port_num, bar, i, nvec, mapped_bars, ret = 0;
 	struct dfl_fpga_enum_info *info;
 	struct dfl_fpga_cdev *cdev;
 	resource_size_t start, len;
@@ -165,6 +170,8 @@ static int cci_enumerate_feature_devs(struct pci_dev *pcidev)
 		goto irq_free_exit;
 	}
 
+	mapped_bars = BIT(0);
+
 	/*
 	 * PF device has FME and Ports/AFUs, and VF device only has one
 	 * Port/AFU. Check them and add related "Device Feature List" info
@@ -174,7 +181,7 @@ static int cci_enumerate_feature_devs(struct pci_dev *pcidev)
 		start = pci_resource_start(pcidev, 0);
 		len = pci_resource_len(pcidev, 0);
 
-		dfl_fpga_enum_info_add_dfl(info, start, len, base);
+		dfl_fpga_enum_info_add_dfl(info, start, len);
 
 		/*
 		 * find more Device Feature Lists (e.g. Ports) per information
@@ -202,21 +209,25 @@ static int cci_enumerate_feature_devs(struct pci_dev *pcidev)
 			if (!base)
 				continue;
 
+			mapped_bars |= BIT(bar);
+
 			start = pci_resource_start(pcidev, bar) + offset;
 			len = pci_resource_len(pcidev, bar) - offset;
 
-			dfl_fpga_enum_info_add_dfl(info, start, len,
-						   base + offset);
+			dfl_fpga_enum_info_add_dfl(info, start, len);
 		}
 	} else if (dfl_feature_is_port(base)) {
 		start = pci_resource_start(pcidev, 0);
 		len = pci_resource_len(pcidev, 0);
 
-		dfl_fpga_enum_info_add_dfl(info, start, len, base);
+		dfl_fpga_enum_info_add_dfl(info, start, len);
 	} else {
 		ret = -ENODEV;
 		goto irq_free_exit;
 	}
+
+	/* release I/O mappings for next step enumeration */
+	cci_pci_iounmap_bars(pcidev, mapped_bars);
 
 	/* start enumeration with prepared enumeration information */
 	cdev = dfl_fpga_feature_devs_enumerate(info);
