@@ -250,6 +250,11 @@ int dfl_fpga_check_port_id(struct platform_device *pdev, void *pport_id)
 }
 EXPORT_SYMBOL_GPL(dfl_fpga_check_port_id);
 
+static bool is_header_feature(struct dfl_feature *feature)
+{
+	return feature->id == FEATURE_ID_FIU_HEADER;
+}
+
 /**
  * dfl_fpga_dev_feature_uinit - uinit for sub features of dfl feature device
  * @pdev: feature device.
@@ -273,7 +278,19 @@ static int dfl_feature_instance_init(struct platform_device *pdev,
 				     struct dfl_feature *feature,
 				     struct dfl_feature_driver *drv)
 {
+	void __iomem *base;
 	int ret = 0;
+
+	if (!is_header_feature(feature)) {
+		base = devm_platform_ioremap_resource(pdev,
+						      feature->resource_index);
+		if (IS_ERR(base)) {
+			dev_err(&pdev->dev, "fail to get iomem resource!\n");
+			return PTR_ERR(base);
+		}
+
+		feature->ioaddr = base;
+	}
 
 	if (drv->ops->init) {
 		ret = drv->ops->init(pdev, feature);
@@ -427,7 +444,9 @@ EXPORT_SYMBOL_GPL(dfl_fpga_dev_ops_unregister);
  * @irq_table: Linux IRQ numbers for all irqs, indexed by local irq index of
  *	       this device.
  * @feature_dev: current feature device.
- * @ioaddr: header register region address of feature device in enumeration.
+ * @ioaddr: header register region address of current FIU in enumeration.
+ * @start: register resource start of current FIU.
+ * @len: max register resource length of current FIU.
  * @sub_features: a sub features linked list for feature device in enumeration.
  * @feature_num: number of sub features for feature device in enumeration.
  */
@@ -439,6 +458,9 @@ struct build_feature_devs_info {
 
 	struct platform_device *feature_dev;
 	void __iomem *ioaddr;
+	resource_size_t start;
+	resource_size_t len;
+
 	struct list_head sub_features;
 	int feature_num;
 };
@@ -484,10 +506,7 @@ static int build_info_commit_dev(struct build_feature_devs_info *binfo)
 	struct dfl_feature_platform_data *pdata;
 	struct dfl_feature_info *finfo, *p;
 	enum dfl_id_type type;
-	int ret, index = 0;
-
-	if (!fdev)
-		return 0;
+	int ret, index = 0, res_idx = 0;
 
 	type = feature_dev_id_type(fdev);
 	if (WARN_ON_ONCE(type >= DFL_ID_MAX))
@@ -531,16 +550,30 @@ static int build_info_commit_dev(struct build_feature_devs_info *binfo)
 
 	/* fill features and resource information for feature dev */
 	list_for_each_entry_safe(finfo, p, &binfo->sub_features, node) {
-		struct dfl_feature *feature = &pdata->features[index];
+		struct dfl_feature *feature = &pdata->features[index++];
 		struct dfl_feature_irq_ctx *ctx;
 		unsigned int i;
 
 		/* save resource information for each feature */
 		feature->dev = fdev;
 		feature->id = finfo->fid;
-		feature->resource_index = index;
-		feature->ioaddr = finfo->ioaddr;
-		fdev->resource[index++] = finfo->mmio_res;
+
+		/*
+		 * map header resource for dfl bus device. Don't add header
+		 * resource to feature devices, or the resource tree will be
+		 * disordered and cause warning on resource release
+		 */
+		if (is_header_feature(feature)) {
+			feature->resource_index = -1;
+			feature->ioaddr =
+				devm_ioremap_resource(binfo->dev,
+						      &finfo->mmio_res);
+			if (IS_ERR(feature->ioaddr))
+				return PTR_ERR(feature->ioaddr);
+		} else {
+			feature->resource_index = res_idx;
+			fdev->resource[res_idx++] = finfo->mmio_res;
+		}
 
 		if (finfo->nr_irqs) {
 			ctx = devm_kcalloc(binfo->dev, finfo->nr_irqs,
@@ -583,18 +616,12 @@ static int build_info_commit_dev(struct build_feature_devs_info *binfo)
 
 static int
 build_info_create_dev(struct build_feature_devs_info *binfo,
-		      enum dfl_id_type type, void __iomem *ioaddr)
+		      enum dfl_id_type type)
 {
 	struct platform_device *fdev;
-	int ret;
 
 	if (type >= DFL_ID_MAX)
 		return -EINVAL;
-
-	/* we will create a new device, commit current device first */
-	ret = build_info_commit_dev(binfo);
-	if (ret)
-		return ret;
 
 	/*
 	 * we use -ENODEV as the initialization indicator which indicates
@@ -606,7 +633,7 @@ build_info_create_dev(struct build_feature_devs_info *binfo,
 
 	binfo->feature_dev = fdev;
 	binfo->feature_num = 0;
-	binfo->ioaddr = ioaddr;
+
 	INIT_LIST_HEAD(&binfo->sub_features);
 
 	fdev->id = dfl_id_alloc(type, &fdev->dev);
@@ -748,18 +775,17 @@ static int parse_feature_irqs(struct build_feature_devs_info *binfo,
  */
 static int
 create_feature_instance(struct build_feature_devs_info *binfo,
-			struct dfl_fpga_enum_dfl *dfl, resource_size_t ofst,
-			resource_size_t size, u64 fid)
+			resource_size_t ofst, resource_size_t size, u64 fid)
 {
 	unsigned int irq_base, nr_irqs;
 	struct dfl_feature_info *finfo;
 	int ret;
 
 	/* read feature size and id if inputs are invalid */
-	size = size ? size : feature_size(dfl->ioaddr + ofst);
-	fid = fid ? fid : feature_id(dfl->ioaddr + ofst);
+	size = size ? size : feature_size(binfo->ioaddr + ofst);
+	fid = fid ? fid : feature_id(binfo->ioaddr + ofst);
 
-	if (dfl->len - ofst < size)
+	if (binfo->len - ofst < size)
 		return -EINVAL;
 
 	ret = parse_feature_irqs(binfo, ofst, fid, &irq_base, &nr_irqs);
@@ -771,12 +797,11 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 		return -ENOMEM;
 
 	finfo->fid = fid;
-	finfo->mmio_res.start = dfl->start + ofst;
+	finfo->mmio_res.start = binfo->start + ofst;
 	finfo->mmio_res.end = finfo->mmio_res.start + size - 1;
 	finfo->mmio_res.flags = IORESOURCE_MEM;
 	finfo->irq_base = irq_base;
 	finfo->nr_irqs = nr_irqs;
-	finfo->ioaddr = dfl->ioaddr + ofst;
 
 	list_add_tail(&finfo->node, &binfo->sub_features);
 	binfo->feature_num++;
@@ -785,7 +810,6 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 }
 
 static int parse_feature_port_afu(struct build_feature_devs_info *binfo,
-				  struct dfl_fpga_enum_dfl *dfl,
 				  resource_size_t ofst)
 {
 	u64 v = readq(binfo->ioaddr + PORT_HDR_CAP);
@@ -793,11 +817,10 @@ static int parse_feature_port_afu(struct build_feature_devs_info *binfo,
 
 	WARN_ON(!size);
 
-	return create_feature_instance(binfo, dfl, ofst, size, FEATURE_ID_AFU);
+	return create_feature_instance(binfo, ofst, size, FEATURE_ID_AFU);
 }
 
 static int parse_feature_afu(struct build_feature_devs_info *binfo,
-			     struct dfl_fpga_enum_dfl *dfl,
 			     resource_size_t ofst)
 {
 	if (!binfo->feature_dev) {
@@ -807,7 +830,7 @@ static int parse_feature_afu(struct build_feature_devs_info *binfo,
 
 	switch (feature_dev_id_type(binfo->feature_dev)) {
 	case PORT_ID:
-		return parse_feature_port_afu(binfo, dfl, ofst);
+		return parse_feature_port_afu(binfo, ofst);
 	default:
 		dev_info(binfo->dev, "AFU belonging to FIU %s is not supported yet.\n",
 			 binfo->feature_dev->name);
@@ -816,35 +839,91 @@ static int parse_feature_afu(struct build_feature_devs_info *binfo,
 	return 0;
 }
 
+static bool is_feature_dev_detected(struct build_feature_devs_info *binfo)
+{
+	return !!binfo->feature_dev;
+}
+
+static void dfl_binfo_shift(struct build_feature_devs_info *binfo,
+			    resource_size_t ofst)
+{
+	binfo->start = binfo->start + ofst;
+	binfo->len = binfo->len - ofst;
+}
+
+static int dfl_binfo_prepare(struct build_feature_devs_info *binfo,
+			     resource_size_t start, resource_size_t len)
+{
+	struct device *dev = binfo->dev;
+	void __iomem *ioaddr;
+
+	if (!devm_request_mem_region(dev, start, len, dev_name(dev))) {
+		dev_err(dev, "request region fail, start:%pa, len:%pa\n",
+			&start, &len);
+		return -ENOMEM;
+	}
+
+	ioaddr = devm_ioremap(dev, start, len);
+	if (!ioaddr) {
+		dev_err(dev, "ioremap region fail, start:%pa, len:%pa\n",
+			&start, &len);
+		devm_release_mem_region(dev, start, len);
+		return -EFAULT;
+	}
+
+	binfo->start = start;
+	binfo->len = len;
+	binfo->ioaddr = ioaddr;
+
+	return 0;
+}
+
+static void dfl_binfo_finish(struct build_feature_devs_info *binfo)
+{
+	devm_iounmap(binfo->dev, binfo->ioaddr);
+	devm_release_mem_region(binfo->dev, binfo->start, binfo->len);
+}
+
 static int parse_feature_fiu(struct build_feature_devs_info *binfo,
-			     struct dfl_fpga_enum_dfl *dfl,
 			     resource_size_t ofst)
 {
 	u32 id, offset;
 	u64 v;
 	int ret = 0;
 
-	v = readq(dfl->ioaddr + ofst + DFH);
+	if (is_feature_dev_detected(binfo)) {
+		dfl_binfo_finish(binfo);
+
+		ret = build_info_commit_dev(binfo);
+		if (ret)
+			return ret;
+
+		dfl_binfo_prepare(binfo, binfo->start + ofst,
+				  binfo->len - ofst);
+	} else {
+		dfl_binfo_shift(binfo, ofst);
+	}
+
+	v = readq(binfo->ioaddr + DFH);
 	id = FIELD_GET(DFH_ID, v);
 
 	/* create platform device for dfl feature dev */
-	ret = build_info_create_dev(binfo, dfh_id_to_type(id),
-				    dfl->ioaddr + ofst);
+	ret = build_info_create_dev(binfo, dfh_id_to_type(id));
 	if (ret)
 		return ret;
 
-	ret = create_feature_instance(binfo, dfl, ofst, 0, 0);
+	ret = create_feature_instance(binfo, 0, 0, 0);
 	if (ret)
 		return ret;
 	/*
 	 * find and parse FIU's child AFU via its NEXT_AFU register.
 	 * please note that only Port has valid NEXT_AFU pointer per spec.
 	 */
-	v = readq(dfl->ioaddr + ofst + NEXT_AFU);
+	v = readq(binfo->ioaddr + NEXT_AFU);
 
 	offset = FIELD_GET(NEXT_AFU_NEXT_DFH_OFST, v);
 	if (offset)
-		return parse_feature_afu(binfo, dfl, ofst + offset);
+		return parse_feature_afu(binfo, offset);
 
 	dev_dbg(binfo->dev, "No AFUs detected on FIU %d\n", id);
 
@@ -852,16 +931,15 @@ static int parse_feature_fiu(struct build_feature_devs_info *binfo,
 }
 
 static int parse_feature_private(struct build_feature_devs_info *binfo,
-				 struct dfl_fpga_enum_dfl *dfl,
 				 resource_size_t ofst)
 {
 	if (!binfo->feature_dev) {
 		dev_err(binfo->dev, "the private feature %llx does not belong to any AFU.\n",
-			(unsigned long long)feature_id(dfl->ioaddr + ofst));
+			(unsigned long long)feature_id(binfo->ioaddr + ofst));
 		return -EINVAL;
 	}
 
-	return create_feature_instance(binfo, dfl, ofst, 0, 0);
+	return create_feature_instance(binfo, ofst, 0, 0);
 }
 
 /**
@@ -869,24 +947,24 @@ static int parse_feature_private(struct build_feature_devs_info *binfo,
  *
  * @binfo: build feature devices information.
  * @dfl: device feature list to parse
- * @ofst: offset to feature header on this device feature list
+ * @ofst: offset to current FIU header
  */
 static int parse_feature(struct build_feature_devs_info *binfo,
-			 struct dfl_fpga_enum_dfl *dfl, resource_size_t ofst)
+			 resource_size_t ofst)
 {
 	u64 v;
 	u32 type;
 
-	v = readq(dfl->ioaddr + ofst + DFH);
+	v = readq(binfo->ioaddr + ofst + DFH);
 	type = FIELD_GET(DFH_TYPE, v);
 
 	switch (type) {
 	case DFH_TYPE_AFU:
-		return parse_feature_afu(binfo, dfl, ofst);
+		return parse_feature_afu(binfo, ofst);
 	case DFH_TYPE_PRIVATE:
-		return parse_feature_private(binfo, dfl, ofst);
+		return parse_feature_private(binfo, ofst);
 	case DFH_TYPE_FIU:
-		return parse_feature_fiu(binfo, dfl, ofst);
+		return parse_feature_fiu(binfo, ofst);
 	default:
 		dev_info(binfo->dev,
 			 "Feature Type %x is not supported.\n", type);
@@ -898,11 +976,17 @@ static int parse_feature(struct build_feature_devs_info *binfo,
 static int parse_feature_list(struct build_feature_devs_info *binfo,
 			      struct dfl_fpga_enum_dfl *dfl)
 {
-	void __iomem *start = dfl->ioaddr;
-	void __iomem *end = dfl->ioaddr + dfl->len;
+	resource_size_t start, end;
 	int ret = 0;
 	u32 ofst = 0;
 	u64 v;
+
+	ret = dfl_binfo_prepare(binfo, dfl->start, dfl->len);
+	if (ret)
+		return ret;
+
+	start = dfl->start;
+	end = start + dfl->len;
 
 	/* walk through the device feature list via DFH's next DFH pointer. */
 	for (; start < end; start += ofst) {
@@ -911,11 +995,11 @@ static int parse_feature_list(struct build_feature_devs_info *binfo,
 			return -EINVAL;
 		}
 
-		ret = parse_feature(binfo, dfl, start - dfl->ioaddr);
+		ret = parse_feature(binfo, start - binfo->start);
 		if (ret)
 			return ret;
 
-		v = readq(start + DFH);
+		v = readq(binfo->ioaddr + start - binfo->start + DFH);
 		ofst = FIELD_GET(DFH_NEXT_HDR_OFST, v);
 
 		/* stop parsing if EOL(End of List) is set or offset is 0 */
@@ -924,6 +1008,8 @@ static int parse_feature_list(struct build_feature_devs_info *binfo,
 	}
 
 	/* commit current feature device when reach the end of list */
+	dfl_binfo_finish(binfo);
+
 	return build_info_commit_dev(binfo);
 }
 
@@ -977,7 +1063,6 @@ EXPORT_SYMBOL_GPL(dfl_fpga_enum_info_free);
  * @info: ptr to dfl_fpga_enum_info
  * @start: mmio resource address of the device feature list.
  * @len: mmio resource length of the device feature list.
- * @ioaddr: mapped mmio resource address of the device feature list.
  *
  * One FPGA device may have one or more Device Feature Lists (DFLs), use this
  * function to add information of each DFL to common data structure for next
@@ -986,8 +1071,7 @@ EXPORT_SYMBOL_GPL(dfl_fpga_enum_info_free);
  * Return: 0 on success, negative error code otherwise.
  */
 int dfl_fpga_enum_info_add_dfl(struct dfl_fpga_enum_info *info,
-			       resource_size_t start, resource_size_t len,
-			       void __iomem *ioaddr)
+			       resource_size_t start, resource_size_t len)
 {
 	struct dfl_fpga_enum_dfl *dfl;
 
@@ -997,7 +1081,6 @@ int dfl_fpga_enum_info_add_dfl(struct dfl_fpga_enum_info *info,
 
 	dfl->start = start;
 	dfl->len = len;
-	dfl->ioaddr = ioaddr;
 
 	list_add_tail(&dfl->node, &info->dfls);
 
