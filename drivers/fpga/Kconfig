@@ -191,6 +191,18 @@ config FPGA_DFL_AFU
 	  to the FPGA infrastructure via a Port. There may be more than one
 	  Port/AFU per DFL based FPGA device.
 
+config FPGA_DFL_N3000_NIOS
+        tristate "FPGA DFL N3000 NIOS Driver"
+        depends on FPGA_DFL
+        select REGMAP
+        help
+	  This is the driver for the nios handshake private feature on Intel
+	  N3000 FPGA Card. This private feature provides a handshake interface
+	  to FPGA NIOS firmware, which receives retimer configuration command
+	  from host and executes via an internal SPI master. When nios finished
+	  the configuration, host takes over the ownership of the SPI master to
+	  control an Intel MAX10 BMC Chip on the SPI bus.
+
 config FPGA_DFL_PCI
 	tristate "FPGA DFL PCIe Device Driver"
 	depends on PCI && FPGA_DFL

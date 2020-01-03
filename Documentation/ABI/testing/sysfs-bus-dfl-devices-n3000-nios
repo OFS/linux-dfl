@@ -1,0 +1,16 @@
+What:		/sys/bus/dfl/devices/dfl-fme.X.X/fec_mode
+Date:		March 2020
+KernelVersion:	5.8
+Contact:	Xu Yilun <yilun.xu@intel.com>
+Description:	Read-only. It returns the FEC mode of the ethernet retimer
+		configured by NIOS firmware. "rs" for RS FEC mode, "kr" for
+		KR FEC mode, "no" FOR NO FEC mode.
+		Format: string
+
+What:		/sys/bus/dfl/devices/dfl-fme.X.X/nios_fw_version
+Date:		March 2020
+KernelVersion:	5.8
+Contact:	Xu Yilun <yilun.xu@intel.com>
+Description:	Read-only. It returns the NIOS firmware version in FPGA. Its
+		format is "major.minor.patch".
+		Format: %x.%x.%x
