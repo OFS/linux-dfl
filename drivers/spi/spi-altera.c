@@ -19,8 +19,6 @@
 #include <linux/io.h>
 #include <linux/of.h>
 
-#define DRV_NAME "spi_altera"
-
 #define ALTERA_SPI_RXDATA	0
 #define ALTERA_SPI_TXDATA	4
 #define ALTERA_SPI_STATUS	8
@@ -338,7 +336,7 @@ MODULE_DEVICE_TABLE(of, altera_spi_match);
 static struct platform_driver altera_spi_driver = {
 	.probe = altera_spi_probe,
 	.driver = {
-		.name = DRV_NAME,
+		.name = ALTERA_SPI_DRV_NAME,
 		.pm = NULL,
 		.of_match_table = of_match_ptr(altera_spi_match),
 	},
@@ -348,4 +346,4 @@ module_platform_driver(altera_spi_driver);
 MODULE_DESCRIPTION("Altera SPI driver");
 MODULE_AUTHOR("Thomas Chou <thomas@wytron.com.tw>");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:" DRV_NAME);
+MODULE_ALIAS("platform:" ALTERA_SPI_DRV_NAME);
