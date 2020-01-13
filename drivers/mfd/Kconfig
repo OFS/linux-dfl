@@ -19,6 +19,15 @@ config MFD_CS5535
 	  This is the core driver for CS5535/CS5536 MFD functions.  This is
 	  necessary for using the board's GPIO and MFGPT functionality.
 
+config MFD_INTEL_M10_BMC
+        tristate "Intel MAX10 board management controller"
+        depends on SPI_MASTER
+        select REGMAP
+        select MFD_CORE
+        help
+          Support for the Intel MAX10 board management controller using the
+          SPI interface.
+
 config MFD_ALTERA_A10SR
 	bool "Altera Arria10 DevKit System Resource chip"
 	depends on ARCH_SOCFPGA && SPI_MASTER=y && OF
