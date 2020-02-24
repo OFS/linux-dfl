@@ -54,4 +54,8 @@ m10bmc_raw_read(struct intel_m10bmc *m10bmc, unsigned int addr,
 #define m10bmc_sys_read(m10bmc, offset, val) \
 	m10bmc_raw_read(m10bmc, M10BMC_SYS_BASE + (offset), val)
 
+/* M10BMC system sub devices for PAC N3000 */
+/* subdev hwmon  */
+#define N3000BMC_HWMON_DEV_NAME         "n3000bmc-hwmon"
+
 #endif /* __INTEL_M10_BMC_H */
