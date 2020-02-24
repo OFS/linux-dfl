@@ -20,7 +20,11 @@ enum m10bmc_type {
 	M10_N3000,
 };
 
-static struct mfd_cell m10bmc_pacn3000_subdevs[] = {};
+static struct mfd_cell m10bmc_pacn3000_subdevs[] = {
+	{
+		.name = N3000BMC_HWMON_DEV_NAME,
+	}
+};
 
 static struct regmap_config intel_m10bmc_regmap_config = {
 	.reg_bits = 32,
