@@ -6,6 +6,9 @@
 # Core FPGA Manager Framework
 obj-$(CONFIG_FPGA)			+= fpga-mgr.o
 
+# Intel FPGA Security Manager Framework
+obj-$(CONFIG_IFPGA_SEC_MGR)		+= ifpga-sec-mgr.o
+
 # FPGA Manager Drivers
 obj-$(CONFIG_FPGA_MGR_ALTERA_CVP)	+= altera-cvp.o
 obj-$(CONFIG_FPGA_MGR_ALTERA_PS_SPI)	+= altera-ps-spi.o
