@@ -526,6 +526,18 @@ void dfl_driver_unregister(struct dfl_driver *dfl_drv)
 }
 EXPORT_SYMBOL(dfl_driver_unregister);
 
+int dfl_dev_get_vendor_net_cfg(struct dfl_device *dfl_dev)
+{
+	u64 v;
+
+	if (!dfl_dev || !dfl_dev->cdev || !dfl_dev->cdev->fme_dev)
+		return -EINVAL;
+
+	v = dfl_get_bitstream_id(dfl_dev->cdev->fme_dev);
+	return (int)FIELD_GET(FME_BID_VENDOR_NET_CFG, v);
+}
+EXPORT_SYMBOL_GPL(dfl_dev_get_vendor_net_cfg);
+
 /**
  * dfl_fpga_dev_feature_uinit - uinit for sub features of dfl feature device
  * @pdev: feature device.
