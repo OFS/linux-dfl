@@ -103,6 +103,9 @@
 #define FME_CAP_CACHE_SIZE	GENMASK_ULL(43, 32)	/* cache size in KB */
 #define FME_CAP_CACHE_ASSOC	GENMASK_ULL(47, 44)	/* Associativity */
 
+/* FME BITSTREAM_ID Register Bitfield */
+#define FME_BID_VENDOR_NET_CFG	GENMASK_ULL(35, 32)     /* vendor net cfg */
+
 /* FME Port Offset Register Bitfield */
 /* Offset to port device feature header */
 #define FME_PORT_OFST_DFH_OFST	GENMASK_ULL(23, 0)
@@ -394,6 +397,15 @@ void __iomem *dfl_get_feature_ioaddr_by_id(struct device *dev, u16 id)
 static inline bool is_dfl_feature_present(struct device *dev, u16 id)
 {
 	return !!dfl_get_feature_ioaddr_by_id(dev, id);
+}
+
+static inline u64 dfl_get_bitstream_id(struct device *dev)
+{
+	void __iomem *base;
+
+	base = dfl_get_feature_ioaddr_by_id(dev, FME_FEATURE_ID_HEADER);
+
+	return readq(base + FME_HDR_BITSTREAM_ID);
 }
 
 static inline
