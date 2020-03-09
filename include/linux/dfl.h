@@ -67,6 +67,8 @@ struct dfl_driver {
 #define to_dfl_dev(d) container_of(d, struct dfl_device, dev)
 #define to_dfl_drv(d) container_of(d, struct dfl_driver, drv)
 
+int dfl_dev_get_vendor_net_cfg(struct dfl_device *dfl_dev);
+
 /*
  * use a macro to avoid include chaining to get THIS_MODULE.
  */
