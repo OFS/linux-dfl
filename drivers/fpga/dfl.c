@@ -535,6 +535,27 @@ void dfl_driver_unregister(struct dfl_driver *dfl_drv)
 }
 EXPORT_SYMBOL(dfl_driver_unregister);
 
+int dfl_dev_get_vendor_net_cfg(struct dfl_device *dfl_dev)
+{
+	struct device *fme_dev;
+	u64 v;
+
+	if (!dfl_dev)
+		return -EINVAL;
+
+	if (dfl_dev->type == FME_ID)
+		fme_dev = dfl_dev->dev.parent;
+	else
+		fme_dev = dfl_dev->cdev->fme_dev;
+
+	if (!fme_dev)
+		return -EINVAL;
+
+	v = dfl_get_bitstream_id(fme_dev);
+	return (int)FIELD_GET(FME_BID_VENDOR_NET_CFG, v);
+}
+EXPORT_SYMBOL_GPL(dfl_dev_get_vendor_net_cfg);
+
 #define is_header_feature(feature) ((feature)->id == FEATURE_ID_FIU_HEADER)
 
 /**
