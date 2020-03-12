@@ -838,4 +838,16 @@ struct mhi_device_id {
 	kernel_ulong_t driver_data;
 };
 
+/**
+ * struct dfl_device_id -  dfl device identifier
+ * @type: contains 4 bits DFL FIU type of the device. See enum dfl_id_type.
+ * @feature_id: contains 12 bits feature identifier local to its DFL FIU type.
+ * @driver_data: driver specific data.
+ */
+struct dfl_device_id {
+	__u8 type;
+	__u16 feature_id;
+	kernel_ulong_t driver_data;
+};
+
 #endif /* LINUX_MOD_DEVICETABLE_H */
