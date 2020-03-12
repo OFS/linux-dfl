@@ -26,6 +26,7 @@
 #include <linux/fpga/fpga-region.h>
 #include <linux/interrupt.h>
 #include <linux/eventfd.h>
+#include <linux/mod_devicetable.h>
 
 /* maximum supported number of ports */
 #define MAX_DFL_FPGA_PORT_NUM 4
@@ -528,18 +529,6 @@ enum dfl_id_type {
 	FME_ID,
 	PORT_ID,
 	DFL_ID_MAX,
-};
-
-/**
- * struct dfl_device_id -  dfl device identifier
- * @type: Type of DFL FIU of the device. See enum dfl_id_type.
- * @feature_id: 64 bits feature identifier local to its DFL FIU type.
- * @driver_data: Driver specific data
- */
-struct dfl_device_id {
-	unsigned int type;
-	unsigned long long feature_id;
-	unsigned long driver_data;
 };
 
 /**
