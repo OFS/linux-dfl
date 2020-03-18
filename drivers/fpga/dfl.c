@@ -532,7 +532,7 @@ static int build_info_commit_dev(struct build_feature_devs_info *binfo)
 	list_for_each_entry_safe(finfo, p, &binfo->sub_features, node) {
 		struct dfl_feature *feature = &pdata->features[index];
 		struct dfl_feature_irq_ctx *ctx;
-		int i;
+		unsigned int i;
 
 		/* save resource information for each feature */
 		feature->dev = fdev;
@@ -667,6 +667,75 @@ static u64 feature_id(void __iomem *start)
 }
 
 /*
+ * This function will not return any error. If irq parsing is failed, we still
+ * try to support the feature without irq capability.
+ */
+static void parse_feature_irqs(struct build_feature_devs_info *binfo,
+			       resource_size_t ofst, u64 fid,
+			       unsigned int *irq_base, unsigned int *nr_irqs)
+{
+	void __iomem *base = binfo->ioaddr + ofst;
+	unsigned int i;
+	int virq;
+	u64 v;
+
+	/*
+	 * Ideally DFL framework should only read info from DFL header, but
+	 * current version DFL only provides mmio resources information for
+	 * each feature in DFL Header, no field for interrupt resources.
+	 * Some interrupt resources information are provided by specific
+	 * mmio registers of each components(e.g. different private features)
+	 * which supports interrupt. So in order to parse and assign irq
+	 * resources to different components, DFL framework has to look into
+	 * specific capability registers of these core private features.
+	 *
+	 * Once future DFL version supports generic interrupt resources
+	 * information in common DFL headers, some generic interrupt parsing
+	 * code could be added. But in order to be compatible to old version
+	 * DFL, driver may still fall back to these quirks.
+	 */
+	switch (fid) {
+	case PORT_FEATURE_ID_UINT:
+		v = readq(base + PORT_UINT_CAP);
+		*irq_base = FIELD_GET(PORT_UINT_CAP_FST_VECT, v);
+		*nr_irqs = FIELD_GET(PORT_UINT_CAP_INT_NUM, v);
+		break;
+	case PORT_FEATURE_ID_ERROR:
+		v = readq(base + PORT_ERROR_CAP);
+		*irq_base = FIELD_GET(PORT_ERROR_CAP_INT_VECT, v);
+		*nr_irqs = FIELD_GET(PORT_ERROR_CAP_SUPP_INT, v);
+		break;
+	case FME_FEATURE_ID_GLOBAL_ERR:
+		v = readq(base + FME_ERROR_CAP);
+		*irq_base = FIELD_GET(FME_ERROR_CAP_INT_VECT, v);
+		*nr_irqs = FIELD_GET(FME_ERROR_CAP_SUPP_INT, v);
+		break;
+	default:
+		return;
+	}
+
+	dev_dbg(binfo->dev, "feature: 0x%llx, nr_irqs: %u, irq_base: %u\n",
+		(unsigned long long)fid, *nr_irqs, *irq_base);
+
+	if (*irq_base + *nr_irqs > binfo->nr_irqs)
+		goto parse_irq_fail;
+
+	for (i = 0; i < *nr_irqs; i++) {
+		virq = binfo->irq_table[*irq_base + i];
+		if (virq < 0 || virq > NR_IRQS)
+			goto parse_irq_fail;
+	}
+
+	return;
+
+parse_irq_fail:
+	*irq_base = 0;
+	*nr_irqs = 0;
+	dev_warn(binfo->dev, "Invalid interrupt number in feature 0x%llx\n",
+		 (unsigned long long)fid);
+}
+
+/*
  * when create sub feature instances, for private features, it doesn't need
  * to provide resource size and feature id as they could be read from DFH
  * register. For afu sub feature, its register region only contains user
@@ -676,9 +745,9 @@ static u64 feature_id(void __iomem *start)
 static int
 create_feature_instance(struct build_feature_devs_info *binfo,
 			struct dfl_fpga_enum_dfl *dfl, resource_size_t ofst,
-			resource_size_t size, u64 fid, unsigned int irq_base,
-			unsigned int nr_irqs)
+			resource_size_t size, u64 fid)
 {
+	unsigned int irq_base = 0, nr_irqs = 0;
 	struct dfl_feature_info *finfo;
 
 	/* read feature size and id if inputs are invalid */
@@ -687,6 +756,8 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 
 	if (dfl->len - ofst < size)
 		return -EINVAL;
+
+	parse_feature_irqs(binfo, ofst, fid, &irq_base, &nr_irqs);
 
 	finfo = kzalloc(sizeof(*finfo), GFP_KERNEL);
 	if (!finfo)
@@ -715,8 +786,7 @@ static int parse_feature_port_afu(struct build_feature_devs_info *binfo,
 
 	WARN_ON(!size);
 
-	return create_feature_instance(binfo, dfl, ofst, size, FEATURE_ID_AFU,
-				       0, 0);
+	return create_feature_instance(binfo, dfl, ofst, size, FEATURE_ID_AFU);
 }
 
 static int parse_feature_afu(struct build_feature_devs_info *binfo,
@@ -756,7 +826,7 @@ static int parse_feature_fiu(struct build_feature_devs_info *binfo,
 	if (ret)
 		return ret;
 
-	ret = create_feature_instance(binfo, dfl, ofst, 0, 0, 0, 0);
+	ret = create_feature_instance(binfo, dfl, ofst, 0, 0);
 	if (ret)
 		return ret;
 	/*
@@ -774,86 +844,17 @@ static int parse_feature_fiu(struct build_feature_devs_info *binfo,
 	return ret;
 }
 
-static void parse_feature_irqs(struct build_feature_devs_info *binfo,
-			       struct dfl_fpga_enum_dfl *dfl,
-			       resource_size_t ofst,
-			       unsigned int *irq_base, unsigned int *nr_irqs)
-{
-	unsigned int i;
-	u64 id, v;
-	int virq;
-
-	/*
-	 * Ideally DFL framework should only read info from DFL header, but
-	 * current version DFL only provides mmio resources information for
-	 * each feature in DFL Header, no field for interrupt resources.
-	 * Some interrupt resources information are provided by specific
-	 * mmio registers of each components(e.g. different private features)
-	 * which supports interrupt. So in order to parse and assign irq
-	 * resources to different components, DFL framework has to look into
-	 * specific capability registers of these core private features.
-	 *
-	 * Once future DFL version supports generic interrupt resources
-	 * information in common DFL headers, some generic interrupt parsing
-	 * code could be added. But in order to be compatible to old version
-	 * DFL, driver may still fall back to these quirks.
-	 */
-
-	id = feature_id((dfl->ioaddr + ofst));
-
-	if (id == PORT_FEATURE_ID_UINT) {
-		v = readq(dfl->ioaddr + ofst + PORT_UINT_CAP);
-		*irq_base = FIELD_GET(PORT_UINT_CAP_FST_VECT, v);
-		*nr_irqs = FIELD_GET(PORT_UINT_CAP_INT_NUM, v);
-	} else if (id == PORT_FEATURE_ID_ERROR) {
-		v = readq(dfl->ioaddr + ofst + PORT_ERROR_CAP);
-		*irq_base = FIELD_GET(PORT_ERROR_CAP_INT_VECT, v);
-		*nr_irqs = FIELD_GET(PORT_ERROR_CAP_SUPP_INT, v);
-	} else if (id == FME_FEATURE_ID_GLOBAL_ERR) {
-		v = readq(dfl->ioaddr + ofst + FME_ERROR_CAP);
-		*irq_base = FIELD_GET(FME_ERROR_CAP_INT_VECT, v);
-		*nr_irqs = FIELD_GET(FME_ERROR_CAP_SUPP_INT, v);
-	} else {
-		return;
-	}
-
-	dev_dbg(binfo->dev, "feature: 0x%llx, nr_irqs: %u, irq_base: %u\n",
-		(unsigned long long)id, *nr_irqs, *irq_base);
-
-	if (*irq_base + *nr_irqs > binfo->nr_irqs)
-		goto parse_irq_fail;
-
-	for (i = 0; i < *nr_irqs; i++) {
-		virq = binfo->irq_table[*irq_base + i];
-		if (virq < 0 || virq > NR_IRQS)
-			goto parse_irq_fail;
-	}
-
-	return;
-
-parse_irq_fail:
-	*irq_base = 0;
-	*nr_irqs = 0;
-	dev_warn(binfo->dev, "Invalid interrupt number in feature 0x%llx\n",
-		 (unsigned long long)id);
-}
-
 static int parse_feature_private(struct build_feature_devs_info *binfo,
 				 struct dfl_fpga_enum_dfl *dfl,
 				 resource_size_t ofst)
 {
-	unsigned int irq_base = 0, nr_irqs = 0;
-
 	if (!binfo->feature_dev) {
 		dev_err(binfo->dev, "the private feature %llx does not belong to any AFU.\n",
 			(unsigned long long)feature_id(dfl->ioaddr + ofst));
 		return -EINVAL;
 	}
 
-	parse_feature_irqs(binfo, dfl, ofst, &irq_base, &nr_irqs);
-
-	return create_feature_instance(binfo, dfl, ofst, 0, 0, irq_base,
-				       nr_irqs);
+	return create_feature_instance(binfo, dfl, ofst, 0, 0);
 }
 
 /**
@@ -1008,8 +1009,11 @@ EXPORT_SYMBOL_GPL(dfl_fpga_enum_info_add_dfl);
  * One FPGA device may have several interrupts. This function adds irq
  * information of the DFL fpga device to enum info for next step enumeration.
  * This function should be called before dfl_fpga_feature_devs_enumerate().
- * Adding multiply irq tables is not supported so it will fail on a second
- * call.
+ * As we only support one irq domain for all DFLs in the same enum info, adding
+ * irq table a second time for the same enum info will return error.
+ *
+ * If we need to enumerate DFLs which belong to different irq domains, we
+ * should fill more enum info and enumerate them one by one.
  *
  * Return: 0 on success, negative error code otherwise.
  */
