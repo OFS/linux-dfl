@@ -141,26 +141,24 @@ static int cci_enumerate_feature_devs(struct pci_dev *pcidev)
 		dev_err(&pcidev->dev, "Fail to alloc irq %d.\n", nvec);
 		ret = nvec;
 		goto enum_info_free_exit;
-	}
-
-	if (nvec) {
+	} else if (nvec) {
 		irq_table = cci_pci_create_irq_table(pcidev, nvec);
 		if (!irq_table) {
 			ret = -ENOMEM;
-			goto error_free_irq;
+			goto irq_free_exit;
 		}
 
 		ret = dfl_fpga_enum_info_add_irq(info, nvec, irq_table);
 		kfree(irq_table);
 		if (ret)
-			goto error_free_irq;
+			goto irq_free_exit;
 	}
 
 	/* start to find Device Feature List from Bar 0 */
 	base = cci_pci_ioremap_bar(pcidev, 0);
 	if (!base) {
 		ret = -ENOMEM;
-		goto error_free_irq;
+		goto irq_free_exit;
 	}
 
 	/*
@@ -213,7 +211,7 @@ static int cci_enumerate_feature_devs(struct pci_dev *pcidev)
 		dfl_fpga_enum_info_add_dfl(info, start, len, base);
 	} else {
 		ret = -ENODEV;
-		goto error_free_irq;
+		goto irq_free_exit;
 	}
 
 	/* start enumeration with prepared enumeration information */
@@ -221,12 +219,12 @@ static int cci_enumerate_feature_devs(struct pci_dev *pcidev)
 	if (IS_ERR(cdev)) {
 		dev_err(&pcidev->dev, "Enumeration failure\n");
 		ret = PTR_ERR(cdev);
-		goto error_free_irq;
+		goto irq_free_exit;
 	}
 
 	drvdata->cdev = cdev;
 
-error_free_irq:
+irq_free_exit:
 	if (ret)
 		cci_pci_free_irq(pcidev);
 enum_info_free_exit:
