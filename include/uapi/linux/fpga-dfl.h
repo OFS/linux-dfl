@@ -196,7 +196,7 @@ struct dfl_fpga_irq_set {
  *						struct dfl_fpga_irq_set)
  *
  * Set fpga afu user interrupt trigger if evtfds[n] is valid.
- * Unset related interrupt trigger if evtfds[n] is a NULL or negative value.
+ * Unset related interrupt trigger if evtfds[n] is a negative value.
  * Return: 0 on success, -errno on failure.
  */
 #define DFL_FPGA_PORT_UINT_SET_IRQ	_IOW(DFL_FPGA_MAGIC,	\
