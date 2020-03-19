@@ -353,11 +353,7 @@ static long
 fme_global_err_get_num_irqs(struct platform_device *pdev,
 			    struct dfl_feature *feature, unsigned long arg)
 {
-	if (copy_to_user((void __user *)arg, &feature->nr_irqs,
-			 sizeof(feature->nr_irqs)))
-		return -EFAULT;
-
-	return 0;
+	return put_user(feature->nr_irqs, (__u32 __user *)arg);
 }
 
 static long

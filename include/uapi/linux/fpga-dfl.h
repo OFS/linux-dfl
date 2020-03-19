@@ -251,7 +251,7 @@ struct dfl_fpga_fme_port_pr {
  *							__u32 num_irqs)
  *
  * Get the number of irqs supported by the fpga fme error reporting private
- * feature.
+ * feature. Currently hardware supports up to 1 irq.
  * Return: 0 on success, -errno on failure.
  */
 #define DFL_FPGA_FME_ERR_GET_IRQ_NUM	_IOR(DFL_FPGA_MAGIC,	\
@@ -262,7 +262,7 @@ struct dfl_fpga_fme_port_pr {
  *						struct dfl_fpga_irq_set)
  *
  * Set fpga fme error reporting interrupt trigger if evtfds[n] is valid.
- * Unset related interrupt trigger if evtfds[n] is a NULL or negative value.
+ * Unset related interrupt trigger if evtfds[n] is a negative value.
  * Return: 0 on success, -errno on failure.
  */
 #define DFL_FPGA_FME_ERR_SET_IRQ	_IOW(DFL_FPGA_MAGIC,	\
