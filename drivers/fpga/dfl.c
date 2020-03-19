@@ -1453,10 +1453,12 @@ free_name:
  * @feature: dfl sub feature.
  * @start: start of irq index in this dfl sub feature.
  * @count: number of irqs.
- * @fds: eventfds to bind with irqs.
+ * @fds: eventfds to bind with irqs. unbind related irq if fds[n] is negative.
+ *	 unbind "count" specified number of irqs if fds ptr is NULL.
  *
- * Bind given eventfds with irqs in this dfl sub feature. Use NULL or negative
- * fds as parameter to unbind irqs.
+ * Bind given eventfds with irqs in this dfl sub feature. Unbind related irq if
+ * fds[n] is negative. Unbind "count" specified number of irqs if fds ptr is
+ * NULL.
  *
  * Return: 0 on success, negative error code otherwise.
  */
