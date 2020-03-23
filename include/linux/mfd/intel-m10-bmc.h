@@ -21,6 +21,22 @@
 #define M10BMC_VER_PCB_INFO_MSK		GENMASK(31, 24)
 #define M10BMC_VER_LEGACY_INVALID	0xffffffff
 
+/* PKVL related registers, in system register region */
+#define PKVL_LINK_STATUS		0x164
+
+/**
+ * struct intel_m10bmc_retimer_pdata - subdev retimer platform data
+ *
+ * @retimer_master: the NIC device which connects to the retimers on m10bmc
+ */
+struct intel_m10bmc_retimer_pdata {
+	struct device *retimer_master;
+};
+
+struct intel_m10bmc_platdata {
+	struct intel_m10bmc_retimer_pdata *retimer;
+};
+
 /**
  * struct intel_m10bmc - Intel MAX 10 BMC parent driver data structure
  * @dev: this device

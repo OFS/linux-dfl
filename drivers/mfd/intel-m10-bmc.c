@@ -23,6 +23,21 @@ static struct mfd_cell m10bmc_pacn3000_subdevs[] = {
 	{ .name = "n3000bmc-secure" },
 };
 
+static void
+m10bmc_init_cells_platdata(struct intel_m10bmc_platdata *pdata,
+			   struct mfd_cell *cells, int n_cell)
+{
+	int i;
+
+	for (i = 0; i < n_cell; i++) {
+		if (!strcmp(cells[i].name, "n3000bmc-retimer")) {
+			cells[i].platform_data = pdata->retimer;
+			cells[i].pdata_size =
+				pdata->retimer ? sizeof(*pdata->retimer) : 0;
+		}
+	}
+}
+
 static struct regmap_config intel_m10bmc_regmap_config = {
 	.reg_bits = 32,
 	.val_bits = 32,
@@ -97,6 +112,7 @@ static int check_m10bmc_version(struct intel_m10bmc *ddata)
 
 static int intel_m10_bmc_spi_probe(struct spi_device *spi)
 {
+	struct intel_m10bmc_platdata *pdata = dev_get_platdata(&spi->dev);
 	const struct spi_device_id *id = spi_get_device_id(spi);
 	struct device *dev = &spi->dev;
 	struct mfd_cell *cells;
@@ -133,6 +149,8 @@ static int intel_m10_bmc_spi_probe(struct spi_device *spi)
 	default:
 		return -ENODEV;
 	}
+
+	m10bmc_init_cells_platdata(pdata, cells, n_cell);
 
 	ret = devm_mfd_add_devices(dev, PLATFORM_DEVID_AUTO, cells, n_cell,
 				   NULL, 0, NULL);
