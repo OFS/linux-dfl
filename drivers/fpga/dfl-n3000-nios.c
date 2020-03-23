@@ -16,6 +16,7 @@
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/mfd/intel-m10-bmc.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 #include <linux/stddef.h>
@@ -95,6 +96,8 @@ struct n3000_nios {
 	struct regmap *regmap;
 	struct device *dev;
 	struct platform_device *altera_spi;
+	struct intel_m10bmc_platdata m10bmc_pdata;
+	struct intel_m10bmc_retimer_pdata m10bmc_retimer_pdata;
 };
 
 static ssize_t nios_fw_version_show(struct device *dev,
@@ -364,7 +367,8 @@ struct spi_board_info m10_n3000_info = {
 	.chip_select = 0,
 };
 
-static int create_altera_spi_controller(struct n3000_nios *ns)
+static int create_altera_spi_controller(struct n3000_nios *ns,
+					struct device *retimer_master)
 {
 	struct altera_spi_platform_data pdata = { 0 };
 	struct platform_device_info pdevinfo = { 0 };
@@ -383,6 +387,9 @@ static int create_altera_spi_controller(struct n3000_nios *ns)
 	pdata.bits_per_word_mask =
 		SPI_BPW_RANGE_MASK(1, FIELD_GET(PARAM_DATA_WIDTH, v));
 
+	ns->m10bmc_retimer_pdata.retimer_master = retimer_master;
+	ns->m10bmc_pdata.retimer = &ns->m10bmc_retimer_pdata;
+	m10_n3000_info.platform_data = &ns->m10bmc_pdata;
 	pdata.num_devices = 1;
 	pdata.devices = &m10_n3000_info;
 
@@ -502,7 +509,7 @@ static int n3000_nios_probe(struct dfl_device *dfl_dev)
 	if (ret)
 		return ret;
 
-	ret = create_altera_spi_controller(ns);
+	ret = create_altera_spi_controller(ns, dfl_dev_get_base_dev(dfl_dev));
 	if (ret)
 		dev_err(dev, "altera spi controller create failed: %d\n", ret);
 
