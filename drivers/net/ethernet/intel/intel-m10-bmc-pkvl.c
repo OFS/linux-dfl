@@ -10,6 +10,8 @@
 #include <linux/phy.h>
 #include <linux/platform_device.h>
 
+#include "dfl-eth-group.h"
+
 #define NUM_CHIP	2
 #define MAX_LINK	4
 
@@ -141,7 +143,7 @@ static int pkvl_mii_bus_init(struct n3000bmc_pkvl *pkvl)
 	bus->name = N3000_PKVL_MII_NAME;
 	bus->read = pkvl_phy_read;
 	bus->write = pkvl_phy_write;
-	snprintf(bus->id, MII_BUS_ID_SIZE, "%s-mii",
+	snprintf(bus->id, MII_BUS_ID_SIZE, DFL_ETH_MII_ID_FMT,
 		 dev_name(pkvl->base_dev));
 	bus->parent = pkvl->dev;
 	bus->phy_mask = ~(BITS_MASK(pkvl->num_devs));
