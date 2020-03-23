@@ -20,11 +20,33 @@ enum m10bmc_type {
 	M10_N3000,
 };
 
+static struct intel_m10bmc_pkvl_pdata pkvl_platdata;
+
 static struct mfd_cell m10bmc_pacn3000_subdevs[] = {
 	{
 		.name = "n3000bmc-hwmon",
-	}
+	},
+	{
+		.name = "n3000bmc-pkvl",
+		.platform_data = &pkvl_platdata,
+		.pdata_size = sizeof(pkvl_platdata),
+	},
 };
+
+static void
+m10bmc_init_cells_platdata(struct intel_m10bmc_platdata *m10_pdata,
+			   struct mfd_cell *cells, int n_cell)
+{
+	int i;
+
+	for (i = 0; i < n_cell; i++) {
+		if (!strcmp(cells[i].name, "n3000bmc-pkvl")) {
+			struct intel_m10bmc_pkvl_pdata *pdata =
+						cells[i].platform_data;
+			pdata->pkvl_master = m10_pdata->pkvl_master;
+		}
+	}
+}
 
 static struct regmap_config intel_m10bmc_regmap_config = {
 	.reg_bits = 32,
@@ -151,6 +173,7 @@ static int m10bmc_spi_setup(struct spi_device *spi)
 
 static int intel_m10_bmc_spi_probe(struct spi_device *spi)
 {
+	struct intel_m10bmc_platdata *pdata = dev_get_platdata(&spi->dev);
 	const struct spi_device_id *id = spi_get_device_id(spi);
 	struct device *dev = &spi->dev;
 	struct mfd_cell *cells;
@@ -166,7 +189,6 @@ static int intel_m10_bmc_spi_probe(struct spi_device *spi)
 		return -ENOMEM;
 
 	m10bmc->dev = dev;
-
 	m10bmc->regmap =
 		devm_regmap_init_spi_avmm(spi, &intel_m10bmc_regmap_config);
 	if (IS_ERR(m10bmc->regmap)) {
@@ -191,6 +213,8 @@ static int intel_m10_bmc_spi_probe(struct spi_device *spi)
 	default:
 		return -ENODEV;
 	}
+
+	m10bmc_init_cells_platdata(pdata, cells, n_cell);
 
 	ret = devm_mfd_add_devices(dev, PLATFORM_DEVID_AUTO, cells, n_cell,
 				   NULL, 0, NULL);

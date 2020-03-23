@@ -342,4 +342,20 @@ config IGC
 	  To compile this driver as a module, choose M here. The module
 	  will be called igc.
 
+config INTEL_M10_BMC_PKVL
+	tristate "Device Driver for Intel(R) MAX10 BMC Parkvale interface"
+	depends on MFD_INTEL_M10_BMC
+	select PHYLIB
+        help
+          This driver supports Intel(R) MAX10 BMC Parkvale interface for
+	  PAC N3000 FPGA Smart NIC.
+
+	  Parkvale is an Intel(R) Ethernet serdes transceiver chip that
+	  supports up to 100G transfer. This driver accesses the Parkvale
+	  interface on MAX10 BMC and adds the phy device for each port of
+	  the Parkvale chips.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called intel-m10-bmc-pkvl.
+
 endif # NET_VENDOR_INTEL
