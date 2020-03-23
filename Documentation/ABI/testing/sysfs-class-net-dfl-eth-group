@@ -1,0 +1,19 @@
+What:		/sys/class/net/<iface>/tx_pause_frame_quanta
+Date:		Oct 2020
+KernelVersion:	5.11
+Contact:	Xu Yilun <yilun.xu@intel.com>
+Description:
+		Read-Write. Value representing the tx pause quanta of Pause
+		flow control frames to be sent to remote partner. Read the file
+		for the actual tx pause quanta value. Write the file to set
+		value of the tx pause quanta.
+
+What:		/sys/class/net/<iface>/tx_pause_frame_holdoff
+Date:		Oct 2020
+KernelVersion:	5.11
+Contact:	Xu Yilun <yilun.xu@intel.com>
+Description:
+		Read-Write. Value representing the separation between 2
+		consecutive XOFF flow control frames. Read the file for the
+		actual separation value. Write the file to set value of the
+		separation.
