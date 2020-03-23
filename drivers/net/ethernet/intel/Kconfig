@@ -343,4 +343,16 @@ config IGC
 	  To compile this driver as a module, choose M here. The module
 	  will be called igc.
 
+config INTEL_M10_BMC_RETIMER
+	tristate "Intel(R) MAX 10 BMC ethernet retimer support"
+	depends on MFD_INTEL_M10_BMC
+	select PHYLIB
+        help
+          This driver supports the ethernet retimer (Parkvale) on
+	  Intel(R) MAX 10 BMC, which is used by Intel PAC N3000 FPGA based
+	  Smart NIC.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called intel-m10-bmc-retimer.
+
 endif # NET_VENDOR_INTEL
