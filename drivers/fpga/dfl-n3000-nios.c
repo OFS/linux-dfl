@@ -15,6 +15,7 @@
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/mfd/intel-m10-bmc.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 #include <linux/stddef.h>
@@ -89,6 +90,7 @@ struct dfl_n3000_nios {
 	struct regmap *regmap;
 	struct device *dev;
 	struct platform_device *altr_spi;
+	struct intel_m10bmc_platdata m10_n3000_pdata;
 };
 
 static int n3000_nios_writel(struct dfl_n3000_nios *ns, unsigned int reg,
@@ -322,7 +324,8 @@ struct spi_board_info m10_n3000_info = {
 	.chip_select = 0,
 };
 
-static int create_altr_spi_controller(struct dfl_n3000_nios *ns)
+static int create_altr_spi_controller(struct dfl_n3000_nios *ns,
+				      struct device *pkvl_master)
 {
 	struct altera_spi_platform_data pdata = { 0 };
 	struct platform_device_info pdevinfo = { 0 };
@@ -341,6 +344,8 @@ static int create_altr_spi_controller(struct dfl_n3000_nios *ns)
 	pdata.bits_per_word_mask =
 		SPI_BPW_RANGE_MASK(1, FIELD_GET(DATA_WIDTH, v));
 
+	ns->m10_n3000_pdata.pkvl_master = pkvl_master;
+	m10_n3000_info.platform_data = &ns->m10_n3000_pdata;
 	pdata.num_devices = 1;
 	pdata.devices = &m10_n3000_info;
 
@@ -452,7 +457,7 @@ static int dfl_n3000_nios_probe(struct dfl_device *dfl_dev)
 	if (ret)
 		return ret;
 
-	ret = create_altr_spi_controller(ns);
+	ret = create_altr_spi_controller(ns, dfl_dev_get_base_dev(dfl_dev));
 	if (ret)
 		dev_err(dev, "altr spi controller create failed: %d\n", ret);
 
