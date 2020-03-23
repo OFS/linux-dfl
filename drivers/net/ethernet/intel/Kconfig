@@ -343,6 +343,24 @@ config IGC
 	  To compile this driver as a module, choose M here. The module
 	  will be called igc.
 
+config FPGA_DFL_ETH_GROUP
+        tristate "DFL Ether Group private feature support"
+        depends on FPGA_DFL && HAS_IOMEM
+        help
+          This driver supports DFL Ether Group private feature for
+	  Intel(R) PAC N3000 FPGA Smart NIC.
+
+	  The DFL Ether Group private feature contains several ether
+	  interfaces, each of them contains an Ether Wrapper and several
+	  ports (phy-mac pairs). There are two types of interfaces, Line
+	  side & CPU side. These 2 types of interfaces, together with FPGA
+	  internal logic, act as several independent pipes between the
+	  host Ethernet Controller and the front-panel cages. The FPGA
+	  logic between 2 interfaces implements user defined mac layer
+	  offloading.
+
+	  This driver implements each active port as a netdev.
+
 config INTEL_M10_BMC_RETIMER
 	tristate "Intel(R) MAX 10 BMC ethernet retimer support"
 	depends on MFD_INTEL_M10_BMC
