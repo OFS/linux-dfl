@@ -255,4 +255,8 @@ struct intel_m10bmc_pkvl_pdata {
 	struct device *pkvl_master;
 };
 
+/* M10BMC sub devices for PAC D5005 */
+/* subdev hwmon  */
+#define d5005BMC_HWMON_DEV_NAME         "d5005bmc-hwmon"
+
 #endif /* __INTEL_M10_BMC_H */
