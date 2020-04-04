@@ -254,4 +254,8 @@ int m10bmc_fw_state_enter(struct intel_m10bmc *m10bmc,
 
 void m10bmc_fw_state_exit(struct intel_m10bmc *m10bmc);
 
+/* M10BMC sub devices for PAC D5005 */
+/* subdev hwmon  */
+#define d5005BMC_HWMON_DEV_NAME         "d5005bmc-hwmon"
+
 #endif /* __MFD_INTEL_M10_BMC_H */
