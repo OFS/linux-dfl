@@ -203,6 +203,15 @@ config FPGA_DFL_N3000_NIOS
 	  the configuration, host takes over the ownership of the SPI master to
 	  control an Intel MAX10 BMC Chip on the SPI bus.
 
+config FPGA_VFIO_MDEV_DFL
+        tristate "VFIO Mdev support for DFL devices"
+        depends on FPGA_DFL && VFIO_MDEV
+        help
+	  Support for DFL devices with VFIO Mdev. This is required to make use
+	  of DFL devices present on the system using the VFIO Mdev framework.
+
+	  If you don't know what to do here, say N.
+
 config FPGA_DFL_PCI
 	tristate "FPGA DFL PCIe Device Driver"
 	depends on PCI && FPGA_DFL
