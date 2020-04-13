@@ -7,6 +7,7 @@
 #ifndef _LINUX_IFPGA_SEC_MGR_H
 #define _LINUX_IFPGA_SEC_MGR_H
 
+#include <linux/completion.h>
 #include <linux/device.h>
 #include <linux/mutex.h>
 #include <linux/types.h>
@@ -86,6 +87,19 @@ typedef int (*sysfs_csk_nbits_t)(struct ifpga_sec_mgr *imgr);
 typedef int (*sysfs_csk_hndlr_t)(struct ifpga_sec_mgr *imgr,
 				 unsigned long *csk_map, unsigned int nbits);
 
+enum ifpga_sec_err {
+	IFPGA_SEC_ERR_NONE	   = 0x0,
+	IFPGA_SEC_ERR_HW_ERROR	   = 0x1,
+	IFPGA_SEC_ERR_TIMEOUT	   = 0x2,
+	IFPGA_SEC_ERR_CANCELED	   = 0x3,
+	IFPGA_SEC_ERR_BUSY	   = 0x4,
+	IFPGA_SEC_ERR_INVALID_SIZE = 0x5,
+	IFPGA_SEC_ERR_RW_ERROR	   = 0x6,
+	IFPGA_SEC_ERR_WEAROUT	   = 0x7,
+	IFPGA_SEC_ERR_FILE_READ	   = 0x8,
+	IFPGA_SEC_ERR_MAX	   = 0x9
+};
+
 /**
  * struct ifpga_sec_mgr_ops - device specific operations
  * @user_flash_count:	    Optional: Return sysfs string output for FPGA
@@ -110,6 +124,17 @@ typedef int (*sysfs_csk_hndlr_t)(struct ifpga_sec_mgr *imgr,
  * @bmc_reh_size:	    Optional: Return byte size for BMC root entry hash
  * @sr_reh_size:	    Optional: Return byte size for SR root entry hash
  * @pr_reh_size:	    Optional: Return byte size for PR root entry hash
+ * @prepare:		    Required: Prepare secure update
+ * @write_blk:		    Required: Write a block of data
+ * @poll_complete:	    Required: Check for the completion of the
+ *			    HW authentication/programming process. This
+ *			    function should check for imgr->driver_unload
+ *			    and abort with IFPGA_SEC_ERR_CANCELED when true.
+ * @cancel:		    Required: Signal HW to cancel update
+ * @cleanup:		    Optional: Complements the prepare()
+ *			    function and is called at the completion
+ *			    of the update, whether success or failure,
+ *			    if the prepare function succeeded.
  */
 struct ifpga_sec_mgr_ops {
 	sysfs_cnt_hndlr_t user_flash_count;
@@ -127,6 +152,22 @@ struct ifpga_sec_mgr_ops {
 	sysfs_csk_nbits_t bmc_canceled_csk_nbits;
 	sysfs_csk_nbits_t sr_canceled_csk_nbits;
 	sysfs_csk_nbits_t pr_canceled_csk_nbits;
+	enum ifpga_sec_err (*prepare)(struct ifpga_sec_mgr *imgr);
+	enum ifpga_sec_err (*write_blk)(struct ifpga_sec_mgr *imgr,
+					u32 offset, u32 size);
+	enum ifpga_sec_err (*poll_complete)(struct ifpga_sec_mgr *imgr);
+	void (*cleanup)(struct ifpga_sec_mgr *imgr);
+	enum ifpga_sec_err (*cancel)(struct ifpga_sec_mgr *imgr);
+};
+
+/* Update progress codes */
+enum ifpga_sec_prog {
+	IFPGA_SEC_PROG_IDLE	   = 0x0,
+	IFPGA_SEC_PROG_READ_FILE   = 0x1,
+	IFPGA_SEC_PROG_PREPARING   = 0x2,
+	IFPGA_SEC_PROG_WRITING	   = 0x3,
+	IFPGA_SEC_PROG_PROGRAMMING = 0x4,
+	IFPGA_SEC_PROG_MAX	   = 0x5
 };
 
 struct ifpga_sec_mgr {
@@ -134,6 +175,14 @@ struct ifpga_sec_mgr {
 	struct device dev;
 	const struct ifpga_sec_mgr_ops *iops;
 	struct mutex lock;		/* protect data structure contents */
+	struct work_struct work;
+	struct completion update_done;
+	char *filename;
+	const u8 *data;			/* pointer to update data */
+	u32 remaining_size;		/* size remaining to transfer */
+	enum ifpga_sec_prog progress;
+	enum ifpga_sec_err err_code;	/* security manager error code */
+	bool driver_unload;
 	void *priv;
 };
 
