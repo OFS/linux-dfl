@@ -5,14 +5,19 @@
  * Copyright (C) 2019-2020 Intel Corporation, Inc.
  */
 
+#include <linux/delay.h>
+#include <linux/firmware.h>
 #include <linux/fpga/ifpga-sec-mgr.h>
 #include <linux/idr.h>
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 
 static DEFINE_IDA(ifpga_sec_mgr_ida);
 static struct class *ifpga_sec_mgr_class;
+
+#define WRITE_BLOCK_SIZE	0x4000
 
 static ssize_t show_root_entry_hash(struct ifpga_sec_mgr *imgr,
 				    sysfs_reh_hndlr_t get_reh, char *buf)
@@ -101,6 +106,69 @@ static struct attribute *sec_mgr_security_attrs[] = {
 	NULL,
 };
 
+static void ifpga_sec_mgr_update(struct work_struct *work)
+{
+	u32 size, blk_size, offset = 0;
+	struct ifpga_sec_mgr *imgr;
+	const struct firmware *fw;
+	int ret;
+
+	imgr = container_of(work, struct ifpga_sec_mgr, work);
+
+	get_device(&imgr->dev);
+	ret = request_firmware(&fw, imgr->filename, &imgr->dev);
+	if (ret) {
+		imgr->err_code = -ENOENT;
+		goto idle_exit;
+	}
+
+	imgr->data = fw->data;
+	imgr->remaining_size = fw->size;
+
+	imgr->progress = IFPGA_SEC_PROG_PREPARING;
+	ret = imgr->iops->prepare(imgr);
+	if (ret) {
+		imgr->err_code = ret;
+		imgr->iops->cancel(imgr);
+		goto release_fw_exit;
+	}
+
+	imgr->progress = IFPGA_SEC_PROG_WRITING;
+	size = imgr->remaining_size;
+	while (size) {
+		blk_size = min_t(u32, size, WRITE_BLOCK_SIZE);
+		size -= blk_size;
+		ret = imgr->iops->write_blk(imgr, offset, blk_size);
+		if (ret) {
+			imgr->err_code = ret;
+			imgr->iops->cancel(imgr);
+			goto done;
+		}
+
+		imgr->remaining_size = size;
+		offset += blk_size;
+	}
+
+	imgr->progress = IFPGA_SEC_PROG_PROGRAMMING;
+	ret = imgr->iops->poll_complete(imgr);
+	if (ret)
+		imgr->err_code = ret;
+
+done:
+	if (imgr->iops->cleanup)
+		imgr->iops->cleanup(imgr);
+
+release_fw_exit:
+	imgr->data = NULL;
+	release_firmware(fw);
+
+idle_exit:
+	imgr->progress = IFPGA_SEC_PROG_IDLE;
+	kfree(imgr->filename);
+	imgr->filename = NULL;
+	put_device(&imgr->dev);
+}
+
 #define check_attr(attribute, _name) \
 	((attribute) == &dev_attr_##_name.attr && imgr->iops->_name)
 
@@ -128,8 +196,53 @@ static struct attribute_group sec_mgr_security_attr_group = {
 	.is_visible = sec_mgr_visible,
 };
 
+static ssize_t filename_store(struct device *dev, struct device_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct ifpga_sec_mgr *imgr = to_sec_mgr(dev);
+	int ret = 0;
+
+	if (count == 0 || count >= PATH_MAX)
+		return -EINVAL;
+
+	mutex_lock(&imgr->lock);
+	if (imgr->driver_unload || imgr->progress != IFPGA_SEC_PROG_IDLE) {
+		ret = -EBUSY;
+		goto unlock_exit;
+	}
+
+	imgr->filename = kstrndup(buf, PATH_MAX - 1, GFP_KERNEL);
+	if (!imgr->filename) {
+		ret = -ENOMEM;
+		goto unlock_exit;
+	}
+
+	if (imgr->filename[strlen(imgr->filename) - 1] == '\n')
+		imgr->filename[strlen(imgr->filename) - 1] = '\0';
+
+	imgr->err_code = 0;
+	imgr->progress = IFPGA_SEC_PROG_READ_FILE;
+	schedule_work(&imgr->work);
+
+unlock_exit:
+	mutex_unlock(&imgr->lock);
+	return ret ? : count;
+}
+static DEVICE_ATTR_WO(filename);
+
+static struct attribute *sec_mgr_update_attrs[] = {
+	&dev_attr_filename.attr,
+	NULL,
+};
+
+static struct attribute_group sec_mgr_update_attr_group = {
+	.name = "update",
+	.attrs = sec_mgr_update_attrs,
+};
+
 static const struct attribute_group *ifpga_sec_mgr_attr_groups[] = {
 	&sec_mgr_security_attr_group,
+	&sec_mgr_update_attr_group,
 	NULL,
 };
 
@@ -153,6 +266,12 @@ ifpga_sec_mgr_create(struct device *dev, const char *name,
 	struct ifpga_sec_mgr *imgr;
 	int id, ret;
 
+	if (!iops || !iops->cancel || !iops->prepare ||
+	    !iops->write_blk || !iops->poll_complete) {
+		dev_err(dev, "Attempt to register without ifpga_sec_mgr_ops\n");
+		return NULL;
+	}
+
 	if (!name || !strlen(name)) {
 		dev_err(dev, "Attempt to register with no name!\n");
 		return NULL;
@@ -171,6 +290,7 @@ ifpga_sec_mgr_create(struct device *dev, const char *name,
 	imgr->name = name;
 	imgr->priv = priv;
 	imgr->iops = iops;
+	INIT_WORK(&imgr->work, ifpga_sec_mgr_update);
 
 	device_initialize(&imgr->dev);
 	imgr->dev.class = ifpga_sec_mgr_class;
@@ -237,6 +357,18 @@ void ifpga_sec_mgr_unregister(struct ifpga_sec_mgr *imgr)
 {
 	dev_info(&imgr->dev, "%s %s\n", __func__, imgr->name);
 
+	mutex_lock(&imgr->lock);
+	imgr->driver_unload = true;
+	if (imgr->progress != IFPGA_SEC_PROG_IDLE) {
+		dev_info(&imgr->dev, "%s waiting on secure update\n",
+			 __func__);
+		do {
+			mutex_unlock(&imgr->lock);
+			msleep(1000);
+			mutex_lock(&imgr->lock);
+		} while (imgr->progress != IFPGA_SEC_PROG_IDLE);
+	}
+	mutex_unlock(&imgr->lock);
 	device_unregister(&imgr->dev);
 }
 EXPORT_SYMBOL_GPL(ifpga_sec_mgr_unregister);

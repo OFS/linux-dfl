@@ -82,6 +82,15 @@ typedef int (*sysfs_csk_hndlr_t)(struct ifpga_sec_mgr *imgr,
  *			 reconfiguration canceled keys
  * @bmc_canceled_csks:	 Optional: Return sysfs string output for bmc
  *			 canceled keys
+ * @prepare:		 Required: Prepare secure update
+ * @write_blk:		 Required: Write a block of data
+ * @poll_complete:	 Required: Check for the completion of the
+ *			 HW authentication/programming function
+ * @cancel:		 Required: Signal HW to cancel update
+ * @cleanup:		 Optional: Complements the prepare()
+ *			 function and is called at the completion
+ *			 of the update, whether success or failure,
+ *			 iff the prepare function succeeded.
  */
 struct ifpga_sec_mgr_ops {
 	sysfs_cnt_hndlr_t user_flash_count;
@@ -93,13 +102,33 @@ struct ifpga_sec_mgr_ops {
 	sysfs_csk_hndlr_t sr_canceled_csks;
 	sysfs_csk_hndlr_t pr_canceled_csks;
 	sysfs_csk_hndlr_t bmc_canceled_csks;
+	int (*prepare)(struct ifpga_sec_mgr *imgr);
+	int (*write_blk)(struct ifpga_sec_mgr *imgr, u32 offset, u32 size);
+	int (*poll_complete)(struct ifpga_sec_mgr *imgr);
+	void (*cleanup)(struct ifpga_sec_mgr *imgr);
+	int (*cancel)(struct ifpga_sec_mgr *imgr);
 };
+
+/* Update progress codes */
+#define IFPGA_SEC_PROG_IDLE			0x0
+#define IFPGA_SEC_PROG_READ_FILE		0x1
+#define IFPGA_SEC_PROG_PREPARING		0x2
+#define IFPGA_SEC_PROG_WRITING			0x3
+#define IFPGA_SEC_PROG_PROGRAMMING		0x4
+#define IFPGA_SEC_PROG_MAX			0x5
 
 struct ifpga_sec_mgr {
 	const char *name;
 	struct device dev;
 	const struct ifpga_sec_mgr_ops *iops;
 	struct mutex lock;	/* protect data structure contents */
+	struct work_struct work;
+	char *filename;
+	const u8 *data;		/* pointer to update data */
+	u32 remaining_size;	/* size remaining to transfer */
+	u32 progress;
+	int err_code;		/* negative errno value on failure */
+	bool driver_unload;
 	void *priv;
 };
 
