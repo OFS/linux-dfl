@@ -106,6 +106,13 @@ static struct attribute *sec_mgr_security_attrs[] = {
 	NULL,
 };
 
+static void
+ifpga_sec_mgr_update_progress(struct ifpga_sec_mgr *imgr, u32 progress)
+{
+	imgr->progress = progress;
+	sysfs_notify(&imgr->dev.kobj, "update", "status");
+}
+
 static void ifpga_sec_mgr_update(struct work_struct *work)
 {
 	u32 size, blk_size, offset = 0;
@@ -125,7 +132,7 @@ static void ifpga_sec_mgr_update(struct work_struct *work)
 	imgr->data = fw->data;
 	imgr->remaining_size = fw->size;
 
-	imgr->progress = IFPGA_SEC_PROG_PREPARING;
+	ifpga_sec_mgr_update_progress(imgr, IFPGA_SEC_PROG_PREPARING);
 	ret = imgr->iops->prepare(imgr);
 	if (ret) {
 		imgr->err_code = ret;
@@ -133,7 +140,7 @@ static void ifpga_sec_mgr_update(struct work_struct *work)
 		goto release_fw_exit;
 	}
 
-	imgr->progress = IFPGA_SEC_PROG_WRITING;
+	ifpga_sec_mgr_update_progress(imgr, IFPGA_SEC_PROG_WRITING);
 	size = imgr->remaining_size;
 	while (size) {
 		blk_size = min_t(u32, size, WRITE_BLOCK_SIZE);
@@ -149,7 +156,7 @@ static void ifpga_sec_mgr_update(struct work_struct *work)
 		offset += blk_size;
 	}
 
-	imgr->progress = IFPGA_SEC_PROG_PROGRAMMING;
+	ifpga_sec_mgr_update_progress(imgr, IFPGA_SEC_PROG_PROGRAMMING);
 	ret = imgr->iops->poll_complete(imgr);
 	if (ret)
 		imgr->err_code = ret;
@@ -163,7 +170,7 @@ release_fw_exit:
 	release_firmware(fw);
 
 idle_exit:
-	imgr->progress = IFPGA_SEC_PROG_IDLE;
+	ifpga_sec_mgr_update_progress(imgr, IFPGA_SEC_PROG_IDLE);
 	kfree(imgr->filename);
 	imgr->filename = NULL;
 	put_device(&imgr->dev);
@@ -195,6 +202,24 @@ static struct attribute_group sec_mgr_security_attr_group = {
 	.attrs = sec_mgr_security_attrs,
 	.is_visible = sec_mgr_visible,
 };
+
+static const char * const sec_mgr_prog_str[] = {
+	"idle",			/* IFPGA_SEC_PROG_IDLE */
+	"read_file",		/* IFPGA_SEC_PROG_READ_FILE */
+	"preparing",		/* IFPGA_SEC_PROG_PREPARING */
+	"writing",		/* IFPGA_SEC_PROG_WRITING */
+	"programming",		/* IFPGA_SEC_PROG_PROGRAMMING */
+};
+
+static ssize_t
+status_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct ifpga_sec_mgr *imgr = to_sec_mgr(dev);
+
+	return sprintf(buf, "%s\n", (imgr->progress < IFPGA_SEC_PROG_MAX) ?
+		       sec_mgr_prog_str[imgr->progress] : "unknown-status");
+}
+static DEVICE_ATTR_RO(status);
 
 static ssize_t filename_store(struct device *dev, struct device_attribute *attr,
 			      const char *buf, size_t count)
@@ -232,6 +257,7 @@ static DEVICE_ATTR_WO(filename);
 
 static struct attribute *sec_mgr_update_attrs[] = {
 	&dev_attr_filename.attr,
+	&dev_attr_status.attr,
 	NULL,
 };
 
