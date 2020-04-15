@@ -213,6 +213,15 @@ config FPGA_DFL_UIO_PDEV
 	  support for userspace access to kernel interrupts and memory
 	  locations.
 
+config FPGA_DFL_SPI_ALTERA
+	tristate "FPGA DFL Altera SPI Master Driver"
+	depends on FPGA_DFL
+	select REGMAP
+	help
+	  This is a DFL bus driver for the Altera SPI master controller.
+	  The SPI master is connected to a SPI slave to Avalon Master
+	  bridge in a Intel MAX BMC.
+
 config FPGA_DFL_PCI
 	tristate "FPGA DFL PCIe Device Driver"
 	depends on PCI && FPGA_DFL
