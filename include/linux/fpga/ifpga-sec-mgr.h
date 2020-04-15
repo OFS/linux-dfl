@@ -129,6 +129,7 @@ struct ifpga_sec_mgr {
 	u32 progress;
 	int err_state;		/* progress state at time of failure */
 	int err_code;		/* negative errno value on failure */
+	bool request_cancel;
 	bool driver_unload;
 	void *priv;
 };

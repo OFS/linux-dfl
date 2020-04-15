@@ -114,11 +114,27 @@ static void ifpga_sec_set_error(struct ifpga_sec_mgr *imgr, int err_code)
 	mutex_unlock(&imgr->lock);
 }
 
+static int ifpga_sec_mgr_do_cancel(struct ifpga_sec_mgr *imgr)
+{
+	int ret;
+
+	if (imgr->request_cancel) {
+		ret = imgr->iops->cancel(imgr);
+		if (!ret) {
+			ifpga_sec_set_error(imgr, -ECANCELED);
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static void
 ifpga_sec_mgr_update_progress(struct ifpga_sec_mgr *imgr, u32 progress)
 {
+	mutex_lock(&imgr->lock);
 	imgr->progress = progress;
 	sysfs_notify(&imgr->dev.kobj, "update", "status");
+	mutex_unlock(&imgr->lock);
 }
 
 static void ifpga_sec_mgr_update(struct work_struct *work)
@@ -137,6 +153,11 @@ static void ifpga_sec_mgr_update(struct work_struct *work)
 		goto idle_exit;
 	}
 
+	if (imgr->request_cancel) {
+		ifpga_sec_set_error(imgr, -ECANCELED);
+		goto release_fw_exit;
+	}
+
 	imgr->data = fw->data;
 	imgr->remaining_size = fw->size;
 
@@ -147,6 +168,9 @@ static void ifpga_sec_mgr_update(struct work_struct *work)
 		imgr->iops->cancel(imgr);
 		goto release_fw_exit;
 	}
+
+	if (ifpga_sec_mgr_do_cancel(imgr))
+		goto done;
 
 	ifpga_sec_mgr_update_progress(imgr, IFPGA_SEC_PROG_WRITING);
 	size = imgr->remaining_size;
@@ -161,6 +185,9 @@ static void ifpga_sec_mgr_update(struct work_struct *work)
 		}
 
 		imgr->remaining_size = size;
+		if (ifpga_sec_mgr_do_cancel(imgr))
+			goto done;
+
 		offset += blk_size;
 	}
 
@@ -306,6 +333,7 @@ static ssize_t filename_store(struct device *dev, struct device_attribute *attr,
 		imgr->filename[strlen(imgr->filename) - 1] = '\0';
 
 	imgr->err_code = 0;
+	imgr->request_cancel = false;
 	imgr->progress = IFPGA_SEC_PROG_READ_FILE;
 	schedule_work(&imgr->work);
 
@@ -315,8 +343,32 @@ unlock_exit:
 }
 static DEVICE_ATTR_WO(filename);
 
+static ssize_t cancel_store(struct device *dev, struct device_attribute *attr,
+			    const char *buf, size_t count)
+{
+	struct ifpga_sec_mgr *imgr = to_sec_mgr(dev);
+	bool cancel;
+	int ret = 0;
+
+	if (kstrtobool(buf, &cancel) || !cancel)
+		return -EINVAL;
+
+	mutex_lock(&imgr->lock);
+	if (imgr->progress == IFPGA_SEC_PROG_READ_FILE ||
+	    imgr->progress == IFPGA_SEC_PROG_PREPARING ||
+	    imgr->progress == IFPGA_SEC_PROG_WRITING)
+		imgr->request_cancel = true;
+	else if (imgr->progress == IFPGA_SEC_PROG_PROGRAMMING)
+		ret = -EBUSY;
+	mutex_unlock(&imgr->lock);
+
+	return ret ? : count;
+}
+static DEVICE_ATTR_WO(cancel);
+
 static struct attribute *sec_mgr_update_attrs[] = {
 	&dev_attr_filename.attr,
+	&dev_attr_cancel.attr,
 	&dev_attr_status.attr,
 	&dev_attr_error.attr,
 	&dev_attr_remaining_size.attr,
@@ -448,6 +500,7 @@ void ifpga_sec_mgr_unregister(struct ifpga_sec_mgr *imgr)
 	mutex_lock(&imgr->lock);
 	imgr->driver_unload = true;
 	if (imgr->progress != IFPGA_SEC_PROG_IDLE) {
+		imgr->request_cancel = true;
 		dev_info(&imgr->dev, "%s waiting on secure update\n",
 			 __func__);
 		do {
