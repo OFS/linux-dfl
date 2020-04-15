@@ -88,3 +88,13 @@ Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read-only. Returns a string describing the current
 		status of an update. The string will be one of the
 		following: idle, preparing, writing, programming.
+
+What: 		/sys/class/ifpga_sec_mgr/ifpga_secX/update/error
+Date:		June 2020
+KernelVersion:  5.8
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read-only. Returns an error string describing the
+		failure of a secure update. This string will be one
+		of the following: operation-error, crc-error,
+		auth-error, timeout-error, user-abort, device-busy,
+		invalid_size.

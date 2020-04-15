@@ -106,6 +106,14 @@ static struct attribute *sec_mgr_security_attrs[] = {
 	NULL,
 };
 
+static void ifpga_sec_set_error(struct ifpga_sec_mgr *imgr, int err_code)
+{
+	mutex_lock(&imgr->lock);
+	imgr->err_state = imgr->progress;
+	imgr->err_code = err_code;
+	mutex_unlock(&imgr->lock);
+}
+
 static void
 ifpga_sec_mgr_update_progress(struct ifpga_sec_mgr *imgr, u32 progress)
 {
@@ -125,7 +133,7 @@ static void ifpga_sec_mgr_update(struct work_struct *work)
 	get_device(&imgr->dev);
 	ret = request_firmware(&fw, imgr->filename, &imgr->dev);
 	if (ret) {
-		imgr->err_code = -ENOENT;
+		ifpga_sec_set_error(imgr, -ENOENT);
 		goto idle_exit;
 	}
 
@@ -135,7 +143,7 @@ static void ifpga_sec_mgr_update(struct work_struct *work)
 	ifpga_sec_mgr_update_progress(imgr, IFPGA_SEC_PROG_PREPARING);
 	ret = imgr->iops->prepare(imgr);
 	if (ret) {
-		imgr->err_code = ret;
+		ifpga_sec_set_error(imgr, ret);
 		imgr->iops->cancel(imgr);
 		goto release_fw_exit;
 	}
@@ -147,7 +155,7 @@ static void ifpga_sec_mgr_update(struct work_struct *work)
 		size -= blk_size;
 		ret = imgr->iops->write_blk(imgr, offset, blk_size);
 		if (ret) {
-			imgr->err_code = ret;
+			ifpga_sec_set_error(imgr, ret);
 			imgr->iops->cancel(imgr);
 			goto done;
 		}
@@ -159,7 +167,7 @@ static void ifpga_sec_mgr_update(struct work_struct *work)
 	ifpga_sec_mgr_update_progress(imgr, IFPGA_SEC_PROG_PROGRAMMING);
 	ret = imgr->iops->poll_complete(imgr);
 	if (ret)
-		imgr->err_code = ret;
+		ifpga_sec_set_error(imgr, ret);
 
 done:
 	if (imgr->iops->cleanup)
@@ -211,15 +219,58 @@ static const char * const sec_mgr_prog_str[] = {
 	"programming",		/* IFPGA_SEC_PROG_PROGRAMMING */
 };
 
+static const struct sec_mgr_error {
+	const int	err_code;
+	const char	*err_str;
+} sec_mgr_errors[] = {
+	{ -EINVAL,    "hw-error"},
+	{ -ETIMEDOUT, "timeout"},
+	{ -ECANCELED, "user-abort"},
+	{ -EBUSY,     "device-busy"},
+	{ -EFBIG,     "invalid-file-size"},
+	{ -EIO,       "read-write-error"},
+	{ -EAGAIN,    "flash-wearout"},
+	{ -ENOENT,    "file-read-error"}
+};
+
+static const char *sec_progress(struct ifpga_sec_mgr *imgr)
+{
+	return (imgr->progress < IFPGA_SEC_PROG_MAX) ?
+		sec_mgr_prog_str[imgr->progress] : "unknown-status";
+}
+
 static ssize_t
 status_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	struct ifpga_sec_mgr *imgr = to_sec_mgr(dev);
-
-	return sprintf(buf, "%s\n", (imgr->progress < IFPGA_SEC_PROG_MAX) ?
-		       sec_mgr_prog_str[imgr->progress] : "unknown-status");
+	return sprintf(buf, "%s\n", sec_progress(to_sec_mgr(dev)));
 }
 static DEVICE_ATTR_RO(status);
+
+static ssize_t
+error_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	const char *prog_str, *err_str = "unknown-error";
+	struct ifpga_sec_mgr *imgr = to_sec_mgr(dev);
+	int err_code;
+	ssize_t i;
+
+	if (!imgr->err_code)
+		return 0;
+
+	mutex_lock(&imgr->lock);
+	err_code = imgr->err_code;
+	prog_str = sec_progress(imgr);
+	mutex_unlock(&imgr->lock);
+
+	for (i = 0; i < ARRAY_SIZE(sec_mgr_errors); i++) {
+		if (sec_mgr_errors[i].err_code == err_code) {
+			err_str = sec_mgr_errors[i].err_str;
+			break;
+		}
+	}
+	return sprintf(buf, "%s:%s\n", prog_str, err_str);
+}
+static DEVICE_ATTR_RO(error);
 
 static ssize_t filename_store(struct device *dev, struct device_attribute *attr,
 			      const char *buf, size_t count)
@@ -258,6 +309,7 @@ static DEVICE_ATTR_WO(filename);
 static struct attribute *sec_mgr_update_attrs[] = {
 	&dev_attr_filename.attr,
 	&dev_attr_status.attr,
+	&dev_attr_error.attr,
 	NULL,
 };
 
