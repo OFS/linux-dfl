@@ -127,6 +127,7 @@ struct ifpga_sec_mgr {
 	const u8 *data;		/* pointer to update data */
 	u32 remaining_size;	/* size remaining to transfer */
 	u32 progress;
+	int err_state;		/* progress state at time of failure */
 	int err_code;		/* negative errno value on failure */
 	bool driver_unload;
 	void *priv;
