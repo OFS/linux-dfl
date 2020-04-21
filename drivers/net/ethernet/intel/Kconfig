@@ -342,4 +342,10 @@ config IGC
 	  To compile this driver as a module, choose M here. The module
 	  will be called igc.
 
+config INTEL_LL_10G_MAC
+	tristate "Control Plane Driver for Intel Low Latency 10G MAC"
+	help
+	  This driver provides control plane support for an Intel
+	  Low Latency 10G MAC.
+
 endif # NET_VENDOR_INTEL
