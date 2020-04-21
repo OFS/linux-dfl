@@ -11,6 +11,7 @@
  */
 #include <linux/bitfield.h>
 #include <linux/errno.h>
+#include <linux/fpga/dfl-bus.h>
 #include <linux/io.h>
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <linux/kernel.h>
@@ -21,8 +22,6 @@
 #include <linux/spi/altera.h>
 #include <linux/spi/spi.h>
 #include <linux/types.h>
-
-#include "dfl.h"
 
 static char *fec_mode = "rs";
 module_param(fec_mode, charp, 0444);
