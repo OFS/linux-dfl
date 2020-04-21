@@ -474,6 +474,15 @@ void dfl_driver_unregister(struct dfl_driver *dfl_drv)
 }
 EXPORT_SYMBOL(dfl_driver_unregister);
 
+struct device *dfl_dev_get_base_dev(struct dfl_device *dfl_dev)
+{
+	if (!dfl_dev || !dfl_dev->cdev)
+		return NULL;
+
+	return dfl_dev->cdev->parent;
+}
+EXPORT_SYMBOL_GPL(dfl_dev_get_base_dev);
+
 #define is_header_feature(feature) ((feature)->id == FEATURE_ID_FIU_HEADER)
 
 /**
