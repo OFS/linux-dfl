@@ -373,4 +373,10 @@ config INTEL_M10_BMC_RETIMER
 	  To compile this driver as a module, choose M here. The module
 	  will be called intel-m10-bmc-retimer.
 
+config S10HSSI
+	tristate "Control Plane Driver for Stratix 10 HSSI"
+	help
+	  This driver provides control plane support for an Stratix 10
+	  High Speed Serial Interface.
+
 endif # NET_VENDOR_INTEL
