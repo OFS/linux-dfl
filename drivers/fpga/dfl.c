@@ -10,6 +10,7 @@
  *   Wu Hao <hao.wu@intel.com>
  *   Xiao Guangrong <guangrong.xiao@linux.intel.com>
  */
+#include <linux/fpga/dfl-bus.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
 #include <linux/fpga-dfl.h>
