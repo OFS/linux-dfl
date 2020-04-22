@@ -57,6 +57,7 @@ obj-$(CONFIG_FPGA_DFL_NIOS_INTEL_PAC_N3000)	+= dfl-n3000-nios.o
 
 # Drivers for FPGAs which implement DFL
 obj-$(CONFIG_FPGA_DFL_PCI)		+= dfl-pci.o
+obj-$(CONFIG_FPGA_DFL_HSSI)		+= dfl-hssi.o
 
 # KUnit tests
 obj-$(CONFIG_FPGA_KUNIT_TESTS)		+= tests/
