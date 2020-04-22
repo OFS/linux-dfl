@@ -227,6 +227,14 @@ config FPGA_DFL_PCI
 
 	  To compile this as a module, choose M here.
 
+config FPGA_DFl_HSSI
+	tristate "FPGA DFL HSSI Driver"
+	depends on FPGA_DFL
+	help
+	  This is the HSSI Ethernet driver for the Intel Stratix 10 FPGA.
+	  This driver provides the ability to view and change some of the
+	  transceiver tuning parameters.
+
 config FPGA_MGR_ZYNQMP_FPGA
 	tristate "Xilinx ZynqMP FPGA"
 	depends on ZYNQMP_FIRMWARE || (!ZYNQMP_FIRMWARE && COMPILE_TEST)
