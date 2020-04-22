@@ -212,6 +212,14 @@ config FPGA_DFL_SPI_ALTERA
           The SPI master is connected to a SPI slave to Avalon Master
 	  bridge in a Intel MAX BMC.
 
+config FPGA_DFl_HSSI
+	tristate "FPGA DFL HSSI Driver"
+	depends on FPGA_DFL
+	help
+	  This is the HSSI Ethernet driver for the Intel Stratix 10 FPGA.
+	  This driver provides the ability to view and change some of the
+	  transceiver tuning parameters.
+
 config FPGA_DFL_PCI
 	tristate "FPGA DFL PCIe Device Driver"
 	depends on PCI && FPGA_DFL
