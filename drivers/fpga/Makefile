@@ -53,3 +53,4 @@ obj-$(CONFIG_FPGA_VFIO_MDEV_DFL)	+= vfio-mdev-dfl.o
 
 # Drivers for FPGAs which implement DFL
 obj-$(CONFIG_FPGA_DFL_PCI)		+= dfl-pci.o
+obj-$(CONFIG_FPGA_DFl_HSSI)		+= dfl-hssi.o
