@@ -10551,6 +10551,13 @@ F:	include/linux/firmware/intel/stratix10-smc.h
 F:	include/linux/firmware/intel/stratix10-svc-client.h
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git
 
+INTEL STRATIX10 PHY DRIVER
+M:	Russ Weight <russell.h.weight@intel.com>
+L:	linux-fpga@vger.kernel.org
+S:	Maintained
+F:	drivers/net/phy/intel-s10-phy.c
+F:	include/linux/phy/intel-s10-phy.h
+
 INTEL TELEMETRY DRIVER
 M:	Rajneesh Bhardwaj <irenic.rajneesh@gmail.com>
 M:	"David E. Box" <david.e.box@linux.intel.com>
