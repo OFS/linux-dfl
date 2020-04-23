@@ -6665,6 +6665,8 @@ S:	Maintained
 F:	Documentation/fpga/dfl.rst
 F:	drivers/fpga/dfl*
 F:	include/uapi/linux/fpga-dfl.h
+F:	drivers/net/phy/intel-s10-phy.c
+F:	include/linux/phy/intel-s10-phy.h
 
 FPGA MANAGER FRAMEWORK
 M:	Moritz Fischer <mdf@kernel.org>
