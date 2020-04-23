@@ -319,3 +319,12 @@ endif # PHYLIB
 config MICREL_KS8995MA
 	tristate "Micrel KS8995MA 5-ports 10/100 managed Ethernet switch"
 	depends on SPI
+
+config INTEL_S10_PHY
+	tristate "Intel HSSI configurable ethernet phy driver"
+	depends on FPGA_DFL
+	select FPGA_DFl_HSSI
+	help
+	  This is the Intel HSSI configurable ethernet phy driver. It
+	  provides the ability to view and change some of the transceiver
+	  tuner parameters for a QSFP interface.
