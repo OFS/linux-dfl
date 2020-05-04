@@ -28,6 +28,13 @@ config MFD_INTEL_M10_BMC
           Support for the Intel MAX10 board management controller using the
           SPI interface.
 
+config MFD_INTEL_M10_BMC_SECURE
+        tristate "Intel MAX10 BMC security engine"
+	depends on MFD_INTEL_M10_BMC && IFPGA_SEC_MGR
+        help
+          Secure update support for the Intel MAX10 board management
+	  controller.
+
 config MFD_ALTERA_A10SR
 	bool "Altera Arria10 DevKit System Resource chip"
 	depends on ARCH_SOCFPGA && SPI_MASTER=y && OF
