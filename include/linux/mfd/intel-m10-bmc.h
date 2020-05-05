@@ -254,6 +254,12 @@ int m10bmc_fw_state_enter(struct intel_m10bmc *m10bmc,
 
 void m10bmc_fw_state_exit(struct intel_m10bmc *m10bmc);
 
+/* Supported MAX10 BMC types */
+enum m10bmc_type {
+	M10_N3000,
+	M10_D5005
+};
+
 /* M10BMC sub devices for PAC D5005 */
 /* subdev hwmon  */
 #define d5005BMC_HWMON_DEV_NAME         "d5005bmc-hwmon"
