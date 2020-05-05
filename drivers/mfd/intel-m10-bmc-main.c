@@ -16,15 +16,13 @@
 
 #include "intel-spi-avmm.h"
 
-enum m10bmc_type {
-	M10_N3000,
-	M10_D5005
-};
-
 static struct mfd_cell m10bmc_bmc_subdevs[] = {
 	{
 		.name = d5005BMC_HWMON_DEV_NAME,
 	},
+	{
+		.name = "d5005bmc-secure",
+	}
 };
 
 static struct intel_m10bmc_pkvl_pdata pkvl_platdata;

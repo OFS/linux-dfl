@@ -249,6 +249,12 @@ int m10bmc_fw_state_enter(struct intel_m10bmc *m10bmc,
 
 void m10bmc_fw_state_exit(struct intel_m10bmc *m10bmc);
 
+/* Supported MAX10 BMC types */
+enum m10bmc_type {
+	M10_N3000,
+	M10_D5005
+};
+
 /* M10BMC system sub devices for PAC N3000 */
 /* subdev Parkvale Interface  */
 struct intel_m10bmc_pkvl_pdata {
