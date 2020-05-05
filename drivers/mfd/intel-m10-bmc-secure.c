@@ -148,14 +148,74 @@ exit_free:
 	return ret ? : cnt;
 }
 
+#define CSK_BIT_LEN			128U
+#define CSK_32ARRAY_SIZE(_nbits)	DIV_ROUND_UP(_nbits, 32)
+
+#define SYSFS_GET_CSK_CANCEL_NBITS(_name) \
+static int get_##_name##_csk_cancel_nbits(struct ifpga_sec_mgr *imgr) \
+{ \
+	return (int)CSK_BIT_LEN; \
+}
+
+SYSFS_GET_CSK_CANCEL_NBITS(bmc)
+SYSFS_GET_CSK_CANCEL_NBITS(sr)
+SYSFS_GET_CSK_CANCEL_NBITS(pr)
+
+static int get_csk_vector(struct ifpga_sec_mgr *imgr, u32 addr,
+			  unsigned long *csk_map, unsigned int nbits)
+{
+	unsigned int i, arr_size = CSK_32ARRAY_SIZE(nbits);
+	struct m10bmc_sec *sec = imgr->priv;
+	u32 *csk32;
+	int ret;
+
+	csk32 = vmalloc(arr_size);
+	if (!csk32)
+		return -ENOMEM;
+
+	ret = m10bmc_raw_bulk_read(sec->m10bmc, addr, csk32, arr_size);
+	if (ret) {
+		dev_err(sec->dev, "%s failed to read %d\n", __func__, ret);
+		goto vfree_exit;
+	}
+
+	for (i = 0; i < arr_size; i++)
+		csk32[i] = le32_to_cpu(csk32[i]);
+
+	bitmap_from_arr32(csk_map, csk32, nbits);
+	bitmap_complement(csk_map, csk_map, nbits);
+
+vfree_exit:
+	vfree(csk32);
+	return ret;
+}
+
+#define SYSFS_GET_CSK_VEC(_name, _addr) \
+static int get_##_name##_canceled_csks(struct ifpga_sec_mgr *imgr, \
+				       unsigned long *csk_map, \
+				       unsigned int nbits) \
+{ return get_csk_vector(imgr, _addr, csk_map, nbits); }
+
+#define CSK_VEC_OFFSET 0x34
+
+SYSFS_GET_CSK_VEC(bmc, BMC_PROG_ADDR + CSK_VEC_OFFSET)
+SYSFS_GET_CSK_VEC(sr, SR_PROG_ADDR + CSK_VEC_OFFSET)
+SYSFS_GET_CSK_VEC(pr, PR_PROG_ADDR + CSK_VEC_OFFSET)
+
 static const struct ifpga_sec_mgr_ops m10bmc_iops = {
 	.user_flash_count = get_qspi_flash_count,
 	.bmc_root_entry_hash = get_bmc_root_entry_hash,
 	.sr_root_entry_hash = get_sr_root_entry_hash,
 	.pr_root_entry_hash = get_pr_root_entry_hash,
+	.bmc_canceled_csks = get_bmc_canceled_csks,
+	.sr_canceled_csks = get_sr_canceled_csks,
+	.pr_canceled_csks = get_pr_canceled_csks,
 	.bmc_reh_size = get_bmc_reh_size,
 	.sr_reh_size = get_sr_reh_size,
 	.pr_reh_size = get_pr_reh_size,
+	.bmc_canceled_csk_nbits = get_bmc_csk_cancel_nbits,
+	.sr_canceled_csk_nbits = get_sr_csk_cancel_nbits,
+	.pr_canceled_csk_nbits = get_pr_csk_cancel_nbits
 };
 
 static void ifpga_sec_mgr_uinit(struct m10bmc_sec *sec)
