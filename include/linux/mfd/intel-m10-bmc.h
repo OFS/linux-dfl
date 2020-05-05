@@ -10,6 +10,12 @@
 #include <linux/regmap.h>
 #include <linux/rwsem.h>
 
+/* Supported MAX10 BMC types */
+enum m10bmc_type {
+	M10_N3000,
+	M10_D5005
+};
+
 #define M10BMC_LEGACY_SYS_BASE		0x300400
 #define M10BMC_SYS_BASE			0x300800
 #define M10BMC_MEM_END			0x200000fc
