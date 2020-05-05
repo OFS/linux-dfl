@@ -13,13 +13,9 @@
 #include <linux/regmap.h>
 #include <linux/spi/spi.h>
 
-enum m10bmc_type {
-	M10_N3000,
-	M10_D5005
-};
-
 static struct mfd_cell m10bmc_bmc_subdevs[] = {
 	{ .name = "d5005bmc-hwmon" },
+	{ .name = "d5005bmc-secure" }
 };
 
 static const struct regmap_range d5005_fw_handshake_regs[] = {
