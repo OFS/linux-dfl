@@ -9,6 +9,7 @@
 #include <linux/device.h>
 #include <linux/fpga/fpga-sec-mgr.h>
 #include <linux/mfd/intel-m10-bmc.h>
+#include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
@@ -717,8 +718,20 @@ static struct image_load n3000_image_load_hndlrs[] = {
 	{}
 };
 
+static struct image_load d5005_image_load_hndlrs[] = {
+	{
+		.name = "bmc_factory",
+		.load_image = m10bmc_sec_bmc_image_load_0,
+	},
+	{
+		.name = "bmc_user",
+		.load_image = m10bmc_sec_bmc_image_load_1,
+	},
+	{}
+};
+
 static struct fpga_sec_mgr_ops *
-m10bmc_sops_create(struct device *dev)
+m10bmc_sops_create(struct device *dev, enum m10bmc_type type)
 {
 	struct fpga_sec_mgr_ops *sops;
 
@@ -731,13 +744,19 @@ m10bmc_sops_create(struct device *dev)
 	sops->poll_complete = m10bmc_sec_poll_complete;
 	sops->cancel = m10bmc_sec_cancel;
 	sops->get_hw_errinfo = m10bmc_sec_hw_errinfo;
-	sops->image_load = n3000_image_load_hndlrs;
+
+	if (type == M10_N3000)
+		sops->image_load = n3000_image_load_hndlrs;
+	else
+		sops->image_load = d5005_image_load_hndlrs;
 
 	return sops;
 }
 
 static int m10bmc_secure_probe(struct platform_device *pdev)
 {
+	const struct platform_device_id *id = platform_get_device_id(pdev);
+	enum m10bmc_type type = (enum m10bmc_type)id->driver_data;
 	struct fpga_sec_mgr_ops *sops;
 	struct fpga_sec_mgr *smgr;
 	struct m10bmc_sec *sec;
@@ -746,7 +765,7 @@ static int m10bmc_secure_probe(struct platform_device *pdev)
 	if (!sec)
 		return -ENOMEM;
 
-	sops = m10bmc_sops_create(&pdev->dev);
+	sops = m10bmc_sops_create(&pdev->dev, type);
 	if (!sops)
 		return -ENOMEM;
 
@@ -764,16 +783,29 @@ static int m10bmc_secure_probe(struct platform_device *pdev)
 	return devm_fpga_sec_mgr_register(sec->dev, smgr);
 }
 
+static const struct platform_device_id intel_m10bmc_secure_ids[] = {
+	{
+		.name = "n3000bmc-secure",
+		.driver_data = (unsigned long)M10_N3000,
+	},
+	{
+		.name = "d5005bmc-secure",
+		.driver_data = (unsigned long)M10_D5005,
+	},
+	{ }
+};
+
 static struct platform_driver intel_m10bmc_secure_driver = {
 	.probe = m10bmc_secure_probe,
 	.driver = {
-		.name = "n3000bmc-secure",
+		.name = "intel-m10bmc-secure",
 		.dev_groups = m10bmc_sec_attr_groups,
 	},
+	.id_table = intel_m10bmc_secure_ids,
 };
 module_platform_driver(intel_m10bmc_secure_driver);
 
-MODULE_ALIAS("platform:n3000bmc-secure");
+MODULE_DEVICE_TABLE(platform, intel_m10bmc_secure_ids);
 MODULE_AUTHOR("Intel Corporation");
 MODULE_DESCRIPTION("Intel MAX10 BMC Secure Update");
 MODULE_LICENSE("GPL v2");
