@@ -9,9 +9,17 @@
 #include <linux/device.h>
 #include <linux/fpga/fpga-image-load.h>
 #include <linux/mfd/intel-m10-bmc.h>
+#include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+
+/* Supported fpga secure manager types */
+enum fpga_sec_type {
+	N3000BMC_SEC,
+	D5005BMC_SEC,
+	N5010BMC_SEC,
+};
 
 struct image_load;
 
@@ -239,6 +247,18 @@ static struct image_load n3000_image_load_hndlrs[] = {
 	{
 		.name = "retimer_fw",
 		.load_image = m10bmc_sec_retimer_eeprom_load,
+	},
+	{}
+};
+
+static struct image_load d5005_image_load_hndlrs[] = {
+	{
+		.name = "bmc_factory",
+		.load_image = m10bmc_sec_bmc_image_load_0,
+	},
+	{
+		.name = "bmc_user",
+		.load_image = m10bmc_sec_bmc_image_load_1,
 	},
 	{}
 };
@@ -786,6 +806,8 @@ static const struct fpga_image_load_ops m10bmc_ops = {
 
 static int m10bmc_sec_probe(struct platform_device *pdev)
 {
+	const struct platform_device_id *id = platform_get_device_id(pdev);
+	enum fpga_sec_type type = (enum fpga_sec_type)id->driver_data;
 	struct fpga_image_load *imgld;
 	struct m10bmc_sec *sec;
 
@@ -795,7 +817,12 @@ static int m10bmc_sec_probe(struct platform_device *pdev)
 
 	sec->dev = &pdev->dev;
 	sec->m10bmc = dev_get_drvdata(pdev->dev.parent);
-	sec->image_load = n3000_image_load_hndlrs;
+
+	if (type == N3000BMC_SEC)
+		sec->image_load = n3000_image_load_hndlrs;
+	else
+		sec->image_load = d5005_image_load_hndlrs;
+
 	dev_set_drvdata(&pdev->dev, sec);
 
 	imgld = fpga_image_load_register(sec->dev, &m10bmc_ops, sec);
@@ -816,17 +843,30 @@ static int m10bmc_sec_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct platform_device_id intel_m10bmc_sec_ids[] = {
+	{
+		.name = "n3000bmc-sec-update",
+		.driver_data = (unsigned long)N3000BMC_SEC,
+	},
+	{
+		.name = "d5005bmc-sec-update",
+		.driver_data = (unsigned long)D5005BMC_SEC,
+	},
+	{ }
+};
+
 static struct platform_driver intel_m10bmc_sec_driver = {
 	.probe = m10bmc_sec_probe,
 	.remove = m10bmc_sec_remove,
 	.driver = {
-		.name = "n3000bmc-sec-update",
+		.name = "intel-m10bmc-sec-update",
 		.dev_groups = m10bmc_sec_attr_groups,
 	},
+	.id_table = intel_m10bmc_sec_ids,
 };
 module_platform_driver(intel_m10bmc_sec_driver);
 
-MODULE_ALIAS("platform:n3000bmc-sec-update");
+MODULE_DEVICE_TABLE(platform, intel_m10bmc_sec_ids);
 MODULE_AUTHOR("Intel Corporation");
 MODULE_DESCRIPTION("Intel MAX10 BMC Secure Update");
 MODULE_LICENSE("GPL v2");
