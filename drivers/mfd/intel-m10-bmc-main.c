@@ -25,6 +25,9 @@ static struct mfd_cell m10bmc_bmc_subdevs[] = {
 	{
 		.name = d5005BMC_HWMON_DEV_NAME,
 	},
+	{
+		.name = INTEL_M10BMC_SEC_DRV_NAME,
+	}
 };
 
 static struct mfd_cell m10bmc_pacn3000_subdevs[] = {
