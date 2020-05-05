@@ -139,11 +139,57 @@ exit_free:
 	return ret ? : cnt;
 }
 
+#define CSK_BIT_LEN         128U
+#define CSK_32ARRAY_SIZE    DIV_ROUND_UP(CSK_BIT_LEN, 32)
+
+static int get_csk_vector(struct ifpga_sec_mgr *imgr, u32 addr,
+			  unsigned long **csk_map, unsigned int *nbits)
+{
+	struct m10bmc_sec *sec = imgr->priv;
+	u32 csk32[CSK_32ARRAY_SIZE];
+	int i, ret;
+
+	*csk_map = vmalloc(sizeof(unsigned long) * BITS_TO_LONGS(CSK_BIT_LEN));
+	if (!*csk_map)
+		return -ENOMEM;
+
+	ret = m10bmc_raw_bulk_read(sec->m10bmc, addr, csk32, CSK_32ARRAY_SIZE);
+	if (ret) {
+		dev_err(sec->dev, "%s failed to read %d\n", __func__, ret);
+		vfree(*csk_map);
+		return ret;
+	}
+
+	for (i = 0; i < CSK_32ARRAY_SIZE; i++)
+		csk32[i] = le32_to_cpu(csk32[i]);
+
+	bitmap_from_arr32(*csk_map, csk32, CSK_BIT_LEN);
+	bitmap_complement(*csk_map, *csk_map, CSK_BIT_LEN);
+
+	*nbits = CSK_BIT_LEN;
+	return 0;
+}
+
+#define SYSFS_GET_CSK_VEC(_name, _addr) \
+	static int get_##_name##_canceled_csks(struct ifpga_sec_mgr *imgr, \
+					unsigned long **csk_map, \
+					unsigned int *nbits) \
+	{ return get_csk_vector(imgr, _addr, csk_map, nbits); }
+
+#define CSK_VEC_OFFSET 0x34
+
+SYSFS_GET_CSK_VEC(bmc, BMC_PROG_ADDR + CSK_VEC_OFFSET)
+SYSFS_GET_CSK_VEC(sr, SR_PROG_ADDR + CSK_VEC_OFFSET)
+SYSFS_GET_CSK_VEC(pr, PR_PROG_ADDR + CSK_VEC_OFFSET)
+
 static const struct ifpga_sec_mgr_ops m10bmc_iops = {
 	.user_flash_count = get_qspi_flash_count,
 	.bmc_root_entry_hash = get_bmc_root_entry_hash,
 	.sr_root_entry_hash = get_sr_root_entry_hash,
 	.pr_root_entry_hash = get_pr_root_entry_hash,
+	.sr_canceled_csks = get_sr_canceled_csks,
+	.bmc_canceled_csks = get_bmc_canceled_csks,
+	.pr_canceled_csks = get_pr_canceled_csks,
 };
 
 static void ifpga_sec_mgr_uinit(struct m10bmc_sec *sec)
