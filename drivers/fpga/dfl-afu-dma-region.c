@@ -9,7 +9,7 @@
  *   Xiao Guangrong <guangrong.xiao@linux.intel.com>
  */
 
-#include <linux/dma-mapping.h>
+#include <linux/fpga-dfl.h>
 #include <linux/sched/signal.h>
 #include <linux/uaccess.h>
 #include <linux/mm.h>
@@ -36,6 +36,7 @@ static int afu_dma_pin_pages(struct dfl_feature_platform_data *pdata,
 {
 	int npages = region->length >> PAGE_SHIFT;
 	struct device *dev = &pdata->dev->dev;
+	unsigned int flags = 0;
 	int ret, pinned;
 
 	ret = account_locked_vm(current->mm, npages, true);
@@ -48,7 +49,10 @@ static int afu_dma_pin_pages(struct dfl_feature_platform_data *pdata,
 		goto unlock_vm;
 	}
 
-	pinned = pin_user_pages_fast(region->user_addr, npages, FOLL_WRITE,
+	if (region->direction != DMA_TO_DEVICE)
+		flags |= FOLL_WRITE;
+
+	pinned = pin_user_pages_fast(region->user_addr, npages, flags,
 				     region->pages);
 	if (pinned < 0) {
 		ret = pinned;
@@ -287,11 +291,31 @@ afu_dma_region_find_iova(struct dfl_feature_platform_data *pdata, u64 iova)
 	return afu_dma_region_find(pdata, iova, 0);
 }
 
+static enum dma_data_direction dma_flag_to_dir(u32 flags)
+{
+	u32 mask = DFL_DMA_MAP_FLAG_READ | DFL_DMA_MAP_FLAG_WRITE;
+
+	/*
+	 * DMA is bidirectional if both read and write are specified or if
+	 * neither read nor write is specified. The latter supports legacy
+	 * code, which did not pass any flags.
+	 */
+	switch (flags & mask) {
+	case DFL_DMA_MAP_FLAG_READ:
+		return DMA_TO_DEVICE;
+	case DFL_DMA_MAP_FLAG_WRITE:
+		return DMA_FROM_DEVICE;
+	}
+
+	return DMA_BIDIRECTIONAL;
+}
+
 /**
  * afu_dma_map_region - map memory region for dma
  * @pdata: feature device platform data
  * @user_addr: address of the memory region
  * @length: size of the memory region
+ * @flags: dma mapping flags
  * @iova: pointer of iova address
  *
  * Map memory region defined by @user_addr and @length, and return dma address
@@ -299,7 +323,7 @@ afu_dma_region_find_iova(struct dfl_feature_platform_data *pdata, u64 iova)
  * Return 0 for success, otherwise error code.
  */
 int afu_dma_map_region(struct dfl_feature_platform_data *pdata,
-		       u64 user_addr, u64 length, u64 *iova)
+		       u64 user_addr, u64 length, u32 flags, u64 *iova)
 {
 	struct dfl_afu_dma_region *region;
 	int ret;
@@ -321,6 +345,7 @@ int afu_dma_map_region(struct dfl_feature_platform_data *pdata,
 
 	region->user_addr = user_addr;
 	region->length = length;
+	region->direction = dma_flag_to_dir(flags);
 
 	/* Pin the user memory region */
 	ret = afu_dma_pin_pages(pdata, region);
@@ -340,7 +365,7 @@ int afu_dma_map_region(struct dfl_feature_platform_data *pdata,
 	region->iova = dma_map_page(dfl_fpga_pdata_to_parent(pdata),
 				    region->pages[0], 0,
 				    region->length,
-				    DMA_BIDIRECTIONAL);
+				    region->direction);
 	if (dma_mapping_error(dfl_fpga_pdata_to_parent(pdata), region->iova)) {
 		dev_err(&pdata->dev->dev, "failed to map for dma\n");
 		ret = -EFAULT;
@@ -361,7 +386,7 @@ int afu_dma_map_region(struct dfl_feature_platform_data *pdata,
 
 unmap_dma:
 	dma_unmap_page(dfl_fpga_pdata_to_parent(pdata),
-		       region->iova, region->length, DMA_BIDIRECTIONAL);
+		       region->iova, region->length, region->direction);
 unpin_pages:
 	afu_dma_unpin_pages(pdata, region);
 free_region:
@@ -397,7 +422,7 @@ int afu_dma_unmap_region(struct dfl_feature_platform_data *pdata, u64 iova)
 	mutex_unlock(&pdata->lock);
 
 	dma_unmap_page(dfl_fpga_pdata_to_parent(pdata),
-		       region->iova, region->length, DMA_BIDIRECTIONAL);
+		       region->iova, region->length, region->direction);
 	afu_dma_unpin_pages(pdata, region);
 	kfree(region);
 
