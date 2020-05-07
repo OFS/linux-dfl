@@ -36,7 +36,7 @@ static int afu_dma_pin_pages(struct dfl_feature_platform_data *pdata,
 {
 	int npages = region->length >> PAGE_SHIFT;
 	struct device *dev = &pdata->dev->dev;
-	unsigned int flags = 0;
+	unsigned int flags = FOLL_LONGTERM;
 	int ret, pinned;
 
 	ret = account_locked_vm(current->mm, npages, true);
