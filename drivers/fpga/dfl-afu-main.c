@@ -711,6 +711,7 @@ static long afu_ioctl_get_region_info(struct dfl_feature_dev_data *fdata,
 static long
 afu_ioctl_dma_map(struct dfl_feature_dev_data *fdata, void __user *arg)
 {
+	u32 dma_mask = DFL_DMA_MAP_FLAG_READ | DFL_DMA_MAP_FLAG_WRITE;
 	struct dfl_fpga_port_dma_map map;
 	unsigned long minsz;
 	long ret;
@@ -720,10 +721,11 @@ afu_ioctl_dma_map(struct dfl_feature_dev_data *fdata, void __user *arg)
 	if (copy_from_user(&map, arg, minsz))
 		return -EFAULT;
 
-	if (map.argsz < minsz || map.flags)
+	if (map.argsz < minsz || map.flags & ~dma_mask)
 		return -EINVAL;
 
-	ret = afu_dma_map_region(fdata, map.user_addr, map.length, &map.iova);
+	ret = afu_dma_map_region(fdata, map.user_addr, map.length, map.flags,
+				 &map.iova);
 	if (ret)
 		return ret;
 
