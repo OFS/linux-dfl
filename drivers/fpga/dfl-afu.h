@@ -17,6 +17,7 @@
 #ifndef __DFL_AFU_H
 #define __DFL_AFU_H
 
+#include <linux/dma-mapping.h>
 #include <linux/mm.h>
 
 #include "dfl.h"
@@ -41,7 +42,7 @@ struct dfl_afu_mmio_region {
 };
 
 /**
- * struct fpga_afu_dma_region - afu DMA region data structure
+ * struct dfl_afu_dma_region - afu DMA region data structure
  *
  * @user_addr: region userspace virtual address.
  * @length: region length.
@@ -49,6 +50,7 @@ struct dfl_afu_mmio_region {
  * @pages: ptr to pages of this region.
  * @node: rb tree node.
  * @in_use: flag to indicate if this region is in_use.
+ * @direction: dma data direction.
  */
 struct dfl_afu_dma_region {
 	u64 user_addr;
@@ -57,6 +59,7 @@ struct dfl_afu_dma_region {
 	struct page **pages;
 	struct rb_node node;
 	bool in_use;
+	enum dma_data_direction direction;
 };
 
 /**
@@ -96,7 +99,7 @@ int afu_mmio_region_get_by_offset(struct dfl_feature_platform_data *pdata,
 void afu_dma_region_init(struct dfl_feature_platform_data *pdata);
 void afu_dma_region_destroy(struct dfl_feature_platform_data *pdata);
 int afu_dma_map_region(struct dfl_feature_platform_data *pdata,
-		       u64 user_addr, u64 length, u64 *iova);
+		       u64 user_addr, u64 length, u32 flags, u64 *iova);
 int afu_dma_unmap_region(struct dfl_feature_platform_data *pdata, u64 iova);
 struct dfl_afu_dma_region *
 afu_dma_region_find(struct dfl_feature_platform_data *pdata,
