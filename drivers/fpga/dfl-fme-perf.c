@@ -940,10 +940,9 @@ static void fme_perf_pmu_unregister(struct fme_perf_priv *priv)
 
 static int fme_perf_offline_cpu(unsigned int cpu, struct hlist_node *node)
 {
-	struct fme_perf_priv *priv;
+	struct fme_perf_priv *priv = hlist_entry(node, struct fme_perf_priv,
+						 node);
 	int target;
-
-	priv = hlist_entry_safe(node, struct fme_perf_priv, node);
 
 	if (cpu != priv->cpu)
 		return 0;
