@@ -152,6 +152,13 @@ static void set_error(struct ifpga_sec_mgr *imgr, enum ifpga_sec_err err_code)
 	imgr->err_code = err_code;
 }
 
+static void set_hw_errinfo(struct ifpga_sec_mgr *imgr,
+			   enum ifpga_sec_err err_code)
+{
+	if (imgr->iops->get_hw_errinfo)
+		imgr->hw_errinfo = imgr->iops->get_hw_errinfo(imgr);
+}
+
 static enum ifpga_sec_err check_and_do_cancel(struct ifpga_sec_mgr *imgr)
 {
 	if (!imgr->request_cancel)
@@ -187,8 +194,12 @@ static void ifpga_sec_error(struct ifpga_sec_mgr *imgr,
 static void ifpga_sec_dev_error(struct ifpga_sec_mgr *imgr,
 				enum ifpga_sec_err err_code)
 {
-	ifpga_sec_error(imgr, err_code);
+	mutex_lock(&imgr->lock);
+	set_error(imgr, err_code);
+	set_hw_errinfo(imgr, err_code);
+	update_progress(imgr, IFPGA_SEC_PROG_IDLE);
 	imgr->iops->cancel(imgr);
+	mutex_unlock(&imgr->lock);
 }
 
 static void ifpga_sec_mgr_update(struct work_struct *work)
@@ -352,6 +363,20 @@ error_show(struct device *dev, struct device_attribute *attr, char *buf)
 }
 static DEVICE_ATTR_RO(error);
 
+static ssize_t
+hw_errinfo_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct ifpga_sec_mgr *imgr = to_sec_mgr(dev);
+	ssize_t cnt = 0;
+
+	mutex_lock(&imgr->lock);
+	cnt = sprintf(buf, "0x%llx\n", imgr->hw_errinfo);
+	mutex_unlock(&imgr->lock);
+
+	return cnt;
+}
+static DEVICE_ATTR_RO(hw_errinfo);
+
 static ssize_t remaining_size_show(struct device *dev,
 				   struct device_attribute *attr, char *buf)
 {
@@ -386,6 +411,7 @@ static ssize_t filename_store(struct device *dev, struct device_attribute *attr,
 		imgr->filename[strlen(imgr->filename) - 1] = '\0';
 
 	imgr->err_code = IFPGA_SEC_ERR_NONE;
+	imgr->hw_errinfo = 0;
 	imgr->request_cancel = false;
 	imgr->progress = IFPGA_SEC_PROG_READ_FILE;
 	reinit_completion(&imgr->update_done);
@@ -420,18 +446,31 @@ static ssize_t cancel_store(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_WO(cancel);
 
+static umode_t
+sec_mgr_update_visible(struct kobject *kobj, struct attribute *attr, int n)
+{
+	struct ifpga_sec_mgr *imgr = to_sec_mgr(kobj_to_dev(kobj));
+
+	if (attr == &dev_attr_hw_errinfo.attr && !imgr->iops->get_hw_errinfo)
+		return 0;
+
+	return attr->mode;
+}
+
 static struct attribute *sec_mgr_update_attrs[] = {
 	&dev_attr_filename.attr,
 	&dev_attr_cancel.attr,
 	&dev_attr_status.attr,
 	&dev_attr_error.attr,
 	&dev_attr_remaining_size.attr,
+	&dev_attr_hw_errinfo.attr,
 	NULL,
 };
 
 static struct attribute_group sec_mgr_update_attr_group = {
 	.name = "update",
 	.attrs = sec_mgr_update_attrs,
+	.is_visible = sec_mgr_update_visible,
 };
 
 static ssize_t name_show(struct device *dev,
