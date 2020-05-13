@@ -91,6 +91,9 @@ typedef int (*sysfs_csk_hndlr_t)(struct ifpga_sec_mgr *imgr,
  *			 function and is called at the completion
  *			 of the update, whether success or failure,
  *			 iff the prepare function succeeded.
+ * @get_hw_errinfo:	 Optional: return u64 hw specific error info.
+ *			 The software err_code may used to determine
+ *			 whether the hw error info is applicable.
  */
 struct ifpga_sec_mgr_ops {
 	sysfs_cnt_hndlr_t user_flash_count;
@@ -107,6 +110,7 @@ struct ifpga_sec_mgr_ops {
 	int (*poll_complete)(struct ifpga_sec_mgr *imgr);
 	void (*cleanup)(struct ifpga_sec_mgr *imgr);
 	int (*cancel)(struct ifpga_sec_mgr *imgr);
+	u64 (*get_hw_errinfo)(struct ifpga_sec_mgr *imgr);
 };
 
 /* Update progress codes */
@@ -129,6 +133,7 @@ struct ifpga_sec_mgr {
 	u32 progress;
 	int err_state;		/* progress state at time of failure */
 	int err_code;		/* negative errno value on failure */
+	u64 hw_errinfo;		/* 64 bits of HW specific error info */
 	bool request_cancel;
 	bool driver_unload;
 	void *priv;

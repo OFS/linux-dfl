@@ -118,3 +118,14 @@ Description:	Read-only. Returns an error string describing the
 		of the following: operation-error, crc-error,
 		auth-error, timeout-error, user-abort, device-busy,
 		invalid_size.
+
+What: 		/sys/class/ifpga_sec_mgr/ifpga_secX/update/hw_errinfo
+Date:		June 2020
+KernelVersion:  5.8
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read-only. Returns a 64 bit error value providing
+		hardware specific information that may be useful in
+		debugging errors that occur during FPGA image updates.
+		This file is only visible if the underlying device
+		supports it.
+		Format: "0x%llx".
