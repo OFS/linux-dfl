@@ -481,6 +481,9 @@ static int eth_group_setup(struct dfl_eth_group *egroup)
 		return ret;
 
 	switch (egroup->speed) {
+	case 10:
+		egroup->ops = &dfl_eth_dev_10g_ops;
+		break;
 	case 25:
 		egroup->ops = &dfl_eth_dev_25g_ops;
 		break;
