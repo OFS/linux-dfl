@@ -77,6 +77,7 @@ struct net_device *n3000_netdev_create(struct eth_dev *edev);
 netdev_tx_t n3000_dummy_netdev_xmit(struct sk_buff *skb,
 				    struct net_device *dev);
 
+extern struct eth_dev_ops dfl_eth_dev_10g_ops;
 extern struct eth_dev_ops dfl_eth_dev_25g_ops;
 extern struct eth_dev_ops dfl_eth_dev_40g_ops;
 
