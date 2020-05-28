@@ -721,9 +721,9 @@ static int regmap_spi_avmm_reg_write(void *context, unsigned int reg,
 	return do_reg_write(context, reg, &val, 1);
 }
 
-int regmap_spi_avmm_gather_write(void *context,
-				 const void *reg_buf, size_t reg_len,
-				 const void *val_buf, size_t val_len)
+static int regmap_spi_avmm_gather_write(void *context,
+					const void *reg_buf, size_t reg_len,
+					const void *val_buf, size_t val_len)
 {
 	if (reg_len != REG_SIZE)
 		return -EINVAL;
@@ -732,7 +732,7 @@ int regmap_spi_avmm_gather_write(void *context,
 			    (u16)(val_len / VAL_SIZE));
 }
 
-int regmap_spi_avmm_write(void *context, const void *data, size_t count)
+static int regmap_spi_avmm_write(void *context, const void *data, size_t count)
 {
 	if (count < REG_SIZE + VAL_SIZE)
 		return -EINVAL;
@@ -741,9 +741,9 @@ int regmap_spi_avmm_write(void *context, const void *data, size_t count)
 					    data + REG_SIZE, count - REG_SIZE);
 }
 
-int regmap_spi_avmm_read(void *context,
-			 const void *reg_buf, size_t reg_len,
-			 void *val_buf, size_t val_len)
+static int regmap_spi_avmm_read(void *context,
+				const void *reg_buf, size_t reg_len,
+				void *val_buf, size_t val_len)
 {
 	if (reg_len != REG_SIZE)
 		return -EINVAL;
@@ -771,7 +771,7 @@ spi_avmm_bridge_ctx_gen(struct spi_device *spi)
 	return br;
 }
 
-struct regmap_bus regmap_spi_avmm_bus = {
+static const struct regmap_bus regmap_spi_avmm_bus = {
 	.write = regmap_spi_avmm_write,
 	.gather_write = regmap_spi_avmm_gather_write,
 	.read = regmap_spi_avmm_read,
