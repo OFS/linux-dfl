@@ -34,7 +34,7 @@ struct m10bmc_sdata {
 	const char *label;
 };
 
-struct m10bmc_sdata pacn3000_sensor_tbl[] = {
+static struct m10bmc_sdata pacn3000_sensor_tbl[] = {
 	{ M10BMC_CHT_TEMP, 0x100, 0x104, 0x108, 0x10c, 0x0, 500,
 	 "Board Temperature" },
 	{ M10BMC_CHT_TEMP, 0x110, 0x114, 0x118, 0x0, 0x0, 500,
@@ -293,8 +293,8 @@ static const struct hwmon_ops m10bmc_hwmon_ops = {
 	.read_string = m10bmc_hwmon_read_string,
 };
 
-int m10bmc_malloc_channels(struct device *dev, struct m10bmc_ch_group *chg,
-			   int num_ch)
+static int m10bmc_malloc_channels(struct device *dev,
+				  struct m10bmc_ch_group *chg, int num_ch)
 {
 	chg->config = devm_kcalloc(dev, num_ch + 1,
 				   sizeof(*chg->config), GFP_KERNEL);
@@ -311,8 +311,8 @@ int m10bmc_malloc_channels(struct device *dev, struct m10bmc_ch_group *chg,
 	return 0;
 }
 
-void m10bmc_fill_temp_channel(struct m10bmc_hwmon *hwmon, int ch_idx,
-			      struct m10bmc_sdata *data)
+static void m10bmc_fill_temp_channel(struct m10bmc_hwmon *hwmon, int ch_idx,
+				     struct m10bmc_sdata *data)
 {
 	struct m10bmc_ch_group *chg = &hwmon->chgs[M10BMC_CHT_TEMP];
 
@@ -337,8 +337,8 @@ void m10bmc_fill_temp_channel(struct m10bmc_hwmon *hwmon, int ch_idx,
 	chg->data_list[ch_idx] = data;
 }
 
-void m10bmc_fill_in_channel(struct m10bmc_hwmon *hwmon, int ch_idx,
-			    struct m10bmc_sdata *data)
+static void m10bmc_fill_in_channel(struct m10bmc_hwmon *hwmon, int ch_idx,
+				   struct m10bmc_sdata *data)
 {
 	struct m10bmc_ch_group *chg = &hwmon->chgs[M10BMC_CHT_IN];
 
@@ -360,8 +360,8 @@ void m10bmc_fill_in_channel(struct m10bmc_hwmon *hwmon, int ch_idx,
 	chg->data_list[ch_idx] = data;
 }
 
-void m10bmc_fill_curr_channel(struct m10bmc_hwmon *hwmon, int ch_idx,
-			      struct m10bmc_sdata *data)
+static void m10bmc_fill_curr_channel(struct m10bmc_hwmon *hwmon, int ch_idx,
+				     struct m10bmc_sdata *data)
 {
 	struct m10bmc_ch_group *chg = &hwmon->chgs[M10BMC_CHT_CURR];
 
@@ -380,8 +380,8 @@ void m10bmc_fill_curr_channel(struct m10bmc_hwmon *hwmon, int ch_idx,
 	chg->data_list[ch_idx] = data;
 }
 
-void m10bmc_fill_power_channel(struct m10bmc_hwmon *hwmon, int ch_idx,
-			       struct m10bmc_sdata *data)
+static void m10bmc_fill_power_channel(struct m10bmc_hwmon *hwmon, int ch_idx,
+				      struct m10bmc_sdata *data)
 {
 	struct m10bmc_ch_group *chg = &hwmon->chgs[M10BMC_CHT_POWER];
 
