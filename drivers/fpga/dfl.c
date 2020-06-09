@@ -1695,6 +1695,13 @@ int dfl_fpga_cdev_assign_port(struct dfl_fpga_cdev *cdev, int port_id)
 		goto put_dev_exit;
 	}
 
+	/*
+	 * HACK: See the commit message associated with the
+	 * INIT_LIST_HEAD() line below. The long term fix
+	 * is to create a new device structure instead of
+	 * reviving the existing device structure.
+	 */
+	INIT_LIST_HEAD(&(&port_pdev->dev)->links.needs_suppliers);
 	ret = platform_device_add(port_pdev);
 	if (ret)
 		goto put_dev_exit;
