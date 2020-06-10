@@ -4,6 +4,7 @@
  * Copyright (C) 2018-2020 Intel Corporation. All rights reserved.
  *
  */
+#include <linux/bitfield.h>
 #include <linux/device.h>
 #include <linux/mfd/intel-m10-bmc.h>
 #include <linux/module.h>
@@ -27,6 +28,38 @@ struct n3000bmc_pkvl {
 	struct device *base_dev;
 	struct mii_bus *pkvl_mii_bus;
 };
+
+#define pkvl_version_attr(chip, type, reg, field)			\
+static ssize_t								\
+chip##_##type##_version_show(struct device *dev,			\
+			     struct device_attribute *attr, char *buf)	\
+{									\
+	struct n3000bmc_pkvl *pkvl = dev_get_drvdata(dev);		\
+	unsigned int val;						\
+	int ret;							\
+									\
+	ret = m10bmc_sys_read(pkvl->m10bmc, reg, &val);			\
+	if (ret)							\
+		return ret;						\
+									\
+	return sprintf(buf, "0x%04x\n", (u16)FIELD_GET(field, val));	\
+}									\
+static DEVICE_ATTR_RO(chip##_##type##_version)
+
+pkvl_version_attr(A, sbus, PKVL_A_VERSION, SBUS_VERSION);
+pkvl_version_attr(A, serdes, PKVL_A_VERSION, SERDES_VERSION);
+pkvl_version_attr(B, sbus, PKVL_B_VERSION, SBUS_VERSION);
+pkvl_version_attr(B, serdes, PKVL_B_VERSION, SERDES_VERSION);
+
+static struct attribute *pkvl_attrs[] = {
+	&dev_attr_A_sbus_version.attr,
+	&dev_attr_A_serdes_version.attr,
+	&dev_attr_B_sbus_version.attr,
+	&dev_attr_B_serdes_version.attr,
+	NULL,
+};
+
+ATTRIBUTE_GROUPS(pkvl);
 
 #define PKVL_LINK_STAT_BIT(pkvl_id, link_id) \
 	BIT(((pkvl_id) << 2) + (link_id))
@@ -196,6 +229,7 @@ static struct platform_driver intel_m10bmc_pkvl_driver = {
 	.remove = m10bmc_pkvl_remove,
 	.driver = {
 		.name = N3000BMC_PKVL_DEV_NAME,
+		.dev_groups = pkvl_groups,
 	},
 };
 

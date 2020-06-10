@@ -1,0 +1,31 @@
+What:		/sys/bus/platform/devices/n3000bmc-pkvl.*.auto/A_sbus_version
+Date:		June 2020
+KernelVersion:  5.8
+Contact:	Xu Yilun <yilun.xu@intel.com>
+Description:	Read only. Returns the Transceiver bus firmware version of
+		Parkvale chip A.
+		Format: "0x%04x".
+
+What:		/sys/bus/platform/devices/n3000bmc-pkvl.*.auto/A_serdes_version
+Date:		June 2020
+KernelVersion:  5.8
+Contact:	Xu Yilun <yilun.xu@intel.com>
+Description:	Read only. Returns the SERDES firmware version of Parkvale
+		chip A.
+		Format: "0x%04x".
+
+What:		/sys/bus/platform/devices/n3000bmc-pkvl.*.auto/B_sbus_version
+Date:		June 2020
+KernelVersion:  5.8
+Contact:	Xu Yilun <yilun.xu@intel.com>
+Description:	Read only. Returns the Transceiver bus firmware version of
+		Parkvale chip B.
+		Format: "0x%04x".
+
+What:		/sys/bus/platform/devices/n3000bmc-pkvl.*.auto/B_serdes_version
+Date:		June 2020
+KernelVersion:  5.8
+Contact:	Xu Yilun <yilun.xu@intel.com>
+Description:	Read only. Returns the SERDES firmware version of Parkvale
+		chip B.
+		Format: "0x%04x".
