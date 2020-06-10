@@ -23,6 +23,10 @@
 
 /* PKVL related registers, in system register region */
 #define PKVL_LINK_STATUS		0x164
+#define PKVL_A_VERSION			0x254
+#define PKVL_B_VERSION			0x258
+#define SERDES_VERSION			GENMASK(15, 0)
+#define SBUS_VERSION			GENMASK(31, 16)
 
 /**
  * struct intel_m10bmc_retimer_pdata - subdev retimer platform data

@@ -1,0 +1,31 @@
+What:		/sys/bus/platform/devices/n3000bmc-retimer.*.auto/A_sbus_version
+Date:		Sep 2020
+KernelVersion:	5.10
+Contact:	Xu Yilun <yilun.xu@intel.com>
+Description:	Read only. Returns the Transceiver bus firmware version of
+		retimer chip A.
+		Format: "0x%04x".
+
+What:		/sys/bus/platform/devices/n3000bmc-retimer.*.auto/A_serdes_version
+Date:		Sep 2020
+KernelVersion:	5.10
+Contact:	Xu Yilun <yilun.xu@intel.com>
+Description:	Read only. Returns the SERDES firmware version of retimer
+		chip A.
+		Format: "0x%04x".
+
+What:		/sys/bus/platform/devices/n3000bmc-retimer.*.auto/B_sbus_version
+Date:		Sep 2020
+KernelVersion:  5.10
+Contact:	Xu Yilun <yilun.xu@intel.com>
+Description:	Read only. Returns the Transceiver bus firmware version of
+		retimer chip B.
+		Format: "0x%04x".
+
+What:		/sys/bus/platform/devices/n3000bmc-retimer.*.auto/B_serdes_version
+Date:		Sep 2020
+KernelVersion:  5.10
+Contact:	Xu Yilun <yilun.xu@intel.com>
+Description:	Read only. Returns the SERDES firmware version of retimer
+		chip B.
+		Format: "0x%04x".
