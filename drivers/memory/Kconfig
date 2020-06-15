@@ -198,6 +198,15 @@ config STM32_FMC2_EBI
 	  devices (like SRAM, ethernet adapters, FPGAs, LCD displays, ...) on
 	  SOCs containing the FMC2 External Bus Interface.
 
+config FPGA_DFL_EMIF
+	tristate "DFL EMIF private feature support"
+	depends on FPGA_DFL && HAS_IOMEM
+	help
+	  This driver is for the EMIF private feature implemented under
+	  FPGA Device Feature List (DFL) framework. It is used to expose
+	  memory interface status information as well as memory clearing
+	  control.
+
 source "drivers/memory/samsung/Kconfig"
 source "drivers/memory/tegra/Kconfig"
 
