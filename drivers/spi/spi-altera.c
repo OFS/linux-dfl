@@ -42,6 +42,7 @@
 #define ALTERA_SPI_MAX_CS		32
 
 struct altera_spi {
+	void __iomem *base;
 	int irq;
 	int len;
 	int count;
@@ -51,44 +52,7 @@ struct altera_spi {
 	/* data buffers */
 	const unsigned char *tx;
 	unsigned char *rx;
-
-	struct regmap *regmap;
-	u32 base;
-
-	struct device *dev;
 };
-
-static const struct regmap_config spi_altera_config = {
-	.reg_bits = 32,
-	.reg_stride = 4,
-	.val_bits = 32,
-	.fast_io = true,
-};
-
-static int altr_spi_writel(struct altera_spi *hw, unsigned int reg,
-			   unsigned int val)
-{
-	int ret;
-
-	ret = regmap_write(hw->regmap, hw->base + reg, val);
-	if (ret)
-		dev_err(hw->dev, "fail to write reg 0x%x val 0x%x: %d\n",
-			reg, val, ret);
-
-	return ret;
-}
-
-static int altr_spi_readl(struct altera_spi *hw, unsigned int reg,
-			  unsigned int *val)
-{
-	int ret;
-
-	ret = regmap_read(hw->regmap, hw->base + reg, val);
-	if (ret)
-		dev_err(hw->dev, "fail to read reg 0x%x: %d\n", reg, ret);
-
-	return ret;
-}
 
 static inline struct altera_spi *altera_spi_to_hw(struct spi_device *sdev)
 {
@@ -101,13 +65,12 @@ static void altera_spi_set_cs(struct spi_device *spi, bool is_high)
 
 	if (is_high) {
 		hw->imr &= ~ALTERA_SPI_CONTROL_SSO_MSK;
-		altr_spi_writel(hw, ALTERA_SPI_CONTROL, hw->imr);
-		altr_spi_writel(hw, ALTERA_SPI_SLAVE_SEL, 0);
+		writel(hw->imr, hw->base + ALTERA_SPI_CONTROL);
+		writel(0, hw->base + ALTERA_SPI_SLAVE_SEL);
 	} else {
-		altr_spi_writel(hw, ALTERA_SPI_SLAVE_SEL,
-				BIT(spi->chip_select));
+		writel(BIT(spi->chip_select), hw->base + ALTERA_SPI_SLAVE_SEL);
 		hw->imr |= ALTERA_SPI_CONTROL_SSO_MSK;
-		altr_spi_writel(hw, ALTERA_SPI_CONTROL, hw->imr);
+		writel(hw->imr, hw->base + ALTERA_SPI_CONTROL);
 	}
 }
 
@@ -134,14 +97,14 @@ static void altera_spi_tx_word(struct altera_spi *hw)
 		}
 	}
 
-	altr_spi_writel(hw, ALTERA_SPI_TXDATA, txd);
+	writel(txd, hw->base + ALTERA_SPI_TXDATA);
 }
 
 static void altera_spi_rx_word(struct altera_spi *hw)
 {
 	unsigned int rxd;
 
-	altr_spi_readl(hw, ALTERA_SPI_RXDATA, &rxd);
+	rxd = readl(hw->base + ALTERA_SPI_RXDATA);
 	if (hw->rx) {
 		switch (hw->bytes_per_word) {
 		case 1:
@@ -168,7 +131,6 @@ static int altera_spi_txrx(struct spi_master *master,
 	struct spi_device *spi, struct spi_transfer *t)
 {
 	struct altera_spi *hw = spi_master_get_devdata(master);
-	u32 val;
 
 	hw->tx = t->tx_buf;
 	hw->rx = t->rx_buf;
@@ -179,7 +141,7 @@ static int altera_spi_txrx(struct spi_master *master,
 	if (hw->irq >= 0) {
 		/* enable receive interrupt */
 		hw->imr |= ALTERA_SPI_CONTROL_IRRDY_MSK;
-		altr_spi_writel(hw, ALTERA_SPI_CONTROL, hw->imr);
+		writel(hw->imr, hw->base + ALTERA_SPI_CONTROL);
 
 		/* send the first byte */
 		altera_spi_tx_word(hw);
@@ -187,13 +149,9 @@ static int altera_spi_txrx(struct spi_master *master,
 		while (hw->count < hw->len) {
 			altera_spi_tx_word(hw);
 
-			for (;;) {
-				altr_spi_readl(hw, ALTERA_SPI_STATUS, &val);
-				if (val & ALTERA_SPI_STATUS_RRDY_MSK)
-					break;
-
+			while (!(readl(hw->base + ALTERA_SPI_STATUS) &
+				 ALTERA_SPI_STATUS_RRDY_MSK))
 				cpu_relax();
-			}
 
 			altera_spi_rx_word(hw);
 		}
@@ -215,7 +173,7 @@ static irqreturn_t altera_spi_irq(int irq, void *dev)
 	} else {
 		/* disable receive interrupt */
 		hw->imr &= ~ALTERA_SPI_CONTROL_IRRDY_MSK;
-		altr_spi_writel(hw, ALTERA_SPI_CONTROL, hw->imr);
+		writel(hw->imr, hw->base + ALTERA_SPI_CONTROL);
 
 		spi_finalize_current_transfer(master);
 	}
@@ -228,9 +186,7 @@ static int altera_spi_probe(struct platform_device *pdev)
 	struct altera_spi_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	struct altera_spi *hw;
 	struct spi_master *master;
-	void __iomem *res;
 	int err = -ENODEV;
-	u32 val;
 	u16 i;
 
 	master = spi_alloc_master(&pdev->dev, sizeof(struct altera_spi));
@@ -262,38 +218,19 @@ static int altera_spi_probe(struct platform_device *pdev)
 	master->set_cs = altera_spi_set_cs;
 
 	hw = spi_master_get_devdata(master);
-	hw->dev = &pdev->dev;
 
 	/* find and map our resources */
-	if (pdata && pdata->use_parent_regmap) {
-		hw->regmap = dev_get_regmap(pdev->dev.parent, NULL);
-		if (!hw->regmap) {
-			dev_err(&pdev->dev, "get regmap failed\n");
-			goto exit;
-		}
-		hw->base = pdata->regoff;
-	} else {
-		res = devm_platform_ioremap_resource(pdev, 0);
-		if (IS_ERR(res)) {
-			err = PTR_ERR(res);
-			goto exit;
-		}
-
-		hw->regmap = devm_regmap_init_mmio(&pdev->dev, res,
-						   &spi_altera_config);
-		if (IS_ERR(hw->regmap)) {
-			dev_err(&pdev->dev, "regmap mmio init failed\n");
-			err = PTR_ERR(hw->regmap);
-			goto exit;
-		}
+	hw->base = devm_platform_ioremap_resource(pdev, 0);
+	if (IS_ERR(hw->base)) {
+		err = PTR_ERR(hw->base);
+		goto exit;
 	}
 	/* program defaults into the registers */
 	hw->imr = 0;		/* disable spi interrupts */
-	altr_spi_writel(hw, ALTERA_SPI_CONTROL, hw->imr);
-	altr_spi_writel(hw, ALTERA_SPI_STATUS, 0);	/* clear status reg */
-	altr_spi_readl(hw, ALTERA_SPI_STATUS, &val);
-	if (val & ALTERA_SPI_STATUS_RRDY_MSK)
-		altr_spi_readl(hw, ALTERA_SPI_RXDATA, &val); /* flush rxdata */
+	writel(hw->imr, hw->base + ALTERA_SPI_CONTROL);
+	writel(0, hw->base + ALTERA_SPI_STATUS);	/* clear status reg */
+	if (readl(hw->base + ALTERA_SPI_STATUS) & ALTERA_SPI_STATUS_RRDY_MSK)
+		readl(hw->base + ALTERA_SPI_RXDATA);	/* flush rxdata */
 	/* irq is optional */
 	hw->irq = platform_get_irq(pdev, 0);
 	if (hw->irq >= 0) {
@@ -316,7 +253,7 @@ static int altera_spi_probe(struct platform_device *pdev)
 		}
 	}
 
-	dev_info(&pdev->dev, "base %u, irq %d\n", hw->base, hw->irq);
+	dev_info(&pdev->dev, "base %p, irq %d\n", hw->base, hw->irq);
 
 	return 0;
 exit:
