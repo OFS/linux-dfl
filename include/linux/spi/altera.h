@@ -9,8 +9,6 @@
 #include <linux/spi/spi.h>
 #include <linux/types.h>
 
-#define ALTERA_SPI_DRV_NAME	"spi-altera"
-
 /**
  * struct altera_spi_platform_data - Platform data of the Altera SPI driver
  * @mode_bits:		Mode bits of SPI master.
