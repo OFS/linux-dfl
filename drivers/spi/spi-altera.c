@@ -49,7 +49,7 @@ struct altera_spi {
 	int len;
 	int count;
 	int bytes_per_word;
-	u32 imr;
+	unsigned long imr;
 
 	/* data buffers */
 	const unsigned char *tx;
