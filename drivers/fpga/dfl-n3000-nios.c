@@ -343,14 +343,12 @@ static int create_altr_spi_controller(struct dfl_n3000_nios *ns)
 
 	pdata.num_devices = 1;
 	pdata.devices = &m10_n3000_info;
-	pdata.use_parent_regmap = true;
-	pdata.regoff = ALTR_SPI_BASE;
 
 	dev_dbg(ns->dev, "%s cs %hu bpm 0x%x mode 0x%hx\n", __func__,
 		pdata.num_chipselect, pdata.bits_per_word_mask,
 		pdata.mode_bits);
 
-	pdevinfo.name = ALTERA_SPI_DRV_NAME;
+	pdevinfo.name = "subdev_spi_altera";
 	pdevinfo.id = PLATFORM_DEVID_AUTO;
 	pdevinfo.parent = ns->dev;
 	pdevinfo.data = &pdata;
