@@ -502,6 +502,26 @@ FME Partial Reconfiguration Sub Feature driver (see drivers/fpga/dfl-fme-pr.c)
 could be a reference.
 
 
+VFIO Mdev support for DFL devices
+=================================
+As we introduced a dfl bus for private features, they could be added to dfl bus
+as independent dfl devices. There is a requirement to handle these devices
+either by kernel drivers or by direct access from userspace. Usually we bind
+the kernel drivers to devices which provide board management functions, and
+gives user direct access to devices which cooperate closely with user
+controlled Accelerated Function Unit (AFU). We realize this with a VFIO Mdev
+implementation. When we bind the vfio-mdev-dfl driver to a dfl device, it
+realizes a group of callbacks and registers to the Mdev framework as a
+parent (physical) device. It could then create one (available_instances == 1)
+mdev device.
+Since dfl devices are sub devices of FPGA DFL physical devices (e.g. PCIE
+device), which provide no DMA isolation for each sub device, this may leads to
+DMA isolation problem if a private feature is designed to be capable of DMA.
+The AFU user could potentially access the whole device addressing space and
+impact the private feature. So now the general HW design rule is, no DMA
+capability for private features. It eliminates the DMA isolation problem.
+
+
 Open discussion
 ===============
 FME driver exports one ioctl (DFL_FPGA_FME_PORT_PR) for partial reconfiguration
