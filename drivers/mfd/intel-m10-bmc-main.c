@@ -142,10 +142,10 @@ static int check_m10bmc_version(struct intel_m10bmc *m10bmc)
 			    &v))
 		return -ENODEV;
 
-	if (v != 0xffffffff) {
-		dev_err(m10bmc->dev, "bad version M10BMC detected\n");
-		return -ENODEV;
-	}
+	if (v != 0xffffffff)
+		dev_info(m10bmc->dev, "non-secure M10BMC detected\n");
+	else
+		m10bmc->flags |= M10BMC_FLAGS_SECURE;
 
 	return 0;
 }

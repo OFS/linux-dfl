@@ -105,7 +105,10 @@
 struct intel_m10bmc {
 	struct device *dev;
 	struct regmap *regmap;
+	unsigned int flags;
 };
+
+#define M10BMC_FLAGS_SECURE		BIT(2)
 
 /*
  * register access helper functions.
@@ -128,7 +131,7 @@ m10bmc_raw_read(struct intel_m10bmc *m10bmc, unsigned int addr,
 }
 
 #define m10bmc_sys_read(m10bmc, offset, val) \
-	m10bmc_raw_read(m10bmc, M10BMC_SYS_BASE + (offset), val)
+	m10bmc_raw_read(m10bmc, m10bmc->flags & M10BMC_FLAGS_SECURE ? M10BMC_SYS_BASE : M10BMC_LEGACY_SYS_BASE + (offset), val)
 
 /* M10BMC system sub devices for PAC N3000 */
 /* subdev hwmon  */
