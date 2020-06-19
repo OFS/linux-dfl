@@ -41,6 +41,8 @@ struct dfl_device {
 	unsigned int num_irqs;
 	struct dfl_fpga_cdev *cdev;
 	const struct dfl_device_id *id_entry;
+
+	char *driver_override;
 };
 
 /**
