@@ -262,6 +262,10 @@ static int dfl_bus_match(struct device *dev, struct device_driver *drv)
 	struct dfl_driver *ddrv = to_dfl_drv(drv);
 	const struct dfl_device_id *id_entry = ddrv->id_table;
 
+	/* When driver_override is set, only bind to the matching driver */
+	if (ddev->driver_override)
+		return !strcmp(ddev->driver_override, drv->name);
+
 	if (id_entry) {
 		while (id_entry->feature_id) {
 			if (dfl_match_one_device(id_entry, ddev)) {
@@ -303,6 +307,53 @@ static int dfl_bus_uevent(struct device *dev, struct kobj_uevent_env *env)
 			      ddev->type, ddev->feature_id);
 }
 
+static ssize_t driver_override_show(struct device *dev,
+				    struct device_attribute *attr, char *buf)
+{
+	struct dfl_device *ddev = to_dfl_dev(dev);
+	ssize_t len;
+
+	device_lock(dev);
+	len = sprintf(buf, "%s\n", ddev->driver_override);
+	device_unlock(dev);
+	return len;
+}
+
+static ssize_t driver_override_store(struct device *dev,
+				     struct device_attribute *attr,
+				     const char *buf, size_t count)
+{
+	struct dfl_device *ddev = to_dfl_dev(dev);
+	char *driver_override, *old, *cp;
+
+	/* We need to keep extra room for a newline */
+	if (count >= (PAGE_SIZE - 1))
+		return -EINVAL;
+
+	driver_override = kstrndup(buf, count, GFP_KERNEL);
+	if (!driver_override)
+		return -ENOMEM;
+
+	cp = strchr(driver_override, '\n');
+	if (cp)
+		*cp = '\0';
+
+	device_lock(dev);
+	old = ddev->driver_override;
+	if (strlen(driver_override)) {
+		ddev->driver_override = driver_override;
+	} else {
+		kfree(driver_override);
+		ddev->driver_override = NULL;
+	}
+	device_unlock(dev);
+
+	kfree(old);
+
+	return count;
+}
+static DEVICE_ATTR_RW(driver_override);
+
 /* show dfl info fields */
 #define dfl_info_attr(field, format_string)				\
 static ssize_t								\
@@ -321,6 +372,7 @@ dfl_info_attr(feature_id, "0x%x\n");
 static struct attribute *dfl_dev_attrs[] = {
 	&dev_attr_type.attr,
 	&dev_attr_feature_id.attr,
+	&dev_attr_driver_override.attr,
 	NULL,
 };
 
@@ -467,7 +519,7 @@ err:
 
 int __dfl_driver_register(struct dfl_driver *dfl_drv, struct module *owner)
 {
-	if (!dfl_drv || !dfl_drv->probe || !dfl_drv->id_table)
+	if (!dfl_drv || !dfl_drv->probe)
 		return -EINVAL;
 
 	dfl_drv->drv.owner = owner;
