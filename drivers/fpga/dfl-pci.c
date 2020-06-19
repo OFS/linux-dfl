@@ -254,6 +254,29 @@ enum_info_free_exit:
 	return ret;
 }
 
+/*
+ * Workaround for Stratix 10 errata: invalid NextFunction value
+ * results in non-fatal errors during probe. Clear these once
+ * during probe.
+ */
+static
+void stratix10_next_function_workaround(struct pci_dev *pcidev)
+{
+	int pos;
+
+	if (pcidev->device == PCIE_DEVICE_ID_PF_PAC_D5005) {
+		pcie_capability_write_word(pcidev, PCI_EXP_DEVSTA,
+					   PCI_EXP_DEVSTA_CED |
+					   PCI_EXP_DEVSTA_URD);
+		pos = pci_find_ext_capability(pcidev, PCI_EXT_CAP_ID_ERR);
+		if (pos) {
+			pci_write_config_dword(pcidev,
+					       pos + PCI_ERR_COR_STATUS,
+					       PCI_ERR_COR_ADV_NFAT);
+		}
+	}
+}
+
 static
 int cci_pci_probe(struct pci_dev *pcidev, const struct pci_device_id *pcidevid)
 {
@@ -264,6 +287,8 @@ int cci_pci_probe(struct pci_dev *pcidev, const struct pci_device_id *pcidevid)
 		dev_err(&pcidev->dev, "Failed to enable device %d.\n", ret);
 		return ret;
 	}
+
+	stratix10_next_function_workaround(pcidev);
 
 	ret = pci_enable_pcie_error_reporting(pcidev);
 	if (ret && ret != -EINVAL)
