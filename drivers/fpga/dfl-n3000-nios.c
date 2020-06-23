@@ -354,10 +354,7 @@ static int create_altr_spi_controller(struct dfl_n3000_nios *ns,
 	pdevinfo.size_data = sizeof(pdata);
 
 	ns->altr_spi = platform_device_register_full(&pdevinfo);
-	if (IS_ERR(ns->altr_spi))
-		return PTR_ERR(ns->altr_spi);
-
-	return 0;
+	return PTR_ERR_OR_ZERO(ns->altr_spi);
 }
 
 static void destroy_altr_spi_controller(struct dfl_n3000_nios *ns)
