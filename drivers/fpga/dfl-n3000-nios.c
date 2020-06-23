@@ -50,12 +50,6 @@ MODULE_PARM_DESC(child, "FEC mode");
 #define STAT_RD_DATA		GENMASK_ULL(31, 0)
 #define STAT_RW_VAL		BIT_ULL(32)
 
-/*
- * Altera spi controller register base, indirect access. Pass it to altera-spi
- * driver.
- */
-#define ALTR_SPI_BASE		0x0
-
 /* nios handshake registers, indirect access */
 #define NIOS_INIT		0x1000
 #define NIOS_INIT_DONE		BIT(0)
