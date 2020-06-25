@@ -218,7 +218,7 @@ static int init_lineside_eth_devs(struct dfl_eth_group *egroup,
 				  struct mii_bus *phy_bus)
 {
 	struct eth_dev *edev;
-	int ret;
+	int ret = 0;
 
 	if (!egroup->ops->lineside_init)
 		return -ENODEV;
