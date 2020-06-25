@@ -210,6 +210,7 @@ static int eth_dev_get_phy_id(struct eth_dev *edev, struct mii_bus *bus)
 	}
 
 	strncpy(edev->phy_id, phydev_name(phydev), MII_BUS_ID_SIZE + 3);
+	edev->phy_id[MII_BUS_ID_SIZE + 2] = '\0';
 
 	return 0;
 }
