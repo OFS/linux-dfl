@@ -472,6 +472,8 @@ int dfl_eth_dev_10g_init(struct eth_dev *edev)
 	int ret;
 
 	netdev = n3000_netdev_create(edev);
+	if (!netdev)
+		return -ENOMEM;
 
 	netdev->hw_features |= NETIF_F_LOOPBACK;
 	netdev->netdev_ops = &edev10g_netdev_ops;
