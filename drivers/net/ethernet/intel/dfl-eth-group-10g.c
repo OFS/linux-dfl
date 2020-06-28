@@ -27,7 +27,7 @@
 #define ADD_PHY_CTRL		0x0
 #define PHY_RESET		BIT(0)
 
-int edev10g_reset(struct eth_dev *edev, bool en)
+static int edev10g_reset(struct eth_dev *edev, bool en)
 {
 	struct eth_com *phy = edev->phy;
 	struct device *dev = edev->dev;
@@ -408,7 +408,7 @@ static int edev10g_change_mtu(struct net_device *netdev, int new_mtu)
 	return 0;
 }
 
-int edev10g_set_loopback(struct net_device *netdev, bool en)
+static int edev10g_set_loopback(struct net_device *netdev, bool en)
 {
 	struct eth_dev *edev = net_device_to_eth_dev(netdev);
 	struct eth_com *phy = edev->phy;
@@ -439,7 +439,7 @@ static int edev10g_set_features(struct net_device *netdev,
 	return 0;
 }
 
-const struct net_device_ops edev10g_netdev_ops = {
+static const struct net_device_ops edev10g_netdev_ops = {
 	.ndo_open = edev10g_netdev_open,
 	.ndo_stop = edev10g_netdev_stop,
 	.ndo_change_mtu = edev10g_change_mtu,
@@ -462,7 +462,7 @@ static int edev10g_netdev_init(struct net_device *netdev)
 				   !!(netdev->features & NETIF_F_LOOPBACK));
 }
 
-int dfl_eth_dev_10g_init(struct eth_dev *edev)
+static int dfl_eth_dev_10g_init(struct eth_dev *edev)
 {
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
 	struct device *dev = edev->dev;
@@ -525,7 +525,7 @@ err_free_netdev:
 	return ret;
 }
 
-void dfl_eth_dev_10g_remove(struct eth_dev *edev)
+static void dfl_eth_dev_10g_remove(struct eth_dev *edev)
 {
 	struct net_device *netdev = edev->netdev;
 	struct n3000_net_priv *priv;
