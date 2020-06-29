@@ -323,7 +323,8 @@ static int edev25g_netdev_open(struct net_device *netdev)
 	if (ret)
 		return ret;
 
-	phy_start(netdev->phydev);
+	if (netdev->phydev)
+		phy_start(netdev->phydev);
 
 	return 0;
 }
@@ -338,7 +339,8 @@ static int edev25g_netdev_stop(struct net_device *netdev)
 	if (ret)
 		return ret;
 
-	phy_stop(netdev->phydev);
+	if (netdev->phydev)
+		phy_stop(netdev->phydev);
 
 	return 0;
 }
