@@ -37,7 +37,6 @@ struct eth_dev_ops {
 
 struct n3000_net_priv {
 	struct eth_dev *edev;
-	struct phy_device *phydev;
 };
 
 static inline struct eth_dev *net_device_to_eth_dev(struct net_device *netdev)

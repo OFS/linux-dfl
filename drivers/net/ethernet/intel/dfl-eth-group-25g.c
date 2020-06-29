@@ -257,9 +257,7 @@ static void edev25g_get_stats(struct net_device *netdev,
 static int edev25g_get_link_ksettings(struct net_device *netdev,
 				      struct ethtool_link_ksettings *cmd)
 {
-	struct n3000_net_priv *priv = netdev_priv(netdev);
-
-	phy_ethtool_ksettings_get(priv->phydev, cmd);
+	phy_ethtool_ksettings_get(netdev->phydev, cmd);
 
 	return 0;
 }
@@ -325,7 +323,7 @@ static int edev25g_netdev_open(struct net_device *netdev)
 	if (ret)
 		return ret;
 
-	phy_start(priv->phydev);
+	phy_start(netdev->phydev);
 
 	return 0;
 }
@@ -340,7 +338,7 @@ static int edev25g_netdev_stop(struct net_device *netdev)
 	if (ret)
 		return ret;
 
-	phy_stop(priv->phydev);
+	phy_stop(netdev->phydev);
 
 	return 0;
 }
@@ -446,7 +444,6 @@ static int dfl_eth_dev_25g_init(struct eth_dev *edev)
 	struct device *dev = edev->dev;
 	struct phy_device *phydev;
 	struct net_device *netdev;
-	struct n3000_net_priv *priv;
 	int ret;
 
 	netdev = n3000_netdev_create(edev);
@@ -471,8 +468,6 @@ static int dfl_eth_dev_25g_init(struct eth_dev *edev)
 	linkmode_and(phydev->supported, phydev->supported, mask);
 	linkmode_copy(phydev->advertising, phydev->supported);
 
-	priv = netdev_priv(netdev);
-	priv->phydev = phydev;
 	phy_attached_info(phydev);
 
 	ret = edev25g_netdev_init(netdev);
@@ -505,10 +500,8 @@ err_free_netdev:
 static void dfl_eth_dev_25g_remove(struct eth_dev *edev)
 {
 	struct net_device *netdev = edev->netdev;
-	struct n3000_net_priv *priv;
 
-	priv = netdev_priv(netdev);
-	phy_disconnect(priv->phydev);
+	phy_disconnect(netdev->phydev);
 	unregister_netdev(netdev);
 }
 
