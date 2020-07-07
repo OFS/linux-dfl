@@ -97,6 +97,17 @@ Description:	Read-only. Returns a string describing the current
 		Userspace code can poll on this file, as it will
 		be signalled by sysfs_notify() on each state change.
 
+What: 		/sys/class/ifpga_sec_mgr/ifpga_secX/update/remaining_size
+Date:		July 2020
+KernelVersion:  5.8
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read-only. Returns the size of data that remains to
+		be written to the secure update engine. The size
+		value is initialized to the full size of the file
+		image and the value is updated periodically during
+		the "writing" phase of the update.
+		Format: "%u".
+
 What: 		/sys/class/ifpga_sec_mgr/ifpga_secX/update/error
 Date:		July 2020
 KernelVersion:  5.8
