@@ -10,6 +10,7 @@
 #include <linux/mfd/intel-m10-bmc.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/slab.h>
 #include <linux/vmalloc.h>
 
 struct m10bmc_sec {
@@ -117,7 +118,38 @@ SYSFS_GET_REH(bmc, BMC_REH_ADDR)
 SYSFS_GET_REH(sr, SR_REH_ADDR)
 SYSFS_GET_REH(pr, PR_REH_ADDR)
 
+#define FLASH_COUNT_SIZE 4096
+#define USER_FLASH_COUNT 0x17ffb000
+
+static int get_qspi_flash_count(struct ifpga_sec_mgr *imgr)
+{
+	struct m10bmc_sec *sec = imgr->priv;
+	unsigned int stride = regmap_get_reg_stride(sec->m10bmc->regmap);
+	unsigned int cnt, num_bits = FLASH_COUNT_SIZE * 8;
+	u8 *flash_buf;
+	int ret;
+
+	flash_buf = kmalloc(FLASH_COUNT_SIZE, GFP_KERNEL);
+	if (!flash_buf)
+		return -ENOMEM;
+
+	ret = m10bmc_raw_bulk_read(sec->m10bmc, USER_FLASH_COUNT, flash_buf,
+				   FLASH_COUNT_SIZE / stride);
+	if (ret) {
+		dev_err(sec->dev, "%s failed to read %d\n", __func__, ret);
+		goto exit_free;
+	}
+
+	cnt = num_bits - bitmap_weight((unsigned long *)flash_buf, num_bits);
+
+exit_free:
+	kfree(flash_buf);
+
+	return ret ? : cnt;
+}
+
 static const struct ifpga_sec_mgr_ops m10bmc_iops = {
+	.user_flash_count = get_qspi_flash_count,
 	.bmc_root_entry_hash = get_bmc_root_entry_hash,
 	.sr_root_entry_hash = get_sr_root_entry_hash,
 	.pr_root_entry_hash = get_pr_root_entry_hash,
