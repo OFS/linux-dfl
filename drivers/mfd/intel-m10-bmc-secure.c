@@ -501,6 +501,30 @@ static enum ifpga_sec_err m10bmc_sec_cancel(struct ifpga_sec_mgr *imgr)
 	return ret ? IFPGA_SEC_ERR_RW_ERROR : IFPGA_SEC_ERR_NONE;
 }
 
+static u64 m10bmc_sec_hw_errinfo(struct ifpga_sec_mgr *imgr)
+{
+	struct m10bmc_sec *sec = imgr->priv;
+	u32 doorbell = 0, auth_result = 0;
+	u64 hw_errinfo = 0;
+
+	switch (imgr->err_code) {
+	case IFPGA_SEC_ERR_HW_ERROR:
+	case IFPGA_SEC_ERR_TIMEOUT:
+	case IFPGA_SEC_ERR_BUSY:
+	case IFPGA_SEC_ERR_WEAROUT:
+		if (!m10bmc_sys_read(sec->m10bmc, M10BMC_DOORBELL, &doorbell))
+			hw_errinfo = (u64)doorbell << 32;
+
+		if (!m10bmc_sys_read(sec->m10bmc, M10BMC_AUTH_RESULT,
+				     &auth_result))
+			hw_errinfo |= (u64)auth_result;
+
+		return hw_errinfo;
+	default:
+		return 0;
+	}
+}
+
 static const struct ifpga_sec_mgr_ops m10bmc_iops = {
 	.user_flash_count = get_qspi_flash_count,
 	.bmc_root_entry_hash = get_bmc_root_entry_hash,
@@ -518,7 +542,8 @@ static const struct ifpga_sec_mgr_ops m10bmc_iops = {
 	.prepare = m10bmc_sec_prepare,
 	.write_blk = m10bmc_sec_write_blk,
 	.poll_complete = m10bmc_sec_poll_complete,
-	.cancel = m10bmc_sec_cancel
+	.cancel = m10bmc_sec_cancel,
+	.get_hw_errinfo = m10bmc_sec_hw_errinfo
 };
 
 static void ifpga_sec_mgr_uinit(struct m10bmc_sec *sec)
