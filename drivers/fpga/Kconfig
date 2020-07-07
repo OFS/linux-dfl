@@ -235,4 +235,13 @@ config FPGA_MGR_ZYNQMP_FPGA
 	  to configure the programmable logic(PL) through PS
 	  on ZynqMP SoC.
 
+config IFPGA_SEC_MGR
+	tristate "Intel Security Manager for FPGA"
+        help
+	  The Intel Security Manager class driver presents a common
+	  user API for managing secure updates for Intel FPGA
+	  devices, including flash images for the FPGA static
+	  region and for the BMC. Select this option to enable
+	  updates for secure FPGA devices.
+
 endif # FPGA
