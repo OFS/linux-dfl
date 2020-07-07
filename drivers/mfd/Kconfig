@@ -2131,5 +2131,16 @@ config MFD_INTEL_M10_BMC
 	  additional drivers must be enabled in order to use the functionality
 	  of the device.
 
+config MFD_INTEL_M10_BMC_SECURE
+        tristate "Intel MAX10 BMC security engine"
+	depends on MFD_INTEL_M10_BMC && IFPGA_SEC_MGR
+        help
+          Secure update support for the Intel MAX10 board management
+	  controller.
+
+	  This is a subdriver of the Intel MAX10 board management controller
+	  (BMC) and provides support for secure updates for the BMC image,
+	  the FPGA image, the Root Entry Hashes, etc.
+
 endmenu
 endif
