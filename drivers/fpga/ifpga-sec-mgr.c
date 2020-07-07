@@ -146,10 +146,16 @@ static void update_progress(struct ifpga_sec_mgr *imgr,
 	sysfs_notify(&imgr->dev.kobj, "update", "status");
 }
 
+static void set_error(struct ifpga_sec_mgr *imgr, enum ifpga_sec_err err_code)
+{
+	imgr->err_state = imgr->progress;
+	imgr->err_code = err_code;
+}
+
 static void ifpga_sec_dev_error(struct ifpga_sec_mgr *imgr,
 				enum ifpga_sec_err err_code)
 {
-	imgr->err_code = err_code;
+	set_error(imgr, err_code);
 	imgr->iops->cancel(imgr);
 }
 
@@ -172,7 +178,7 @@ static void ifpga_sec_mgr_update(struct work_struct *work)
 
 	get_device(&imgr->dev);
 	if (request_firmware(&fw, imgr->filename, &imgr->dev)) {
-		imgr->err_code = IFPGA_SEC_ERR_FILE_READ;
+		set_error(imgr, IFPGA_SEC_ERR_FILE_READ);
 		goto idle_exit;
 	}
 
@@ -180,7 +186,7 @@ static void ifpga_sec_mgr_update(struct work_struct *work)
 	imgr->remaining_size = fw->size;
 
 	if (!try_module_get(imgr->dev.parent->driver->owner)) {
-		imgr->err_code = IFPGA_SEC_ERR_BUSY;
+		set_error(imgr, IFPGA_SEC_ERR_BUSY);
 		goto release_fw_exit;
 	}
 
@@ -266,15 +272,58 @@ static const char * const sec_mgr_prog_str[] = {
 	"programming"		/* IFPGA_SEC_PROG_PROGRAMMING */
 };
 
+static const char * const sec_mgr_err_str[] = {
+	"none",			/* IFPGA_SEC_ERR_NONE */
+	"hw-error",		/* IFPGA_SEC_ERR_HW_ERROR */
+	"timeout",		/* IFPGA_SEC_ERR_TIMEOUT */
+	"user-abort",		/* IFPGA_SEC_ERR_CANCELED */
+	"device-busy",		/* IFPGA_SEC_ERR_BUSY */
+	"invalid-file-size",	/* IFPGA_SEC_ERR_INVALID_SIZE */
+	"read-write-error",	/* IFPGA_SEC_ERR_RW_ERROR */
+	"flash-wearout",	/* IFPGA_SEC_ERR_WEAROUT */
+	"file-read-error"	/* IFPGA_SEC_ERR_FILE_READ */
+};
+
+static const char *sec_progress(enum ifpga_sec_prog prog)
+{
+	return (prog < IFPGA_SEC_PROG_MAX) ?
+		sec_mgr_prog_str[prog] : "unknown-status";
+}
+
 static ssize_t
 status_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct ifpga_sec_mgr *imgr = to_sec_mgr(dev);
 
-	return sprintf(buf, "%s\n", (imgr->progress < IFPGA_SEC_PROG_MAX) ?
-		       sec_mgr_prog_str[imgr->progress] : "unknown-status");
+	return sprintf(buf, "%s\n", sec_progress(imgr->progress));
 }
 static DEVICE_ATTR_RO(status);
+
+static ssize_t
+error_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct ifpga_sec_mgr *imgr = to_sec_mgr(dev);
+	enum ifpga_sec_err err_code;
+	const char *prog_str;
+	int ret;
+
+	mutex_lock(&imgr->lock);
+	if (imgr->progress != IFPGA_SEC_PROG_IDLE) {
+		ret = -EBUSY;
+	} else if (!imgr->err_code) {
+		ret = 0;
+	} else {
+		err_code = imgr->err_code;
+		prog_str = sec_progress(imgr->err_state);
+		ret = sprintf(buf, "%s:%s\n", prog_str,
+			      (err_code < IFPGA_SEC_ERR_MAX) ?
+			      sec_mgr_err_str[err_code] : "unknown-error");
+	}
+	mutex_unlock(&imgr->lock);
+
+	return ret;
+}
+static DEVICE_ATTR_RO(error);
 
 static ssize_t filename_store(struct device *dev, struct device_attribute *attr,
 			      const char *buf, size_t count)
@@ -314,6 +363,7 @@ static DEVICE_ATTR_WO(filename);
 static struct attribute *sec_mgr_update_attrs[] = {
 	&dev_attr_filename.attr,
 	&dev_attr_status.attr,
+	&dev_attr_error.attr,
 	NULL,
 };
 
