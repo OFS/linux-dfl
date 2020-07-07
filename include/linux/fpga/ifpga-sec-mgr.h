@@ -181,6 +181,7 @@ struct ifpga_sec_mgr {
 	const u8 *data;			/* pointer to update data */
 	u32 remaining_size;		/* size remaining to transfer */
 	enum ifpga_sec_prog progress;
+	enum ifpga_sec_prog err_state;	/* progress state at time of failure */
 	enum ifpga_sec_err err_code;	/* security manager error code */
 	bool driver_unload;
 	void *priv;
