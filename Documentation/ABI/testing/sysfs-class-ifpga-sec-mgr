@@ -96,3 +96,16 @@ Description:	Read-only. Returns a string describing the current
 		following: idle, preparing, writing, programming.
 		Userspace code can poll on this file, as it will
 		be signalled by sysfs_notify() on each state change.
+
+What: 		/sys/class/ifpga_sec_mgr/ifpga_secX/update/error
+Date:		July 2020
+KernelVersion:  5.8
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read-only. Returns an error string describing the
+		failure of a secure update. This string will be one
+		of the following: operation-error, crc-error,
+		auth-error, timeout-error, user-abort, device-busy,
+		invalid_size. The error string is only accessible
+		when the secure update engine is in the idle state.
+		If this file is read while a secure update is in
+		progress, then the read will fail with EBUSY.
