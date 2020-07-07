@@ -159,6 +159,23 @@ static void ifpga_sec_dev_error(struct ifpga_sec_mgr *imgr,
 	imgr->iops->cancel(imgr);
 }
 
+static int progress_transition(struct ifpga_sec_mgr *imgr,
+			       enum ifpga_sec_prog new_progress)
+{
+	int ret = 0;
+
+	mutex_lock(&imgr->lock);
+	if (imgr->request_cancel) {
+		set_error(imgr, IFPGA_SEC_ERR_CANCELED);
+		imgr->iops->cancel(imgr);
+		ret = -ECANCELED;
+	} else {
+		update_progress(imgr, new_progress);
+	}
+	mutex_unlock(&imgr->lock);
+	return ret;
+}
+
 static void progress_complete(struct ifpga_sec_mgr *imgr)
 {
 	mutex_lock(&imgr->lock);
@@ -190,16 +207,20 @@ static void ifpga_sec_mgr_update(struct work_struct *work)
 		goto release_fw_exit;
 	}
 
-	update_progress(imgr, IFPGA_SEC_PROG_PREPARING);
+	if (progress_transition(imgr, IFPGA_SEC_PROG_PREPARING))
+		goto modput_exit;
+
 	ret = imgr->iops->prepare(imgr);
 	if (ret) {
 		ifpga_sec_dev_error(imgr, ret);
 		goto modput_exit;
 	}
 
-	update_progress(imgr, IFPGA_SEC_PROG_WRITING);
+	if (progress_transition(imgr, IFPGA_SEC_PROG_WRITING))
+		goto done;
+
 	size = imgr->remaining_size;
-	while (size) {
+	while (size && !imgr->request_cancel) {
 		blk_size = min_t(u32, size, WRITE_BLOCK_SIZE);
 		size -= blk_size;
 		ret = imgr->iops->write_blk(imgr, offset, blk_size);
@@ -212,7 +233,9 @@ static void ifpga_sec_mgr_update(struct work_struct *work)
 		offset += blk_size;
 	}
 
-	update_progress(imgr, IFPGA_SEC_PROG_PROGRAMMING);
+	if (progress_transition(imgr, IFPGA_SEC_PROG_PROGRAMMING))
+		goto done;
+
 	ret = imgr->iops->poll_complete(imgr);
 	if (ret) {
 		ifpga_sec_dev_error(imgr, ret);
@@ -359,6 +382,7 @@ static ssize_t filename_store(struct device *dev, struct device_attribute *attr,
 		imgr->filename[strlen(imgr->filename) - 1] = '\0';
 
 	imgr->err_code = IFPGA_SEC_ERR_NONE;
+	imgr->request_cancel = false;
 	imgr->progress = IFPGA_SEC_PROG_READ_FILE;
 	reinit_completion(&imgr->update_done);
 	schedule_work(&imgr->work);
@@ -369,8 +393,32 @@ unlock_exit:
 }
 static DEVICE_ATTR_WO(filename);
 
+static ssize_t cancel_store(struct device *dev, struct device_attribute *attr,
+			    const char *buf, size_t count)
+{
+	struct ifpga_sec_mgr *imgr = to_sec_mgr(dev);
+	bool cancel;
+	int ret = 0;
+
+	if (kstrtobool(buf, &cancel) || !cancel)
+		return -EINVAL;
+
+	mutex_lock(&imgr->lock);
+	if (imgr->progress == IFPGA_SEC_PROG_PROGRAMMING)
+		ret = -EBUSY;
+	else if (imgr->progress == IFPGA_SEC_PROG_IDLE)
+		ret = -ENODEV;
+	else
+		imgr->request_cancel = true;
+	mutex_unlock(&imgr->lock);
+
+	return ret ? : count;
+}
+static DEVICE_ATTR_WO(cancel);
+
 static struct attribute *sec_mgr_update_attrs[] = {
 	&dev_attr_filename.attr,
+	&dev_attr_cancel.attr,
 	&dev_attr_status.attr,
 	&dev_attr_error.attr,
 	&dev_attr_remaining_size.attr,
@@ -535,6 +583,9 @@ void ifpga_sec_mgr_unregister(struct ifpga_sec_mgr *imgr)
 		mutex_unlock(&imgr->lock);
 		goto unregister;
 	}
+
+	if (imgr->progress != IFPGA_SEC_PROG_PROGRAMMING)
+		imgr->request_cancel = true;
 
 	mutex_unlock(&imgr->lock);
 	wait_for_completion(&imgr->update_done);
