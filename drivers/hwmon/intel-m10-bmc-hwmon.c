@@ -481,10 +481,7 @@ static int m10bmc_hwmon_init(struct device *dev, struct intel_m10bmc *m10bmc,
 
 	hwmon_dev = devm_hwmon_device_register_with_info(dev, hw->hw_name,
 							 hw, &hw->chip, NULL);
-	if (IS_ERR(hwmon_dev))
-		return PTR_ERR(hwmon_dev);
-
-	return 0;
+	return PTR_ERR_OR_ZERO(hwmon_dev);
 }
 
 static int m10bmc_hwmon_probe(struct platform_device *pdev)
