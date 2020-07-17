@@ -258,6 +258,9 @@ static void edev10g_get_stats(struct net_device *netdev,
 static int edev10g_get_link_ksettings(struct net_device *netdev,
 				      struct ethtool_link_ksettings *cmd)
 {
+	if (!netdev->phydev)
+		return -ENODEV;
+
 	phy_ethtool_ksettings_get(netdev->phydev, cmd);
 
 	return 0;
@@ -515,7 +518,8 @@ static int dfl_eth_dev_10g_init(struct eth_dev *edev)
 	return 0;
 
 err_phy_disconnect:
-	phy_disconnect(phydev);
+	if (netdev->phydev)
+		phy_disconnect(phydev);
 err_free_netdev:
 	free_netdev(netdev);
 
@@ -526,7 +530,9 @@ static void dfl_eth_dev_10g_remove(struct eth_dev *edev)
 {
 	struct net_device *netdev = edev->netdev;
 
-	phy_disconnect(netdev->phydev);
+	if (netdev->phydev)
+		phy_disconnect(netdev->phydev);
+
 	unregister_netdev(netdev);
 }
 
