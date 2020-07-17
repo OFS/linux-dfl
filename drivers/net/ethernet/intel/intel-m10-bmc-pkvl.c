@@ -98,6 +98,12 @@ static int n3000_pkvl_phy_probe(struct phy_device *phydev)
 	return 0;
 }
 
+static void n3000_pkvl_phy_remove(struct phy_device *phydev)
+{
+	if (phydev->attached_dev)
+		phy_disconnect(phydev);
+}
+
 static int n3000_pkvl_phy_read_status(struct phy_device *phydev)
 {
 	struct n3000bmc_pkvl *pkvl = phydev->priv;
@@ -141,6 +147,7 @@ static struct phy_driver n3000_pkvl_phy_driver = {
 	.name			= "N3000 pkvl PHY",
 	.match_phy_device	= n3000_pkvl_phy_match,
 	.probe			= n3000_pkvl_phy_probe,
+	.remove			= n3000_pkvl_phy_remove,
 	.read_status		= n3000_pkvl_phy_read_status,
 	.get_features		= n3000_pkvl_phy_get_features,
 	.read_mmd		= genphy_read_mmd_unsupported,
