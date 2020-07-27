@@ -367,11 +367,19 @@ static enum ifpga_sec_err m10bmc_sec_prepare(struct ifpga_sec_mgr *imgr)
 	if (ret)
 		return ret;
 
+	ret = m10bmc_fw_state_enter(sec->m10bmc, M10BMC_FW_STATE_SEC_UPDATE);
+	if (ret)
+		return IFPGA_SEC_ERR_BUSY;
+
 	ret = rsu_update_init(sec);
 	if (ret)
-		return ret;
+		goto fw_state_exit;
 
-	return rsu_prog_ready(sec);
+	ret = rsu_prog_ready(sec);
+
+fw_state_exit:
+	m10bmc_fw_state_exit(sec->m10bmc);
+	return ret;
 }
 
 static enum ifpga_sec_err
@@ -404,30 +412,38 @@ static enum ifpga_sec_err m10bmc_sec_poll_complete(struct ifpga_sec_mgr *imgr)
 	u32 doorbell;
 	int ret;
 
+	ret = m10bmc_fw_state_enter(sec->m10bmc, M10BMC_FW_STATE_SEC_UPDATE);
+	if (ret)
+		return IFPGA_SEC_ERR_BUSY;
+
 	result = rsu_send_data(sec);
 	if (result)
-		return result;
+		goto fw_state_exit;
 
 	ret = rsu_check_complete(sec, &doorbell);
 	poll_timeout = jiffies + msecs_to_jiffies(RSU_COMPLETE_TIMEOUT_MS);
 	while (ret == -EAGAIN && !time_after(jiffies, poll_timeout)) {
 		msleep(RSU_COMPLETE_INTERVAL_MS);
 		ret = rsu_check_complete(sec, &doorbell);
-		if (imgr->driver_unload)
-			return IFPGA_SEC_ERR_CANCELED;
+		if (imgr->driver_unload) {
+			result = IFPGA_SEC_ERR_CANCELED;
+			goto fw_state_exit;
+		}
 	}
 
 	if (ret == -EAGAIN) {
 		log_error_regs(sec, doorbell);
-		return IFPGA_SEC_ERR_TIMEOUT;
+		result = IFPGA_SEC_ERR_TIMEOUT;
 	} else if (ret == -EIO) {
-		return IFPGA_SEC_ERR_RW_ERROR;
+		result = IFPGA_SEC_ERR_RW_ERROR;
 	} else if (ret) {
 		log_error_regs(sec, doorbell);
-		return IFPGA_SEC_ERR_HW_ERROR;
+		result = IFPGA_SEC_ERR_HW_ERROR;
 	}
 
-	return IFPGA_SEC_ERR_NONE;
+fw_state_exit:
+	m10bmc_fw_state_exit(sec->m10bmc);
+	return result;
 }
 
 static enum ifpga_sec_err m10bmc_sec_cancel(struct ifpga_sec_mgr *imgr)
