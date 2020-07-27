@@ -8,6 +8,7 @@
 #define __MFD_INTEL_M10_BMC_H
 
 #include <linux/regmap.h>
+#include <linux/rwsem.h>
 
 #define M10BMC_LEGACY_SYS_BASE		0x300400
 #define M10BMC_SYS_BASE			0x300800
@@ -38,6 +39,10 @@
 #define PKVL_B_VERSION			0x258
 #define SERDES_VERSION			GENMASK(15, 0)
 #define SBUS_VERSION			GENMASK(31, 16)
+
+/* Telemetry registers */
+#define M10BMC_TELEM_START		0x100
+#define M10BMC_TELEM_END		0x33c
 
 /* Secure update doorbell register, in system register region */
 #define M10BMC_DOORBELL			0x400
@@ -116,14 +121,22 @@ struct intel_m10bmc_platdata {
 	struct intel_m10bmc_retimer_pdata *retimer;
 };
 
+enum m10bmc_fw_state {
+	M10BMC_FW_STATE_NORMAL,
+	M10BMC_FW_STATE_SEC_UPDATE,
+};
+
 /**
  * struct intel_m10bmc - Intel MAX 10 BMC parent driver data structure
  * @dev: this device
  * @regmap: the regmap used to access registers by m10bmc itself
+ * @bmcfw_state: BMC firmware running state.
  */
 struct intel_m10bmc {
 	struct device *dev;
 	struct regmap *regmap;
+	struct rw_semaphore bmcfw_lock;
+	enum m10bmc_fw_state bmcfw_state;
 };
 
 /*
@@ -192,10 +205,22 @@ m10bmc_raw_update_bits(struct intel_m10bmc *m10bmc, unsigned int addr,
 	return ret;
 }
 
-#define m10bmc_sys_read(m10bmc, offset, val) \
-	m10bmc_raw_read(m10bmc, M10BMC_SYS_BASE + (offset), val)
+int m10bmc_sys_read(struct intel_m10bmc *m10bmc, unsigned int offset,
+		    unsigned int *val);
 
-#define m10bmc_sys_update_bits(m10bmc, offset, msk, val) \
-	m10bmc_raw_update_bits(m10bmc, M10BMC_SYS_BASE + (offset), msk, val)
+int m10bmc_sys_update_bits(struct intel_m10bmc *m10bmc, unsigned int offset,
+			   unsigned int msk, unsigned int val);
+
+/*
+ * Track the state of the firmware, as it is not available for
+ * register handshakes during secure updates.
+ *
+ * m10bmc_fw_state_enter - firmware is unavailable for handshakes
+ * m10bmc_fw_state_exit  - firmware is available for handshakes
+ */
+int m10bmc_fw_state_enter(struct intel_m10bmc *m10bmc,
+			  enum m10bmc_fw_state new_state);
+
+void m10bmc_fw_state_exit(struct intel_m10bmc *m10bmc);
 
 #endif /* __MFD_INTEL_M10_BMC_H */
