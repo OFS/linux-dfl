@@ -20,57 +20,6 @@ struct m10bmc_sec {
 	struct ifpga_sec_mgr *imgr;
 };
 
-/*
- * register access helper functions.
- *
- * m10bmc_raw_bulk_read - bulk_read max10 registers per addr
- * m10bmc_raw_bulk_write - bulk_write max10 registers per addr
- * m10bmc_raw_update_bits - update max10 register per addr
- * m10bmc_sys_update_bits - update max10 system register per offset
- */
-static int m10bmc_raw_bulk_read(struct intel_m10bmc *m10bmc, unsigned int addr,
-				void *val, size_t cnt)
-{
-	int ret;
-
-	ret = regmap_bulk_read(m10bmc->regmap, addr, val, cnt);
-	if (ret)
-		dev_err(m10bmc->dev, "fail to read raw reg %x cnt %zx: %d\n",
-			addr, cnt, ret);
-
-	return ret;
-}
-
-static int m10bmc_raw_bulk_write(struct intel_m10bmc *m10bmc, unsigned int addr,
-				 void *val, size_t cnt)
-{
-	int ret;
-
-	ret = regmap_bulk_write(m10bmc->regmap, addr, val, cnt);
-	if (ret)
-		dev_err(m10bmc->dev, "fail to write raw reg %x cnt %zx: %d\n",
-			addr, cnt, ret);
-
-	return ret;
-}
-
-static int m10bmc_raw_update_bits(struct intel_m10bmc *m10bmc,
-				  unsigned int addr, unsigned int msk,
-				  unsigned int val)
-{
-	int ret;
-
-	ret = regmap_update_bits(m10bmc->regmap, addr, msk, val);
-	if (ret)
-		dev_err(m10bmc->dev, "fail to update raw reg %x: %d\n",
-			addr, ret);
-
-	return ret;
-}
-
-#define	m10bmc_sys_update_bits(m10bmc, offset, msk, val) \
-	m10bmc_raw_update_bits(m10bmc, M10BMC_SYS_BASE + (offset), msk, val)
-
 #define SHA256_REH_SIZE		32
 #define SHA384_REH_SIZE		48
 
