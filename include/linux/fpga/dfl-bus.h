@@ -10,6 +10,7 @@
 
 #include <linux/device.h>
 #include <linux/mod_devicetable.h>
+#include <linux/regmap.h>
 
 /**
  * enum dfl_id_type - define the DFL FIU types
@@ -69,6 +70,18 @@ struct dfl_driver {
 
 int dfl_dev_get_vendor_net_cfg(struct dfl_device *dfl_dev);
 struct device *dfl_dev_get_base_dev(struct dfl_device *dfl_dev);
+
+struct regmap *dfl_indirect_regmap_init(struct device *dev, void __iomem *base, unsigned int off);
+
+struct dfl_regmap_debug {
+	struct regmap *map;
+	struct dentry *debugfs;
+	u32 regaddr;
+	struct mutex lock;
+};
+
+struct dfl_regmap_debug *dfl_regmap_debug_init(struct device *dev,struct regmap *map);
+void dfl_regmap_debug_exit(struct dfl_regmap_debug *debug);
 
 /*
  * use a macro to avoid include chaining to get THIS_MODULE.
