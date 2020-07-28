@@ -69,3 +69,6 @@ config REGMAP_SPI_AVMM
 config REGMAP_FSI
 	tristate
 	depends on FSI
+
+config REGMAP_INDIRECT_REGISTER
+	tristate
