@@ -61,3 +61,6 @@ config REGMAP_I3C
 config REGMAP_SPI_AVMM
 	tristate
 	depends on SPI
+
+config REGMAP_INDIRECT_REGISTER
+	tristate
