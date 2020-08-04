@@ -15,7 +15,8 @@
 #include <linux/etherdevice.h>
 #include <linux/uaccess.h>
 
-#define MB_BASE_OFFSET		0x30
+#define CAPABILITY_OFFSET	0x08
+#define MB_BASE_OFFSET		0x28
 
 #define PHY_BASE_OFF		0x2000
 #define PHY_RX_SER_LOOP_BACK	0x4e1
@@ -269,6 +270,7 @@ static int intel_ll_10g_mac_probe(struct dfl_device *dfl_dev)
 	struct regmap *regmap;
 	void __iomem *base;
 	u32 flags;
+	u64 val;
 	int ret;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
@@ -282,6 +284,10 @@ static int intel_ll_10g_mac_probe(struct dfl_device *dfl_dev)
 
 	if (!base)
 		return -ENOMEM;
+
+	val = readq(base + CAPABILITY_OFFSET);
+
+	dev_info(dev, "%s capability register 0x%llx\n", __func__, val);
 
 	regmap = dfl_indirect_regmap_init(dev, base, MB_BASE_OFFSET);
 
