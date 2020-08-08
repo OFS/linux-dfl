@@ -261,4 +261,14 @@ config IFPGA_SEC_MGR
 	  region and for the BMC. Select this option to enable
 	  updates for secure FPGA devices.
 
+config FPGA_DFL_INTEL_S10_IOPLL
+	tristate "FPGA DFL Intel S10 IOPLL User Clock"
+        help
+	  The FPGA DFL driver for the Intel S10 IOPLL device provides
+	  a configurable clock that can be used to drive RTL logic in
+	  the Partial Reconfiguration (PR) region of an FPGA. The clock
+	  speed can be configured dynamically from user space. Select
+	  this option to support a configurable user clock in FPGA
+	  PR regions.
+
 endif # FPGA
