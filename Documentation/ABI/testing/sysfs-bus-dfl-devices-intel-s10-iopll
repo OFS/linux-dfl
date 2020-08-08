@@ -1,0 +1,29 @@
+What:		/sys/bus/dfl/devices/dfl-port.X.X/userclk/frequency
+Date:		Aug 2020
+KernelVersion:	5.9
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read/Write. When read, the frequencies of both the low
+		and high frequency clocks. These are displayed as two
+		decimal values in units of KHz. The low frequency is
+		listed first. The high clock frequency is generally 2x
+		the low frequency, except that as the low clock exceeds
+		300MHz, the high clock remains at 600MHz. When written,
+		this file receives binary data containing the
+		configuration parameters required to obtain the desired
+		clock frequencies.
+		Read format: %u %u
+
+What:		/sys/bus/dfl/devices/dfl-port.X.X/userclk/ref_frequency
+Date:		Aug 2020
+KernelVersion:	5.9
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read only. Displays the user clock reference frequency in KHZ.
+		Format: %llu
+
+What:		/sys/bus/dfl/devices/dfl-port.0.6/userclk/revision
+Date:		June 2020
+KernelVersion:	5.9
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read only. Displays the revision number for the user clock
+		implementation.
+		Format: %llu
