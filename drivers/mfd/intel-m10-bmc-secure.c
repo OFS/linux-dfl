@@ -490,38 +490,54 @@ static u64 m10bmc_sec_hw_errinfo(struct ifpga_sec_mgr *imgr)
 	}
 }
 
-static const struct ifpga_sec_mgr_ops m10bmc_iops = {
-	.user_flash_count = get_qspi_flash_count,
-	.bmc_root_entry_hash = get_bmc_root_entry_hash,
-	.sr_root_entry_hash = get_sr_root_entry_hash,
-	.pr_root_entry_hash = get_pr_root_entry_hash,
-	.bmc_canceled_csks = get_bmc_canceled_csks,
-	.sr_canceled_csks = get_sr_canceled_csks,
-	.pr_canceled_csks = get_pr_canceled_csks,
-	.bmc_reh_size = get_bmc_reh_size,
-	.sr_reh_size = get_sr_reh_size,
-	.pr_reh_size = get_pr_reh_size,
-	.bmc_canceled_csk_nbits = get_bmc_csk_cancel_nbits,
-	.sr_canceled_csk_nbits = get_sr_csk_cancel_nbits,
-	.pr_canceled_csk_nbits = get_pr_csk_cancel_nbits,
-	.prepare = m10bmc_sec_prepare,
-	.write_blk = m10bmc_sec_write_blk,
-	.poll_complete = m10bmc_sec_poll_complete,
-	.cancel = m10bmc_sec_cancel,
-	.get_hw_errinfo = m10bmc_sec_hw_errinfo
-};
+static int m10bmc_sec_bmc_image_load(struct ifpga_sec_mgr *imgr,
+				     unsigned int val)
+{
+	struct m10bmc_sec *sec = imgr->priv;
+	u32 doorbell;
+	int ret;
+
+	if (val > 1) {
+		dev_err(sec->dev, "%s invalid reload val = %d\n",
+			__func__, val);
+		return -EINVAL;
+	}
+
+	ret = m10bmc_sys_read(sec->m10bmc, M10BMC_DOORBELL, &doorbell);
+	if (ret)
+		return ret;
+
+	if (doorbell & REBOOT_DISABLED)
+		return -EBUSY;
+
+	return m10bmc_sys_update_bits(sec->m10bmc, M10BMC_DOORBELL,
+				     CONFIG_SEL | REBOOT_REQ,
+				     FIELD_PREP(CONFIG_SEL, val) |
+				     REBOOT_REQ);
+}
+
+static int m10bmc_sec_bmc_image_load_0(struct ifpga_sec_mgr *imgr)
+{
+	return m10bmc_sec_bmc_image_load(imgr, 0);
+}
+
+static int m10bmc_sec_bmc_image_load_1(struct ifpga_sec_mgr *imgr)
+{
+	return m10bmc_sec_bmc_image_load(imgr, 1);
+}
 
 static void ifpga_sec_mgr_uinit(struct m10bmc_sec *sec)
 {
 	ifpga_sec_mgr_unregister(sec->imgr);
 }
 
-static int ifpga_sec_mgr_init(struct m10bmc_sec *sec)
+static int ifpga_sec_mgr_init(struct m10bmc_sec *sec,
+			      struct ifpga_sec_mgr_ops *iops)
 {
 	struct ifpga_sec_mgr *imgr;
 
 	imgr = ifpga_sec_mgr_register(sec->dev, "Max10 BMC Security Manager",
-				      &m10bmc_iops, sec);
+				      iops, sec);
 	if (IS_ERR(imgr))
 		return PTR_ERR(imgr);
 
@@ -529,8 +545,53 @@ static int ifpga_sec_mgr_init(struct m10bmc_sec *sec)
 	return 0;
 }
 
+static struct image_load n3000_image_load_hndlrs[] = {
+	{
+		.name = "bmc_user",
+		.load_image = m10bmc_sec_bmc_image_load_0,
+	},
+	{
+		.name = "bmc_factory",
+		.load_image = m10bmc_sec_bmc_image_load_1,
+	},
+	{}
+};
+
+static struct ifpga_sec_mgr_ops *
+m10bmc_iops_create(struct device *dev)
+{
+	struct ifpga_sec_mgr_ops *iops;
+
+	iops = devm_kzalloc(dev, sizeof(*iops), GFP_KERNEL);
+	if (!iops)
+		return NULL;
+
+	iops->user_flash_count = get_qspi_flash_count;
+	iops->bmc_root_entry_hash = get_bmc_root_entry_hash;
+	iops->sr_root_entry_hash = get_sr_root_entry_hash;
+	iops->pr_root_entry_hash = get_pr_root_entry_hash;
+	iops->bmc_canceled_csks = get_bmc_canceled_csks;
+	iops->sr_canceled_csks = get_sr_canceled_csks;
+	iops->pr_canceled_csks = get_pr_canceled_csks;
+	iops->bmc_reh_size = get_bmc_reh_size;
+	iops->sr_reh_size = get_sr_reh_size;
+	iops->pr_reh_size = get_pr_reh_size;
+	iops->bmc_canceled_csk_nbits = get_bmc_csk_cancel_nbits;
+	iops->sr_canceled_csk_nbits = get_sr_csk_cancel_nbits;
+	iops->pr_canceled_csk_nbits = get_pr_csk_cancel_nbits;
+	iops->prepare = m10bmc_sec_prepare;
+	iops->write_blk = m10bmc_sec_write_blk;
+	iops->poll_complete = m10bmc_sec_poll_complete;
+	iops->cancel = m10bmc_sec_cancel;
+	iops->get_hw_errinfo = m10bmc_sec_hw_errinfo;
+	iops->image_load = n3000_image_load_hndlrs;
+
+	return iops;
+}
+
 static int m10bmc_secure_probe(struct platform_device *pdev)
 {
+	struct ifpga_sec_mgr_ops *iops;
 	struct m10bmc_sec *sec;
 	int ret;
 
@@ -538,11 +599,15 @@ static int m10bmc_secure_probe(struct platform_device *pdev)
 	if (!sec)
 		return -ENOMEM;
 
+	iops = m10bmc_iops_create(&pdev->dev);
+	if (!iops)
+		return -ENOMEM;
+
 	sec->dev = &pdev->dev;
 	sec->m10bmc = dev_get_drvdata(pdev->dev.parent);
 	dev_set_drvdata(&pdev->dev, sec);
 
-	ret = ifpga_sec_mgr_init(sec);
+	ret = ifpga_sec_mgr_init(sec, iops);
 	if (ret)
 		dev_err(&pdev->dev,
 			"Security manager failed to start: %d\n", ret);
