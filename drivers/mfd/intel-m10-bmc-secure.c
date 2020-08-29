@@ -562,12 +562,12 @@ static struct platform_driver intel_m10bmc_secure_driver = {
 	.probe = m10bmc_secure_probe,
 	.remove = m10bmc_secure_remove,
 	.driver = {
-		.name = INTEL_M10BMC_SEC_DRV_NAME,
+		.name = "n3000bmc-secure",
 	},
 };
 module_platform_driver(intel_m10bmc_secure_driver);
 
-MODULE_ALIAS("platform:" INTEL_M10BMC_SEC_DRV_NAME);
+MODULE_ALIAS("platform:n3000bmc-secure");
 MODULE_AUTHOR("Intel Corporation");
 MODULE_DESCRIPTION("Intel MAX10 BMC secure engine");
 MODULE_LICENSE("GPL v2");
