@@ -32,7 +32,7 @@ static struct mfd_cell m10bmc_pacn3000_subdevs[] = {
 		.pdata_size = sizeof(pkvl_platdata),
 	},
 	{
-		.name = INTEL_M10BMC_SEC_DRV_NAME,
+		.name = "n3000bmc-secure",
 	},
 };
 
