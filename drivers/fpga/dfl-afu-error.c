@@ -103,7 +103,7 @@ static int afu_port_err_clear(struct device *dev, u64 err)
 	__afu_port_err_mask(dev, false);
 
 	/* Enable the Port by clear the reset */
-	__afu_port_enable(pdev);
+	ret = __afu_port_enable(pdev);
 
 done:
 	mutex_unlock(&pdata->lock);
