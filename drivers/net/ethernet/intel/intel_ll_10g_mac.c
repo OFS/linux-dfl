@@ -16,6 +16,18 @@
 #include <linux/uaccess.h>
 
 #define CAPABILITY_OFFSET	0x08
+#define CAP_AVAILABLE_RATES	GENMASK_ULL(7, 0)
+#define CAP_CONTAINS_PCS	GENMASK_ULL(15, 8)
+#define CAP_CONTAINS_FEC	GENMASK_ULL(23, 16)
+#define CAP_RATE_1G		BIT_ULL(0)
+#define CAP_RATE_10G		BIT_ULL(1)
+#define CAP_RATE_25G		BIT_ULL(2)
+#define CAP_RATE_40G		BIT_ULL(3)
+#define CAP_RATE_50G		BIT_ULL(4)
+#define CAP_RATE_100G		BIT_ULL(5)
+#define CAP_RATE_200G		BIT_ULL(6)
+#define CAP_RATE_400G		BIT_ULL(7)
+
 #define MB_BASE_OFFSET		0x28
 
 #define PHY_BASE_OFF		0x2000
@@ -23,6 +35,11 @@
 
 #define ILL_10G_TX_STATS_CLR	0x1c00
 #define ILL_10G_RX_STATS_CLR	0x0c00
+
+#define ILL_100G_TX_STATS_CLR	0x845
+#define ILL_100G_RX_STATS_CLR	0x945
+#define ILL_100G_LPBK_OFF	0x313
+#define ILL_100G_LPBK_EN_VAL	0xffff
 
 #define STATS_CLR_INT_US		1
 #define STATS_CLR_INT_TIMEOUT_US	1000
@@ -273,6 +290,79 @@ static const struct intel_ll_10g_ops_params intel_ll_10g_params = {
 	.lpbk_en_val = 1,
 };
 
+static struct stat_info stats_100g[] = {
+	/* tx statistics */
+	{STAT_INFO(0x800, "tx_fragments")},
+	{STAT_INFO(0x802, "tx_jabbers")},
+	{STAT_INFO(0x804, "tx_crcerr")},
+	{STAT_INFO(0x806, "tx_crcerr_sizeok")},
+	{STAT_INFO(0x808, "tx_mcast_data_err")},
+	{STAT_INFO(0x80a, "tx_bcast_data_err")},
+	{STAT_INFO(0x80c, "tx_ucast_data_err")},
+	{STAT_INFO(0x80e, "tx_mcast_ctrl_err")},
+	{STAT_INFO(0x810, "tx_bcast_ctrl_err")},
+	{STAT_INFO(0x812, "tx_ucast_ctrl_err")},
+	{STAT_INFO(0x814, "tx_pause_err")},
+	{STAT_INFO(0x816, "tx_64b")},
+	{STAT_INFO(0x818, "tx_65to127b")},
+	{STAT_INFO(0x81a, "tx_128to255b")},
+	{STAT_INFO(0x81c, "tx_256to511b")},
+	{STAT_INFO(0x81e, "tx_512to1023b")},
+	{STAT_INFO(0x820, "tx_1024to1518b")},
+	{STAT_INFO(0x822, "tx_1519tomaxb")},
+	{STAT_INFO(0x824, "tx_oversize")},
+	{STAT_INFO(0x836, "tx_st")},
+	{STAT_INFO(0x826, "tx_mcast_data_ok")},
+	{STAT_INFO(0x828, "tx_bcast_data_ok")},
+	{STAT_INFO(0x82a, "tx_ucast_data_ok")},
+	{STAT_INFO(0x82c, "tx_mcast_ctrl_ok")},
+	{STAT_INFO(0x82e, "tx_bcast_ctrl_ok")},
+	{STAT_INFO(0x830, "tx_ucast_ctrl_ok")},
+	{STAT_INFO(0x832, "tx_pause")},
+	{STAT_INFO(0x860, "tx_payload_octets_ok")},
+	{STAT_INFO(0x862, "tx_frame_octets_ok")},
+
+	/* rx statistics */
+	{STAT_INFO(0x900, "rx_fragments")},
+	{STAT_INFO(0x902, "rx_jabbers")},
+	{STAT_INFO(0x904, "rx_crcerr")},
+	{STAT_INFO(0x906, "rx_crcerr_sizeok")},
+	{STAT_INFO(0x908, "rx_mcast_data_err")},
+	{STAT_INFO(0x90a, "rx_bcast_data_err")},
+	{STAT_INFO(0x90c, "rx_ucast_data_err")},
+	{STAT_INFO(0x90e, "rx_mcast_ctrl_err")},
+	{STAT_INFO(0x910, "rx_bcast_ctrl_err")},
+	{STAT_INFO(0x912, "rx_ucast_ctrl_err")},
+	{STAT_INFO(0x914, "rx_pause_err")},
+	{STAT_INFO(0x916, "rx_64b")},
+	{STAT_INFO(0x918, "rx_65to127b")},
+	{STAT_INFO(0x91a, "rx_128to255b")},
+	{STAT_INFO(0x91c, "rx_256to511b")},
+	{STAT_INFO(0x91e, "rx_512to1023b")},
+	{STAT_INFO(0x920, "rx_1024to1518b")},
+	{STAT_INFO(0x922, "rx_1519tomaxb")},
+	{STAT_INFO(0x924, "rx_oversize")},
+	{STAT_INFO(0x936, "rx_st")},
+	{STAT_INFO(0x926, "rx_mcast_data_ok")},
+	{STAT_INFO(0x928, "rx_bcast_data_ok")},
+	{STAT_INFO(0x92a, "rx_ucast_data_ok")},
+	{STAT_INFO(0x92c, "rx_mcast_ctrl_ok")},
+	{STAT_INFO(0x92e, "rx_bcast_ctrl_ok")},
+	{STAT_INFO(0x930, "rx_ucast_ctrl_ok")},
+	{STAT_INFO(0x932, "rx_pause")},
+	{STAT_INFO(0x960, "rx_payload_octets_ok")},
+	{STAT_INFO(0x962, "rx_frame_octets_ok")}
+};
+
+static const struct intel_ll_10g_ops_params intel_ll_100g_params = {
+	.stats = stats_100g,
+	.num_stats = ARRAY_SIZE(stats_100g),
+	.tx_clr_off = ILL_100G_TX_STATS_CLR,
+	.rx_clr_off = ILL_100G_RX_STATS_CLR,
+	.lpbk_off = ILL_100G_LPBK_OFF,
+	.lpbk_en_val = ILL_100G_LPBK_EN_VAL,
+};
+
 static void intel_ll_10g_init_netdev(struct net_device *netdev)
 {
 	netdev->ethtool_ops = &ethtool_ops;
@@ -294,8 +384,8 @@ static int intel_ll_10g_mac_probe(struct dfl_device *dfl_dev)
 	struct intel_ll_10g_drvdata *priv;
 	struct regmap *regmap;
 	void __iomem *base;
+	u64 val, pcs_speed;
 	u32 flags;
-	u64 val;
 	int ret;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
@@ -331,7 +421,20 @@ static int intel_ll_10g_mac_probe(struct dfl_device *dfl_dev)
 	npriv->dfl_dev = dfl_dev;
 	npriv->regmap = regmap;
 	npriv->debug = dfl_regmap_debug_init(dev, regmap);
-	npriv->ops_params = &intel_ll_10g_params;
+
+	pcs_speed = FIELD_GET(CAP_CONTAINS_PCS, val);
+
+	if (pcs_speed == CAP_RATE_10G) {
+		dev_info(dev, "%s found 10G\n", __func__);
+		npriv->ops_params = &intel_ll_10g_params;
+	} else if (pcs_speed == CAP_RATE_100G) {
+		dev_info(dev, "%s found 100G\n", __func__);
+		npriv->ops_params = &intel_ll_100g_params;
+	} else {
+		dev_err(dev, "%s unsupported pcs data rate 0x%llx\n",
+			__func__, pcs_speed);
+		return -EINVAL;
+	}
 
 	SET_NETDEV_DEV(priv->netdev, &dfl_dev->dev);
 
