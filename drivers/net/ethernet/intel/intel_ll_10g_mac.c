@@ -24,17 +24,27 @@
 #define ILL_10G_TX_STATS_CLR	0x1c00
 #define ILL_10G_RX_STATS_CLR	0x0c00
 
-#define ILL_10G_STATS_CLR_INT_US		1
-#define ILL_10G_STATS_CLR_INT_TIMEOUT_US	1000
+#define STATS_CLR_INT_US		1
+#define STATS_CLR_INT_TIMEOUT_US	1000
 
 struct intel_ll_10g_drvdata {
 	struct net_device *netdev;
+};
+
+struct intel_ll_10g_ops_params {
+	struct stat_info *stats;
+	u32 num_stats;
+	u32 tx_clr_off;
+	u32 rx_clr_off;
+	u32 lpbk_off;
+	u32 lpbk_en_val;
 };
 
 struct intel_ll_10g_netdata {
 	struct dfl_device *dfl_dev;
 	struct regmap *regmap;
 	struct dfl_regmap_debug *debug;
+	const struct intel_ll_10g_ops_params *ops_params;
 };
 
 static int netdev_change_mtu(struct net_device *netdev, int new_mtu)
@@ -47,9 +57,12 @@ static int netdev_change_mtu(struct net_device *netdev, int new_mtu)
 static int netdev_set_loopback(struct net_device *netdev, bool en)
 {
 	struct intel_ll_10g_netdata *npriv = netdev_priv(netdev);
-	u32 val = en;
+	u32 val = 0;
 
-	return(regmap_write(npriv->regmap, (PHY_BASE_OFF + PHY_RX_SER_LOOP_BACK), val));
+	if (en)
+		val = npriv->ops_params->lpbk_en_val;
+
+	return regmap_write(npriv->regmap, npriv->ops_params->lpbk_off, val);
 }
 
 static int netdev_set_features(struct net_device *netdev,
@@ -157,13 +170,14 @@ static struct stat_info stats_10g[] = {
 static void ethtool_get_strings(struct net_device *netdev, u32 stringset,
 				u8 *s)
 {
+	struct intel_ll_10g_netdata *npriv = netdev_priv(netdev);
 	unsigned int i, stats_num = 0;
 	struct stat_info *stat;
 
 	switch (stringset) {
 	case ETH_SS_STATS:
-		stat = stats_10g;
-		stats_num = ARRAY_SIZE(stats_10g);
+		stat = npriv->ops_params->stats;
+		stats_num = npriv->ops_params->num_stats;
 		break;
 	default:
 		return;
@@ -175,9 +189,11 @@ static void ethtool_get_strings(struct net_device *netdev, u32 stringset,
 
 static int ethtool_get_sset_count(struct net_device *netdev, int stringset)
 {
+	struct intel_ll_10g_netdata *npriv = netdev_priv(netdev);
+
 	switch (stringset) {
 	case ETH_SS_STATS:
-		return ARRAY_SIZE(stats_10g);
+		return npriv->ops_params->num_stats;
 
 	default:
 		return 0;
@@ -203,9 +219,9 @@ static int ethtool_reset(struct net_device *netdev, u32 *flags)
 	if (*flags | ETH_RESET_MGMT) {
 		regmap_write(npriv->regmap, ILL_10G_TX_STATS_CLR, 1);
 
-		ret = regmap_read_poll_timeout(npriv->regmap,  ILL_10G_TX_STATS_CLR,
-					       val, (!val), ILL_10G_STATS_CLR_INT_US,
-					       ILL_10G_STATS_CLR_INT_TIMEOUT_US);
+		ret = regmap_read_poll_timeout(npriv->regmap,  npriv->ops_params->tx_clr_off,
+					       val, (!val), STATS_CLR_INT_US,
+					       STATS_CLR_INT_TIMEOUT_US);
 
 		if (ret) {
 			dev_err(&netdev->dev, "%s failed to clear tx stats\n", __func__);
@@ -214,9 +230,9 @@ static int ethtool_reset(struct net_device *netdev, u32 *flags)
 
 		regmap_write(npriv->regmap, ILL_10G_RX_STATS_CLR, 1);
 
-		ret = regmap_read_poll_timeout(npriv->regmap,  ILL_10G_RX_STATS_CLR,
-					       val, (!val), ILL_10G_STATS_CLR_INT_US,
-					       ILL_10G_STATS_CLR_INT_TIMEOUT_US);
+		ret = regmap_read_poll_timeout(npriv->regmap,  npriv->ops_params->rx_clr_off,
+					       val, (!val), STATS_CLR_INT_US,
+					       STATS_CLR_INT_TIMEOUT_US);
 
 		if (ret) {
 			dev_err(&netdev->dev, "%s failed to clear rx stats\n", __func__);
@@ -231,8 +247,8 @@ static void ethtool_get_stats(struct net_device *netdev,
 			      struct ethtool_stats *stats, u64 *data)
 {
 	struct intel_ll_10g_netdata *npriv = netdev_priv(netdev);
-	unsigned int i, stats_num = ARRAY_SIZE(stats_10g);
-	struct stat_info *stat = stats_10g;
+	unsigned int i, stats_num = npriv->ops_params->num_stats;
+	struct stat_info *stat = npriv->ops_params->stats;
 	u32 flags = ETH_RESET_MGMT;
 
 	for (i = 0; i < stats_num; i++)
@@ -246,6 +262,15 @@ static const struct ethtool_ops ethtool_ops = {
 	.get_sset_count = ethtool_get_sset_count,
 	.get_ethtool_stats = ethtool_get_stats,
 	.reset = ethtool_reset,
+};
+
+static const struct intel_ll_10g_ops_params intel_ll_10g_params = {
+	.stats = stats_10g,
+	.num_stats = ARRAY_SIZE(stats_10g),
+	.tx_clr_off = ILL_10G_TX_STATS_CLR,
+	.rx_clr_off = ILL_10G_RX_STATS_CLR,
+	.lpbk_off = PHY_BASE_OFF + PHY_RX_SER_LOOP_BACK,
+	.lpbk_en_val = 1,
 };
 
 static void intel_ll_10g_init_netdev(struct net_device *netdev)
@@ -306,7 +331,7 @@ static int intel_ll_10g_mac_probe(struct dfl_device *dfl_dev)
 	npriv->dfl_dev = dfl_dev;
 	npriv->regmap = regmap;
 	npriv->debug = dfl_regmap_debug_init(dev, regmap);
-
+	npriv->ops_params = &intel_ll_10g_params;
 
 	SET_NETDEV_DEV(priv->netdev, &dfl_dev->dev);
 
