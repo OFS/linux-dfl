@@ -44,11 +44,11 @@
 #define STATS_CLR_INT_US		1
 #define STATS_CLR_INT_TIMEOUT_US	1000
 
-struct intel_ll_10g_drvdata {
+struct s10hssi_drvdata {
 	struct net_device *netdev;
 };
 
-struct intel_ll_10g_ops_params {
+struct s10hssi_ops_params {
 	struct stat_info *stats;
 	u32 num_stats;
 	u32 tx_clr_off;
@@ -57,11 +57,11 @@ struct intel_ll_10g_ops_params {
 	u32 lpbk_en_val;
 };
 
-struct intel_ll_10g_netdata {
+struct s10hssi_netdata {
 	struct dfl_device *dfl_dev;
 	struct regmap *regmap;
 	struct dfl_regmap_debug *debug;
-	const struct intel_ll_10g_ops_params *ops_params;
+	const struct s10hssi_ops_params *ops_params;
 };
 
 static int netdev_change_mtu(struct net_device *netdev, int new_mtu)
@@ -73,7 +73,7 @@ static int netdev_change_mtu(struct net_device *netdev, int new_mtu)
 
 static int netdev_set_loopback(struct net_device *netdev, bool en)
 {
-	struct intel_ll_10g_netdata *npriv = netdev_priv(netdev);
+	struct s10hssi_netdata *npriv = netdev_priv(netdev);
 	u32 val = 0;
 
 	if (en)
@@ -187,7 +187,7 @@ static struct stat_info stats_10g[] = {
 static void ethtool_get_strings(struct net_device *netdev, u32 stringset,
 				u8 *s)
 {
-	struct intel_ll_10g_netdata *npriv = netdev_priv(netdev);
+	struct s10hssi_netdata *npriv = netdev_priv(netdev);
 	unsigned int i, stats_num = 0;
 	struct stat_info *stat;
 
@@ -206,7 +206,7 @@ static void ethtool_get_strings(struct net_device *netdev, u32 stringset,
 
 static int ethtool_get_sset_count(struct net_device *netdev, int stringset)
 {
-	struct intel_ll_10g_netdata *npriv = netdev_priv(netdev);
+	struct s10hssi_netdata *npriv = netdev_priv(netdev);
 
 	switch (stringset) {
 	case ETH_SS_STATS:
@@ -229,12 +229,12 @@ static u64 read_mac_stat(struct regmap *regmap, unsigned int addr)
 
 static int ethtool_reset(struct net_device *netdev, u32 *flags)
 {
-	struct intel_ll_10g_netdata *npriv = netdev_priv(netdev);
+	struct s10hssi_netdata *npriv = netdev_priv(netdev);
 	int ret;
 	u32 val;
 
 	if (*flags | ETH_RESET_MGMT) {
-		regmap_write(npriv->regmap, ILL_10G_TX_STATS_CLR, 1);
+		regmap_write(npriv->regmap, npriv->ops_params->tx_clr_off, 1);
 
 		ret = regmap_read_poll_timeout(npriv->regmap,  npriv->ops_params->tx_clr_off,
 					       val, (!val), STATS_CLR_INT_US,
@@ -245,7 +245,7 @@ static int ethtool_reset(struct net_device *netdev, u32 *flags)
 			return ret;
 		}
 
-		regmap_write(npriv->regmap, ILL_10G_RX_STATS_CLR, 1);
+		regmap_write(npriv->regmap, npriv->ops_params->rx_clr_off, 1);
 
 		ret = regmap_read_poll_timeout(npriv->regmap,  npriv->ops_params->rx_clr_off,
 					       val, (!val), STATS_CLR_INT_US,
@@ -255,6 +255,7 @@ static int ethtool_reset(struct net_device *netdev, u32 *flags)
 			dev_err(&netdev->dev, "%s failed to clear rx stats\n", __func__);
 			return ret;
 		}
+		dev_info(&netdev->dev, "%s reset statistics registers\n", __func__);
 	}
 
 	return 0;
@@ -263,7 +264,7 @@ static int ethtool_reset(struct net_device *netdev, u32 *flags)
 static void ethtool_get_stats(struct net_device *netdev,
 			      struct ethtool_stats *stats, u64 *data)
 {
-	struct intel_ll_10g_netdata *npriv = netdev_priv(netdev);
+	struct s10hssi_netdata *npriv = netdev_priv(netdev);
 	unsigned int i, stats_num = npriv->ops_params->num_stats;
 	struct stat_info *stat = npriv->ops_params->stats;
 	u32 flags = ETH_RESET_MGMT;
@@ -281,7 +282,7 @@ static const struct ethtool_ops ethtool_ops = {
 	.reset = ethtool_reset,
 };
 
-static const struct intel_ll_10g_ops_params intel_ll_10g_params = {
+static const struct s10hssi_ops_params s10hssi_params = {
 	.stats = stats_10g,
 	.num_stats = ARRAY_SIZE(stats_10g),
 	.tx_clr_off = ILL_10G_TX_STATS_CLR,
@@ -354,7 +355,7 @@ static struct stat_info stats_100g[] = {
 	{STAT_INFO(0x962, "rx_frame_octets_ok")}
 };
 
-static const struct intel_ll_10g_ops_params intel_ll_100g_params = {
+static const struct s10hssi_ops_params intel_ll_100g_params = {
 	.stats = stats_100g,
 	.num_stats = ARRAY_SIZE(stats_100g),
 	.tx_clr_off = ILL_100G_TX_STATS_CLR,
@@ -363,7 +364,7 @@ static const struct intel_ll_10g_ops_params intel_ll_100g_params = {
 	.lpbk_en_val = ILL_100G_LPBK_EN_VAL,
 };
 
-static void intel_ll_10g_init_netdev(struct net_device *netdev)
+static void s10hssi_init_netdev(struct net_device *netdev)
 {
 	netdev->ethtool_ops = &ethtool_ops;
 	netdev->netdev_ops = &netdev_ops;
@@ -377,11 +378,11 @@ static void intel_ll_10g_init_netdev(struct net_device *netdev)
 	ether_setup(netdev);
 }
 
-static int intel_ll_10g_mac_probe(struct dfl_device *dfl_dev)
+static int s10hssi_mac_probe(struct dfl_device *dfl_dev)
 {
 	struct device *dev = &dfl_dev->dev;
-	struct intel_ll_10g_netdata *npriv;
-	struct intel_ll_10g_drvdata *priv;
+	struct s10hssi_netdata *npriv;
+	struct s10hssi_drvdata *priv;
 	struct regmap *regmap;
 	void __iomem *base;
 	u64 val, pcs_speed;
@@ -409,9 +410,9 @@ static int intel_ll_10g_mac_probe(struct dfl_device *dfl_dev)
 	if (!regmap)
 		return -ENOMEM;
 
-	priv->netdev = alloc_netdev(sizeof(struct intel_ll_10g_netdata),
-				    "ll_10g%d", NET_NAME_UNKNOWN,
-				    intel_ll_10g_init_netdev);
+	priv->netdev = alloc_netdev(sizeof(struct s10hssi_netdata),
+				    "s10hssi%d", NET_NAME_UNKNOWN,
+				    s10hssi_init_netdev);
 
 	if (!priv->netdev)
 		return -ENOMEM;
@@ -426,7 +427,7 @@ static int intel_ll_10g_mac_probe(struct dfl_device *dfl_dev)
 
 	if (pcs_speed == CAP_RATE_10G) {
 		dev_info(dev, "%s found 10G\n", __func__);
-		npriv->ops_params = &intel_ll_10g_params;
+		npriv->ops_params = &s10hssi_params;
 	} else if (pcs_speed == CAP_RATE_100G) {
 		dev_info(dev, "%s found 100G\n", __func__);
 		npriv->ops_params = &intel_ll_100g_params;
@@ -455,10 +456,10 @@ static int intel_ll_10g_mac_probe(struct dfl_device *dfl_dev)
 	return ret;
 }
 
-static int intel_ll_10g_mac_remove(struct dfl_device *dfl_dev)
+static int s10hssi_mac_remove(struct dfl_device *dfl_dev)
 {
-	struct intel_ll_10g_drvdata *priv = dev_get_drvdata(&dfl_dev->dev);
-	struct intel_ll_10g_netdata *npriv = netdev_priv(priv->netdev);
+	struct s10hssi_drvdata *priv = dev_get_drvdata(&dfl_dev->dev);
+	struct s10hssi_netdata *npriv = netdev_priv(priv->netdev);
 
 	dfl_regmap_debug_exit(npriv->debug);
 
@@ -469,22 +470,22 @@ static int intel_ll_10g_mac_remove(struct dfl_device *dfl_dev)
 
 #define FME_FEATURE_ID_LL_10G_MAC 0xf
 
-static const struct dfl_device_id intel_ll_10g_mac_ids[] = {
+static const struct dfl_device_id s10hssi_mac_ids[] = {
 	{ FME_ID, FME_FEATURE_ID_LL_10G_MAC },
 	{ }
 };
 
-static struct dfl_driver intel_ll_10g_mac_driver = {
+static struct dfl_driver s10hssi_mac_driver = {
 	.drv = {
-		.name = "intel-ll-10g-mac",
+		.name = "s10hssi",
 	},
-	.id_table = intel_ll_10g_mac_ids,
-	.probe = intel_ll_10g_mac_probe,
-	.remove = intel_ll_10g_mac_remove,
+	.id_table = s10hssi_mac_ids,
+	.probe = s10hssi_mac_probe,
+	.remove = s10hssi_mac_remove,
 };
 
-module_dfl_driver(intel_ll_10g_mac_driver);
-MODULE_DEVICE_TABLE(dfl, intel_ll_10g_mac_ids);
-MODULE_DESCRIPTION("Network Device Driver for Intel(R) Low Latency 10G MAC");
+module_dfl_driver(s10hssi_mac_driver);
+MODULE_DEVICE_TABLE(dfl, s10hssi_mac_ids);
+MODULE_DESCRIPTION("Network Device Driver for Intel(R) Startix10 HSSI");
 MODULE_AUTHOR("Intel Corporation");
 MODULE_LICENSE("GPL v2");

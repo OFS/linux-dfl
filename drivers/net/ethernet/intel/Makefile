@@ -20,4 +20,4 @@ obj-$(CONFIG_ICE) += ice/
 dfl-eth-group-objs := dfl-eth-group-main.o dfl-eth-group-10g.o dfl-eth-group-25g.o
 obj-$(CONFIG_FPGA_DFL_ETH_GROUP) += dfl-eth-group.o
 obj-$(CONFIG_INTEL_M10_BMC_PKVL) += intel-m10-bmc-pkvl.o
-obj-$(CONFIG_INTEL_LL_10G_MAC) += intel_ll_10g_mac.o
+obj-$(CONFIG_S10HSSI) += s10hssi.o
