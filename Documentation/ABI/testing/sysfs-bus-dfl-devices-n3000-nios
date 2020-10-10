@@ -7,7 +7,9 @@ Description:	Read-only. Returns the FEC mode of the 25G links of the
 		Solomon FEC, "kr" for Fire Code FEC, "no" for NO FEC.
 		"not supported" if the FEC mode setting is not supported, this
 		happens when the Nios firmware version major < 3, or no link is
-		configured to 25G.
+		configured to 25G. The FEC mode could be set by module
+		parameters, but it could only be set once after the board
+		powers up.
 		Format: string
 
 What:		/sys/bus/dfl/devices/dfl_dev.X/retimer_A_mode
