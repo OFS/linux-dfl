@@ -23,6 +23,10 @@
 #include <linux/spi/spi.h>
 #include <linux/types.h>
 
+static char *fec_mode = "rs";
+module_param(fec_mode, charp, 0444);
+MODULE_PARM_DESC(fec_mode, "FEC mode of the ethernet retimer on Intel PAC N3000");
+
 /*
  * N3000 Nios private feature registers, named as NIOS_SPI_XX on spec.
  * NS is the abbreviation of NIOS_SPI.
@@ -348,13 +352,17 @@ static int n3000_nios_init_done_check(struct n3000_nios *nn)
 		 * mode field cause host could not get the retimer working mode
 		 * until the Nios init is done.
 		 *
-		 * For now the driver doesn't support the retimer FEC mode
-		 * switching per user's request. It is always set to Reed
-		 * Solomon FEC.
-		 *
 		 * The driver will set the same FEC mode for all links.
 		 */
-		val |= N3000_NIOS_INIT_REQ_FEC_MODE_RS_ALL;
+
+		if (!strcmp(fec_mode, "no"))
+			val |= N3000_NIOS_INIT_REQ_FEC_MODE_NO_ALL;
+		else if (!strcmp(fec_mode, "kr"))
+			val |= N3000_NIOS_INIT_REQ_FEC_MODE_KR_ALL;
+		else if (!strcmp(fec_mode, "rs"))
+			val |= N3000_NIOS_INIT_REQ_FEC_MODE_RS_ALL;
+		else
+			return -EINVAL;
 
 		ret = regmap_write(nn->regmap, N3000_NIOS_INIT, val);
 		if (ret)
