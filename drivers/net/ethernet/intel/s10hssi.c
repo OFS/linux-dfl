@@ -405,7 +405,7 @@ static int s10hssi_mac_probe(struct dfl_device *dfl_dev)
 
 	dev_info(dev, "%s capability register 0x%llx\n", __func__, val);
 
-	regmap = dfl_indirect_regmap_init(dev, base, MB_BASE_OFFSET);
+	regmap = dfl_indirect_regmap_init(dev, base + MB_BASE_OFFSET);
 
 	if (!regmap)
 		return -ENOMEM;
