@@ -205,7 +205,6 @@ EXPORT_SYMBOL_GPL(dfl_regmap_debug_exit);
 
 struct dfl_indirect_ctx {
 	void __iomem *base;
-	unsigned int base_off;
 	struct device *dev;
 };
 
@@ -214,9 +213,9 @@ static int dfl_indirect_bus_clr_cmd(struct dfl_indirect_ctx *ctx)
 	unsigned int cmd;
 	int ret;
 
-	writel(0, ctx->base + ctx->base_off + DFL_INDIRECT_CMD_OFF);
+	writel(0, ctx->base + DFL_INDIRECT_CMD_OFF);
 
-	ret = readl_poll_timeout((ctx->base + ctx->base_off + DFL_INDIRECT_CMD_OFF), cmd,
+	ret = readl_poll_timeout((ctx->base + DFL_INDIRECT_CMD_OFF), cmd,
 				 (!cmd), DFL_INDIRECT_INT_US, DFL_INDIRECT_TIMEOUT_US);
 
 	if (ret)
@@ -232,20 +231,20 @@ static int dfl_indirect_bus_reg_read(void *context, unsigned int reg,
 	unsigned int cmd;
 	int ret;
 
-	cmd = readl(ctx->base + ctx->base_off + DFL_INDIRECT_CMD_OFF);
+	cmd = readl(ctx->base + DFL_INDIRECT_CMD_OFF);
 
 	if (cmd)
 		dev_warn(ctx->dev, "%s non-zero cmd 0x%x\n", __func__, cmd);
 
-	writel(reg, ctx->base + ctx->base_off + DFL_INDIRECT_ADDR_OFF);
+	writel(reg, ctx->base + DFL_INDIRECT_ADDR_OFF);
 
-	writel(DFL_INDIRECT_CMD_RD, ctx->base + ctx->base_off + DFL_INDIRECT_CMD_OFF);
+	writel(DFL_INDIRECT_CMD_RD, ctx->base + DFL_INDIRECT_CMD_OFF);
 
-	ret = readl_poll_timeout((ctx->base + ctx->base_off + DFL_INDIRECT_CMD_OFF), cmd,
+	ret = readl_poll_timeout((ctx->base + DFL_INDIRECT_CMD_OFF), cmd,
 				 (cmd & DFL_INDIRECT_CMD_ACK), DFL_INDIRECT_INT_US,
 				 DFL_INDIRECT_TIMEOUT_US);
 
-	*val = readl(ctx->base + ctx->base_off + DFL_INDIRECT_RD_OFF);
+	*val = readl(ctx->base + DFL_INDIRECT_RD_OFF);
 
 	if (ret)
 		dev_err(ctx->dev, "%s timed out on reg 0x%x cmd 0x%x\n", __func__, reg, cmd);
@@ -263,18 +262,18 @@ static int dfl_indirect_bus_reg_write(void *context, unsigned int reg,
 	unsigned int cmd;
 	int ret;
 
-	cmd = readl(ctx->base + ctx->base_off + DFL_INDIRECT_CMD_OFF);
+	cmd = readl(ctx->base + DFL_INDIRECT_CMD_OFF);
 
 	if (cmd)
 		dev_warn(ctx->dev, "%s non-zero cmd 0x%x\n", __func__, cmd);
 
-	writel(val, ctx->base + ctx->base_off + DFL_INDIRECT_WR_OFF);
+	writel(val, ctx->base + DFL_INDIRECT_WR_OFF);
 
-	writel(reg, ctx->base + ctx->base_off + DFL_INDIRECT_ADDR_OFF);
+	writel(reg, ctx->base + DFL_INDIRECT_ADDR_OFF);
 
-	writel(DFL_INDIRECT_CMD_WR, ctx->base + ctx->base_off + DFL_INDIRECT_CMD_OFF);
+	writel(DFL_INDIRECT_CMD_WR, ctx->base + DFL_INDIRECT_CMD_OFF);
 
-	ret = readl_poll_timeout((ctx->base + ctx->base_off + DFL_INDIRECT_CMD_OFF), cmd,
+	ret = readl_poll_timeout((ctx->base + DFL_INDIRECT_CMD_OFF), cmd,
 				 (cmd & DFL_INDIRECT_CMD_ACK), DFL_INDIRECT_INT_US,
 				 DFL_INDIRECT_TIMEOUT_US);
 
@@ -304,7 +303,7 @@ static const struct regmap_config dfl_indirect_regbus_cfg = {
  *
  * Return: 0 on success, negative error code otherwise.
  */
-struct regmap *dfl_indirect_regmap_init(struct device *dev, void __iomem *base, unsigned int off)
+struct regmap *dfl_indirect_regmap_init(struct device *dev, void __iomem *base)
 {
 	struct dfl_indirect_ctx *ctx;
 
@@ -314,7 +313,6 @@ struct regmap *dfl_indirect_regmap_init(struct device *dev, void __iomem *base, 
 		return NULL;
 
 	ctx->base = base;
-	ctx->base_off = off;
 	ctx->dev = dev;
 
 	return devm_regmap_init(dev, NULL, ctx, &dfl_indirect_regbus_cfg);
