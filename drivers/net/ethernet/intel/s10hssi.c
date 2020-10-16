@@ -381,6 +381,7 @@ static void s10hssi_init_netdev(struct net_device *netdev)
 static int s10hssi_mac_probe(struct dfl_device *dfl_dev)
 {
 	struct device *dev = &dfl_dev->dev;
+	struct regmap_config cfg = {0};
 	struct s10hssi_netdata *npriv;
 	struct s10hssi_drvdata *priv;
 	struct regmap *regmap;
@@ -405,7 +406,10 @@ static int s10hssi_mac_probe(struct dfl_device *dfl_dev)
 
 	dev_info(dev, "%s capability register 0x%llx\n", __func__, val);
 
-	regmap = dfl_indirect_regmap_init(dev, base + MB_BASE_OFFSET);
+	cfg.reg_bits = 32;
+	cfg.val_bits = 32;
+
+	regmap = dfl_indirect_regmap_init(dev, base + MB_BASE_OFFSET, &cfg);
 
 	if (!regmap)
 		return -ENOMEM;

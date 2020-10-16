@@ -286,13 +286,10 @@ static int dfl_indirect_bus_reg_write(void *context, unsigned int reg,
 	return ret;
 }
 
-static const struct regmap_config dfl_indirect_regbus_cfg = {
-	.reg_bits = 32,
-	.val_bits = 32,
+static const struct regmap_bus indirect_bus = {
 	.fast_io = true,
-
-	.reg_write = dfl_indirect_bus_reg_write,
 	.reg_read = dfl_indirect_bus_reg_read,
+	.reg_write = dfl_indirect_bus_reg_write,
 };
 
 /**
@@ -303,7 +300,7 @@ static const struct regmap_config dfl_indirect_regbus_cfg = {
  *
  * Return: 0 on success, negative error code otherwise.
  */
-struct regmap *dfl_indirect_regmap_init(struct device *dev, void __iomem *base)
+struct regmap *dfl_indirect_regmap_init(struct device *dev, void __iomem *base, struct regmap_config *cfg)
 {
 	struct dfl_indirect_ctx *ctx;
 
@@ -315,7 +312,7 @@ struct regmap *dfl_indirect_regmap_init(struct device *dev, void __iomem *base)
 	ctx->base = base;
 	ctx->dev = dev;
 
-	return devm_regmap_init(dev, NULL, ctx, &dfl_indirect_regbus_cfg);
+	return devm_regmap_init(dev, &indirect_bus, ctx, cfg);
 }
 EXPORT_SYMBOL_GPL(dfl_indirect_regmap_init);
 
