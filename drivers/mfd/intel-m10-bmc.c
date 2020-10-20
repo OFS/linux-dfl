@@ -131,10 +131,22 @@ int m10bmc_sys_update_bits(struct intel_m10bmc *m10bmc, unsigned int offset,
 }
 EXPORT_SYMBOL_GPL(m10bmc_sys_update_bits);
 
+static const struct regmap_range m10_regmap_range[] = {
+	regmap_reg_range(M10BMC_LEGACY_SYS_BASE, M10BMC_SYS_END),
+	regmap_reg_range(M10BMC_FLASH_BASE, M10BMC_MEM_END),
+};
+
+static const struct regmap_access_table m10_access_table = {
+	.yes_ranges	= m10_regmap_range,
+	.n_yes_ranges	= ARRAY_SIZE(m10_regmap_range),
+};
+
 static struct regmap_config intel_m10bmc_regmap_config = {
 	.reg_bits = 32,
 	.val_bits = 32,
 	.reg_stride = 4,
+	.wr_table = &m10_access_table,
+	.rd_table = &m10_access_table,
 	.max_register = M10BMC_MEM_END,
 };
 
