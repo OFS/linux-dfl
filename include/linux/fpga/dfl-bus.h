@@ -80,9 +80,6 @@ struct dfl_regmap_debug {
 	struct mutex lock;
 };
 
-struct dfl_regmap_debug *dfl_regmap_debug_init(struct device *dev,struct regmap *map);
-void dfl_regmap_debug_exit(struct dfl_regmap_debug *debug);
-
 /*
  * use a macro to avoid include chaining to get THIS_MODULE.
  */
