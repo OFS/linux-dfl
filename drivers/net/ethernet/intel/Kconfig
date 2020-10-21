@@ -375,6 +375,7 @@ config INTEL_M10_BMC_RETIMER
 
 config S10HSSI
 	tristate "Control Plane Driver for Stratix 10 HSSI"
+	select REGMAP_INDIRECT_REGISTER
 	help
 	  This driver provides control plane support for an Stratix 10
 	  High Speed Serial Interface.

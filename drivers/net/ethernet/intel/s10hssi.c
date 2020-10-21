@@ -13,6 +13,7 @@
 #include <linux/module.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/regmap.h>
 #include <linux/uaccess.h>
 
 #define CAPABILITY_OFF		0x08
@@ -467,7 +468,7 @@ static int s10hssi_mac_probe(struct dfl_device *dfl_dev)
 	cfg.reg_bits = 32;
 	cfg.val_bits = 32;
 
-	regmap = dfl_indirect_regmap_init(dev, base + MB_BASE_OFF, &cfg);
+	regmap = devm_regmap_init_indirect_register(dev, base + MB_BASE_OFF, &cfg);
 
 	if (!regmap)
 		return -ENOMEM;
