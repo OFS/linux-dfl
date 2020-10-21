@@ -104,6 +104,7 @@ static const struct regmap_config indirect_regbus_cfg = {
 	.reg_stride = 4,
 	.val_bits = 32,
 	.fast_io = true,
+	.max_register = 24,
 
 	.reg_write = indirect_bus_reg_write,
 	.reg_read = indirect_bus_reg_read,
