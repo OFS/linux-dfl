@@ -15,7 +15,7 @@
 #include <linux/etherdevice.h>
 #include <linux/uaccess.h>
 
-#define CAPABILITY_OFFSET	0x08
+#define CAPABILITY_OFF		0x08
 #define CAP_AVAILABLE_RATES	GENMASK_ULL(7, 0)
 #define CAP_CONTAINS_PCS	GENMASK_ULL(15, 8)
 #define CAP_CONTAINS_FEC	GENMASK_ULL(23, 16)
@@ -28,16 +28,24 @@
 #define CAP_RATE_200G		BIT_ULL(6)
 #define CAP_RATE_400G		BIT_ULL(7)
 
-#define MB_BASE_OFFSET		0x28
+#define MB_BASE_OFF		0x28
 
 #define PHY_BASE_OFF		0x2000
 #define PHY_RX_SER_LOOP_BACK	0x4e1
+#define PHY_MAX_OFF		0x541
 
+#define ILL_10G_BASE_OFF	0
+#define ILL_10G_MAX_OFF		0x1d00
 #define ILL_10G_TX_STATS_CLR	0x1c00
 #define ILL_10G_RX_STATS_CLR	0x0c00
 
+#define ILL_100G_BASE_OFF	0x400
+#define ILL_100G_MAX_OFF	0x9ff
 #define ILL_100G_TX_STATS_CLR	0x845
 #define ILL_100G_RX_STATS_CLR	0x945
+
+#define ILL_100G_PHY_BASE_OFF	0x300
+#define ILL_100G_PHY_MAX_OFF	0x3ff
 #define ILL_100G_LPBK_OFF	0x313
 #define ILL_100G_LPBK_EN_VAL	0xffff
 
@@ -60,7 +68,6 @@ struct s10hssi_ops_params {
 struct s10hssi_netdata {
 	struct dfl_device *dfl_dev;
 	struct regmap *regmap;
-	struct dfl_regmap_debug *debug;
 	const struct s10hssi_ops_params *ops_params;
 };
 
@@ -291,6 +298,16 @@ static const struct s10hssi_ops_params s10hssi_params = {
 	.lpbk_en_val = 1,
 };
 
+static const struct regmap_range regmap_range_10g[] = {
+	regmap_reg_range(ILL_10G_BASE_OFF, ILL_10G_MAX_OFF),
+	regmap_reg_range(PHY_BASE_OFF, PHY_BASE_OFF + PHY_MAX_OFF),
+};
+
+static const struct regmap_access_table access_table_10g = {
+	.yes_ranges	= regmap_range_10g,
+	.n_yes_ranges	= ARRAY_SIZE(regmap_range_10g),
+};
+
 static struct stat_info stats_100g[] = {
 	/* tx statistics */
 	{STAT_INFO(0x800, "tx_fragments")},
@@ -364,6 +381,16 @@ static const struct s10hssi_ops_params intel_ll_100g_params = {
 	.lpbk_en_val = ILL_100G_LPBK_EN_VAL,
 };
 
+static const struct regmap_range regmap_range_100g[] = {
+	regmap_reg_range(ILL_100G_PHY_BASE_OFF, ILL_100G_PHY_MAX_OFF),
+	regmap_reg_range(ILL_100G_BASE_OFF, ILL_100G_MAX_OFF),
+};
+
+static const struct regmap_access_table access_table_100g = {
+	.yes_ranges	= regmap_range_100g,
+	.n_yes_ranges	= ARRAY_SIZE(regmap_range_100g),
+};
+
 static void s10hssi_init_netdev(struct net_device *netdev)
 {
 	netdev->ethtool_ops = &ethtool_ops;
@@ -402,18 +429,6 @@ static int s10hssi_mac_probe(struct dfl_device *dfl_dev)
 	if (!base)
 		return -ENOMEM;
 
-	val = readq(base + CAPABILITY_OFFSET);
-
-	dev_info(dev, "%s capability register 0x%llx\n", __func__, val);
-
-	cfg.reg_bits = 32;
-	cfg.val_bits = 32;
-
-	regmap = dfl_indirect_regmap_init(dev, base + MB_BASE_OFFSET, &cfg);
-
-	if (!regmap)
-		return -ENOMEM;
-
 	priv->netdev = alloc_netdev(sizeof(struct s10hssi_netdata),
 				    "s10hssi%d", NET_NAME_UNKNOWN,
 				    s10hssi_init_netdev);
@@ -424,22 +439,40 @@ static int s10hssi_mac_probe(struct dfl_device *dfl_dev)
 	npriv = netdev_priv(priv->netdev);
 
 	npriv->dfl_dev = dfl_dev;
-	npriv->regmap = regmap;
-	npriv->debug = dfl_regmap_debug_init(dev, regmap);
+
+	val = readq(base + CAPABILITY_OFF);
+
+	dev_info(dev, "%s capability register 0x%llx\n", __func__, val);
 
 	pcs_speed = FIELD_GET(CAP_CONTAINS_PCS, val);
 
 	if (pcs_speed == CAP_RATE_10G) {
 		dev_info(dev, "%s found 10G\n", __func__);
 		npriv->ops_params = &s10hssi_params;
+		cfg.wr_table = &access_table_10g;
+		cfg.rd_table = &access_table_10g;
+		cfg.max_register = PHY_BASE_OFF + PHY_MAX_OFF;
 	} else if (pcs_speed == CAP_RATE_100G) {
 		dev_info(dev, "%s found 100G\n", __func__);
 		npriv->ops_params = &intel_ll_100g_params;
+		cfg.wr_table = &access_table_100g;
+		cfg.rd_table = &access_table_100g;
+		cfg.max_register = ILL_100G_MAX_OFF;
 	} else {
 		dev_err(dev, "%s unsupported pcs data rate 0x%llx\n",
 			__func__, pcs_speed);
 		return -EINVAL;
 	}
+
+	cfg.reg_bits = 32;
+	cfg.val_bits = 32;
+
+	regmap = dfl_indirect_regmap_init(dev, base + MB_BASE_OFF, &cfg);
+
+	if (!regmap)
+		return -ENOMEM;
+
+	npriv->regmap = regmap;
 
 	SET_NETDEV_DEV(priv->netdev, &dfl_dev->dev);
 
@@ -463,9 +496,6 @@ static int s10hssi_mac_probe(struct dfl_device *dfl_dev)
 static void s10hssi_mac_remove(struct dfl_device *dfl_dev)
 {
 	struct s10hssi_drvdata *priv = dev_get_drvdata(&dfl_dev->dev);
-	struct s10hssi_netdata *npriv = netdev_priv(priv->netdev);
-
-	dfl_regmap_debug_exit(npriv->debug);
 
 	unregister_netdev(priv->netdev);
 }
