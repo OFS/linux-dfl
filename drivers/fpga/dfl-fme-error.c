@@ -281,6 +281,20 @@ static ssize_t next_error_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(next_error);
 
+static ssize_t revision_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct dfl_feature_dev_data *fdata = to_dfl_feature_dev_data(dev);
+	void __iomem *base;
+	u64 dfh;
+
+	base = dfl_get_feature_ioaddr_by_id(fdata, FME_FEATURE_ID_GLOBAL_ERR);
+
+	dfh = readq(base);
+
+	return sprintf(buf, "%lld\n", FIELD_GET(DFH_REVISION, dfh));
+}
+static DEVICE_ATTR_RO(revision);
+
 static struct attribute *fme_global_err_attrs[] = {
 	&dev_attr_pcie0_errors.attr,
 	&dev_attr_pcie1_errors.attr,
@@ -290,6 +304,7 @@ static struct attribute *fme_global_err_attrs[] = {
 	&dev_attr_fme_errors.attr,
 	&dev_attr_first_error.attr,
 	&dev_attr_next_error.attr,
+	&dev_attr_revision.attr,
 	NULL,
 };
 
