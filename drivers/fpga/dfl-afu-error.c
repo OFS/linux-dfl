@@ -178,10 +178,24 @@ static ssize_t first_malformed_req_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(first_malformed_req);
 
+static ssize_t revision_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	void __iomem *base;
+	u64 dfh;
+
+	base = dfl_get_feature_ioaddr_by_id(dev, PORT_FEATURE_ID_ERROR);
+
+	dfh = readq(base);
+
+	return sprintf(buf, "%lld\n", FIELD_GET(DFH_REVISION, dfh));
+}
+static DEVICE_ATTR_RO(revision);
+
 static struct attribute *port_err_attrs[] = {
 	&dev_attr_errors.attr,
 	&dev_attr_first_error.attr,
 	&dev_attr_first_malformed_req.attr,
+	&dev_attr_revision.attr,
 	NULL,
 };
 
