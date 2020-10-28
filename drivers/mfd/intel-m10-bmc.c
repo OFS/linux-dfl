@@ -40,6 +40,91 @@ static struct mfd_cell m10bmc_pacn3000_subdevs[] = {
 	{ .name = "n3000bmc-secure" },
 };
 
+static const struct regmap_range n3000_fw_handshake_regs[] = {
+	regmap_reg_range(M10BMC_TELEM_START, M10BMC_TELEM_END),
+};
+
+int m10bmc_fw_state_enter(struct intel_m10bmc *m10bmc,
+			  enum m10bmc_fw_state new_state)
+{
+	int ret = 0;
+
+	if (new_state == M10BMC_FW_STATE_NORMAL)
+		return -EINVAL;
+
+	down_write(&m10bmc->bmcfw_lock);
+
+	if (m10bmc->bmcfw_state == M10BMC_FW_STATE_NORMAL)
+		m10bmc->bmcfw_state = new_state;
+	else if (m10bmc->bmcfw_state != new_state)
+		ret = -EBUSY;
+
+	up_write(&m10bmc->bmcfw_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(m10bmc_fw_state_enter);
+
+void m10bmc_fw_state_exit(struct intel_m10bmc *m10bmc)
+{
+	down_write(&m10bmc->bmcfw_lock);
+
+	m10bmc->bmcfw_state = M10BMC_FW_STATE_NORMAL;
+
+	up_write(&m10bmc->bmcfw_lock);
+}
+EXPORT_SYMBOL_GPL(m10bmc_fw_state_exit);
+
+static bool is_handshake_sys_reg(unsigned int offset)
+{
+	return regmap_reg_in_ranges(offset, n3000_fw_handshake_regs,
+				    ARRAY_SIZE(n3000_fw_handshake_regs));
+}
+
+int m10bmc_sys_read(struct intel_m10bmc *m10bmc, unsigned int offset,
+		    unsigned int *val)
+{
+	int ret;
+
+	if (!is_handshake_sys_reg(offset))
+		return m10bmc_raw_read(m10bmc, M10BMC_SYS_BASE + (offset), val);
+
+	down_read(&m10bmc->bmcfw_lock);
+
+	if (m10bmc->bmcfw_state == M10BMC_FW_STATE_SEC_UPDATE)
+		ret = -EBUSY;
+	else
+		ret = m10bmc_raw_read(m10bmc, M10BMC_SYS_BASE + (offset), val);
+
+	up_read(&m10bmc->bmcfw_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(m10bmc_sys_read);
+
+int m10bmc_sys_update_bits(struct intel_m10bmc *m10bmc, unsigned int offset,
+			   unsigned int msk, unsigned int val)
+{
+	int ret;
+
+	if (!is_handshake_sys_reg(offset))
+		return regmap_update_bits(m10bmc->regmap,
+					  M10BMC_SYS_BASE + (offset), msk, val);
+
+	down_read(&m10bmc->bmcfw_lock);
+
+	if (m10bmc->bmcfw_state == M10BMC_FW_STATE_SEC_UPDATE)
+		ret = -EBUSY;
+	else
+		ret = regmap_update_bits(m10bmc->regmap,
+					 M10BMC_SYS_BASE + (offset), msk, val);
+
+	up_read(&m10bmc->bmcfw_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(m10bmc_sys_update_bits);
+
 static struct regmap_config intel_m10bmc_regmap_config = {
 	.reg_bits = 32,
 	.val_bits = 32,
@@ -167,6 +252,7 @@ static int intel_m10_bmc_spi_probe(struct spi_device *spi)
 	if (!ddata)
 		return -ENOMEM;
 
+	init_rwsem(&ddata->bmcfw_lock);
 	ddata->dev = dev;
 
 	ddata->regmap =
