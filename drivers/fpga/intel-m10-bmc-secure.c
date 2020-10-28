@@ -137,14 +137,96 @@ exit_free:
 	return ret;
 }
 
+#define CSK_BIT_LEN			128U
+#define CSK_32ARRAY_SIZE(_nbits)	DIV_ROUND_UP(_nbits, 32)
+
+static int m10bmc_csk_cancel_nbits(struct fpga_sec_mgr *smgr)
+{
+	return (int)CSK_BIT_LEN;
+}
+
+static int m10bmc_csk_vector(struct fpga_sec_mgr *smgr, u32 addr,
+			     unsigned long *csk_map, unsigned int nbits)
+{
+	unsigned int i, size, arr_size = CSK_32ARRAY_SIZE(nbits);
+	struct m10bmc_sec *sec = smgr->priv;
+	unsigned int stride;
+	__le32 *csk_le32;
+	u32 *csk32;
+	int ret;
+
+	stride = regmap_get_reg_stride(sec->m10bmc->regmap);
+	size = arr_size * sizeof(u32);
+
+	csk32 = vmalloc(size);
+	if (!csk32)
+		return -ENOMEM;
+
+	csk_le32 = vmalloc(size);
+	if (!csk_le32) {
+		vfree(csk32);
+		return -ENOMEM;
+	}
+
+	ret = regmap_bulk_read(sec->m10bmc->regmap, addr, csk_le32, size / stride);
+	if (ret) {
+		dev_err(sec->dev, "failed to read CSK vector: %x cnt %x: %d\n",
+			addr, size / stride, ret);
+		goto vfree_exit;
+	}
+
+	for (i = 0; i < arr_size; i++)
+		csk32[i] = le32_to_cpu(((csk_le32[i])));
+
+	bitmap_from_arr32(csk_map, csk32, nbits);
+	bitmap_complement(csk_map, csk_map, nbits);
+
+vfree_exit:
+	vfree(csk_le32);
+	vfree(csk32);
+	return ret;
+}
+
+#define CSK_VEC_OFFSET 0x34
+
+static int m10bmc_bmc_canceled_csks(struct fpga_sec_mgr *smgr,
+				    unsigned long *csk_map,
+				    unsigned int nbits)
+{
+	return m10bmc_csk_vector(smgr, BMC_PROG_ADDR + CSK_VEC_OFFSET,
+				 csk_map, nbits);
+}
+
+static int m10bmc_sr_canceled_csks(struct fpga_sec_mgr *smgr,
+				   unsigned long *csk_map,
+				   unsigned int nbits)
+{
+	return m10bmc_csk_vector(smgr, SR_PROG_ADDR + CSK_VEC_OFFSET,
+				 csk_map, nbits);
+}
+
+static int m10bmc_pr_canceled_csks(struct fpga_sec_mgr *smgr,
+				   unsigned long *csk_map,
+				   unsigned int nbits)
+{
+	return m10bmc_csk_vector(smgr, PR_PROG_ADDR + CSK_VEC_OFFSET,
+				 csk_map, nbits);
+}
+
 static const struct fpga_sec_mgr_ops m10bmc_sops = {
 	.user_flash_count = m10bmc_user_flash_count,
 	.bmc_root_entry_hash = m10bmc_bmc_reh,
 	.sr_root_entry_hash = m10bmc_sr_reh,
 	.pr_root_entry_hash = m10bmc_pr_reh,
+	.bmc_canceled_csks = m10bmc_bmc_canceled_csks,
+	.sr_canceled_csks = m10bmc_sr_canceled_csks,
+	.pr_canceled_csks = m10bmc_pr_canceled_csks,
 	.bmc_reh_size = m10bmc_bmc_reh_size,
 	.sr_reh_size = m10bmc_sr_reh_size,
 	.pr_reh_size = m10bmc_pr_reh_size,
+	.bmc_canceled_csk_nbits = m10bmc_csk_cancel_nbits,
+	.sr_canceled_csk_nbits = m10bmc_csk_cancel_nbits,
+	.pr_canceled_csk_nbits = m10bmc_csk_cancel_nbits,
 };
 
 static int m10bmc_secure_probe(struct platform_device *pdev)
