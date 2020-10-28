@@ -231,12 +231,11 @@ static enum fpga_sec_err rsu_update_init(struct m10bmc_sec *sec)
 	u32 doorbell, status;
 	int ret;
 
-	ret = regmap_update_bits(sec->m10bmc->regmap,
-				 M10BMC_SYS_BASE + M10BMC_DOORBELL,
-				 DRBL_RSU_REQUEST | DRBL_HOST_STATUS,
-				 DRBL_RSU_REQUEST |
-				 FIELD_PREP(DRBL_HOST_STATUS,
-					    HOST_STATUS_IDLE));
+	ret = m10bmc_sys_update_bits(sec->m10bmc, M10BMC_DOORBELL,
+				     DRBL_RSU_REQUEST | DRBL_HOST_STATUS,
+				     DRBL_RSU_REQUEST |
+				     FIELD_PREP(DRBL_HOST_STATUS,
+						HOST_STATUS_IDLE));
 	if (ret)
 		return FPGA_SEC_ERR_RW_ERROR;
 
@@ -304,11 +303,10 @@ static enum fpga_sec_err rsu_send_data(struct m10bmc_sec *sec)
 	u32 doorbell;
 	int ret;
 
-	ret = regmap_update_bits(sec->m10bmc->regmap,
-				 M10BMC_SYS_BASE + M10BMC_DOORBELL,
-				 DRBL_HOST_STATUS,
-				 FIELD_PREP(DRBL_HOST_STATUS,
-					    HOST_STATUS_WRITE_DONE));
+	ret = m10bmc_sys_update_bits(sec->m10bmc, M10BMC_DOORBELL,
+				     DRBL_HOST_STATUS,
+				     FIELD_PREP(DRBL_HOST_STATUS,
+						HOST_STATUS_WRITE_DONE));
 	if (ret)
 		return FPGA_SEC_ERR_RW_ERROR;
 
@@ -381,11 +379,19 @@ static enum fpga_sec_err m10bmc_sec_prepare(struct fpga_sec_mgr *smgr)
 	if (ret != FPGA_SEC_ERR_NONE)
 		return ret;
 
+	ret = m10bmc_fw_state_enter(sec->m10bmc, M10BMC_FW_STATE_SEC_UPDATE);
+	if (ret)
+		return FPGA_SEC_ERR_BUSY;
+
 	ret = rsu_update_init(sec);
 	if (ret != FPGA_SEC_ERR_NONE)
-		return ret;
+		goto fw_state_exit;
 
-	return rsu_prog_ready(sec);
+	ret = rsu_prog_ready(sec);
+
+fw_state_exit:
+	m10bmc_fw_state_exit(sec->m10bmc);
+	return ret;
 }
 
 static enum fpga_sec_err
@@ -429,29 +435,37 @@ static enum fpga_sec_err m10bmc_sec_poll_complete(struct fpga_sec_mgr *smgr)
 	u32 doorbell;
 	int ret;
 
+	ret = m10bmc_fw_state_enter(sec->m10bmc, M10BMC_FW_STATE_SEC_UPDATE);
+	if (ret)
+		return FPGA_SEC_ERR_BUSY;
+
 	result = rsu_send_data(sec);
 	if (result != FPGA_SEC_ERR_NONE)
-		return result;
+		goto fw_state_exit;
 
 	poll_timeout = jiffies + msecs_to_jiffies(RSU_COMPLETE_TIMEOUT_MS);
 	do {
 		msleep(RSU_COMPLETE_INTERVAL_MS);
 		ret = rsu_check_complete(sec, &doorbell);
-		if (smgr->driver_unload)
-			return FPGA_SEC_ERR_CANCELED;
+		if (smgr->driver_unload) {
+			result = FPGA_SEC_ERR_CANCELED;
+			goto fw_state_exit;
+		}
 	} while (ret == -EAGAIN && !time_after(jiffies, poll_timeout));
 
 	if (ret == -EAGAIN) {
 		log_error_regs(sec, doorbell);
-		return FPGA_SEC_ERR_TIMEOUT;
+		result = FPGA_SEC_ERR_TIMEOUT;
 	} else if (ret == -EIO) {
-		return FPGA_SEC_ERR_RW_ERROR;
+		result = FPGA_SEC_ERR_RW_ERROR;
 	} else if (ret) {
 		log_error_regs(sec, doorbell);
-		return FPGA_SEC_ERR_HW_ERROR;
+		result = FPGA_SEC_ERR_HW_ERROR;
 	}
 
-	return FPGA_SEC_ERR_NONE;
+fw_state_exit:
+	m10bmc_fw_state_exit(sec->m10bmc);
+	return result;
 }
 
 static enum fpga_sec_err m10bmc_sec_cancel(struct fpga_sec_mgr *smgr)
@@ -467,11 +481,10 @@ static enum fpga_sec_err m10bmc_sec_cancel(struct fpga_sec_mgr *smgr)
 	if (rsu_prog(doorbell) != RSU_PROG_READY)
 		return FPGA_SEC_ERR_BUSY;
 
-	ret = regmap_update_bits(sec->m10bmc->regmap,
-				 M10BMC_SYS_BASE + M10BMC_DOORBELL,
-				 DRBL_HOST_STATUS,
-				 FIELD_PREP(DRBL_HOST_STATUS,
-					    HOST_STATUS_ABORT_RSU));
+	ret = m10bmc_sys_update_bits(sec->m10bmc, M10BMC_DOORBELL,
+				     DRBL_HOST_STATUS,
+				     FIELD_PREP(DRBL_HOST_STATUS,
+						HOST_STATUS_ABORT_RSU));
 
 	return ret ? FPGA_SEC_ERR_RW_ERROR : FPGA_SEC_ERR_NONE;
 }
