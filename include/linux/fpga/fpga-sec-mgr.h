@@ -28,6 +28,16 @@ enum fpga_sec_err {
 };
 
 /**
+ * struct image_load - device specific image-load triggers
+ * @name:	    Required: keyword used to enable the trigger
+ * @load_image:	    Required: pointer to the trigger callback function
+ */
+struct image_load {
+	const char *name;
+	int (*load_image)(struct fpga_sec_mgr *smgr);
+};
+
+/**
  * struct fpga_sec_mgr_ops - device specific operations
  * @user_flash_count:	    Optional: Return sysfs string output for FPGA
  *			    image flash count
@@ -63,6 +73,10 @@ enum fpga_sec_err {
  * @get_hw_errinfo:	    Optional: Return u64 hw specific error info.
  *			    The software err_code may used to determine
  *			    whether the hw error info is applicable.
+ * @image_load:		    pointer to array of image_load structures,
+ *			    { } member terminated. These structures describe
+ *			    image load triggers for BMC, FPGA, or firmware
+ *			    images.
  */
 struct fpga_sec_mgr_ops {
 	int (*user_flash_count)(struct fpga_sec_mgr *smgr);
@@ -91,6 +105,7 @@ struct fpga_sec_mgr_ops {
 	void (*cleanup)(struct fpga_sec_mgr *smgr);
 	enum fpga_sec_err (*cancel)(struct fpga_sec_mgr *smgr);
 	u64 (*get_hw_errinfo)(struct fpga_sec_mgr *smgr);
+	struct image_load *image_load;	/* terminated with { } member */
 };
 
 /* Update progress codes */
