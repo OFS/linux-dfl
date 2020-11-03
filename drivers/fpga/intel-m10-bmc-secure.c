@@ -792,7 +792,6 @@ static int m10bmc_secure_probe(struct platform_device *pdev)
 	struct fpga_sec_mgr_ops *sops;
 	struct fpga_sec_mgr *smgr;
 	struct m10bmc_sec *sec;
-	int ret;
 
 	sec = devm_kzalloc(&pdev->dev, sizeof(*sec), GFP_KERNEL);
 	if (!sec)
@@ -809,8 +808,7 @@ static int m10bmc_secure_probe(struct platform_device *pdev)
 	smgr = devm_fpga_sec_mgr_create(sec->dev, "Max10 BMC Secure Update",
 					sops, sec);
 	if (!smgr) {
-		dev_err(sec->dev,
-			"Security manager failed to start: %d\n", ret);
+		dev_err(sec->dev, "Security manager failed to start");
 		return -ENOMEM;
 	}
 
