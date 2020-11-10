@@ -21,6 +21,13 @@
 #define M10BMC_VER_PCB_INFO_MSK		GENMASK(31, 24)
 #define M10BMC_VER_LEGACY_INVALID	0xffffffff
 
+/* Retimer related registers, in system register region */
+#define M10BMC_PKVL_LSTATUS		0x164
+#define M10BMC_PKVL_A_VER		0x254
+#define M10BMC_PKVL_B_VER		0x258
+#define M10BMC_PKVL_SERDES_VER		GENMASK(15, 0)
+#define M10BMC_PKVL_SBUS_VER		GENMASK(31, 16)
+
 /**
  * struct intel_m10bmc - Intel MAX 10 BMC parent driver data structure
  * @dev: this device

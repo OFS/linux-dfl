@@ -17,9 +17,26 @@ enum m10bmc_type {
 	M10_N3000,
 };
 
+static struct resource retimer0_resources[] = {
+	{M10BMC_PKVL_A_VER, M10BMC_PKVL_A_VER, "version", IORESOURCE_REG, },
+};
+
+static struct resource retimer1_resources[] = {
+	{M10BMC_PKVL_B_VER, M10BMC_PKVL_B_VER, "version", IORESOURCE_REG, },
+};
+
 static struct mfd_cell m10bmc_pacn3000_subdevs[] = {
 	{ .name = "n3000bmc-hwmon" },
-	{ .name = "n3000bmc-retimer" },
+	{
+		.name = "n3000bmc-retimer",
+		.num_resources = ARRAY_SIZE(retimer0_resources),
+		.resources = retimer0_resources,
+	},
+	{
+		.name = "n3000bmc-retimer",
+		.num_resources = ARRAY_SIZE(retimer1_resources),
+		.resources = retimer1_resources,
+	},
 	{ .name = "n3000bmc-secure" },
 };
 

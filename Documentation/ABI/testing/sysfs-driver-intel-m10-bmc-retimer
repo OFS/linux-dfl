@@ -1,0 +1,32 @@
+What:		/sys/bus/platform/devices/n3000bmc-retimer.*.auto/tag
+Date:		Nov 2020
+KernelVersion:	5.11
+Contact:	Xu Yilun <yilun.xu@intel.com>
+Description:	Read only. Returns the tag of the retimer chip. Now there are 2
+		retimer chips on Intel PAC N3000, they are tagged as
+		'retimer_A' and 'retimer_B'.
+		Format: "retimer_%c".
+
+What:		/sys/bus/platform/devices/n3000bmc-retimer.*.auto/sbus_version
+Date:		Nov 2020
+KernelVersion:	5.11
+Contact:	Xu Yilun <yilun.xu@intel.com>
+Description:	Read only. Returns the Transceiver bus firmware version of
+		the retimer chip.
+		Format: "0x%04x".
+
+What:		/sys/bus/platform/devices/n3000bmc-retimer.*.auto/serdes_version
+Date:		Nov 2020
+KernelVersion:	5.11
+Contact:	Xu Yilun <yilun.xu@intel.com>
+Description:	Read only. Returns the SERDES firmware version of the retimer
+		chip.
+		Format: "0x%04x".
+
+What:		/sys/bus/platform/devices/n3000bmc-retimer.*.auto/link_statusX
+Date:		Nov 2020
+KernelVersion:  5.11
+Contact:	Xu Yilun <yilun.xu@intel.com>
+Description:	Read only. Returns the status of each line side link. "1" for
+		link up, "0" for link down.
+		Format: "%u".
