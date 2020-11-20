@@ -321,6 +321,37 @@ struct regmap *dfl_indirect_regmap_init(struct device *dev, void __iomem *base, 
 }
 EXPORT_SYMBOL_GPL(dfl_indirect_regmap_init);
 
+static const struct regmap_bus indirect_bus = {
+	.fast_io = true,
+	.reg_write = dfl_indirect_bus_reg_write,
+	.reg_read =  dfl_indirect_bus_reg_read,
+};
+
+/**
+ * devm_regmap_init_indirect_register - create a regmap for indirect register access
+ * @dev: device creating the regmap
+ * @base: __iomem point to base of memory with mailbox
+ * @cfg: regmap_config describing interface
+ *
+ * Return: 0 on success, negative error code otherwise.
+ */
+struct regmap *devm_regmap_init_indirect_register(struct device *dev,
+		void __iomem *base, struct regmap_config *cfg)
+{
+	struct dfl_indirect_ctx *ctx;
+
+	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
+
+	if (!ctx)
+		return NULL;
+
+	ctx->base = base;
+	ctx->dev = dev;
+
+	return devm_regmap_init(dev, &indirect_bus, ctx, cfg);
+}
+EXPORT_SYMBOL_GPL(devm_regmap_init_indirect_register);
+
 MODULE_DESCRIPTION("DFL mailbox regmap support");
 MODULE_AUTHOR("Intel Corporation");
 MODULE_LICENSE("GPL v2");

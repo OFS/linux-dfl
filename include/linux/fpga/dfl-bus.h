@@ -68,7 +68,10 @@ struct dfl_driver {
 int dfl_dev_get_vendor_net_cfg(struct dfl_device *dfl_dev);
 struct device *dfl_dev_get_base_dev(struct dfl_device *dfl_dev);
 
-struct regmap *dfl_indirect_regmap_init(struct device *dev, void __iomem *base, unsigned int off);
+struct regmap *dfl_indirect_regmap_init(struct device *dev, void __iomem *base,
+					unsigned int off);
+struct regmap *devm_regmap_init_indirect_register(struct device *dev,
+		void __iomem *base, struct regmap_config *cfg);
 
 struct dfl_regmap_debug {
 	struct regmap *map;
