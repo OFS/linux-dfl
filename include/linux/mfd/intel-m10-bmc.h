@@ -252,7 +252,8 @@ void m10bmc_fw_state_exit(struct intel_m10bmc *m10bmc);
 /* Supported MAX10 BMC types */
 enum m10bmc_type {
 	M10_N3000,
-	M10_D5005
+	M10_D5005,
+	M10_N5010, /* Silicom Lightning Creek */
 };
 
 /* M10BMC system sub devices for PAC N3000 */
