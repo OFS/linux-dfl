@@ -26,6 +26,9 @@ static struct mfd_cell m10bmc_bmc_subdevs[] = {
 };
 
 static struct mfd_cell m10bmc_n5010_bmc_subdevs[] = {
+	{
+		.name = "n5010bmc-hwmon",
+	},
 };
 
 static struct intel_m10bmc_pkvl_pdata pkvl_platdata;
