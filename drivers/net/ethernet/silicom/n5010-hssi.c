@@ -372,6 +372,12 @@ enum n5010_hssi_regmap {
 	regmap_phy,
 };
 
+#ifndef devm_regmap_init_indirect_register
+struct regmap *devm_regmap_init_indirect_register(struct device *dev,
+						  void __iomem *base,
+						  struct regmap_config *cfg);
+#endif
+
 static struct regmap *n5010_hssi_create_regmap(struct n5010_hssi_drvdata *priv,
 					       u64 port,
 					       enum n5010_hssi_regmap type)
