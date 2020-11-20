@@ -27,6 +27,8 @@
 #define FME_FEATURE_ID_MAX10_SPI	0xe
 #define FME_FEATURE_REV_MAX10_SPI_N5010	0x1
 
+#define FME_FEATURE_ID_MAX10_SPI_N5010	0x1e
+
 struct dfl_altera_spi {
 	void __iomem *base;
 	struct regmap *regmap;
@@ -190,7 +192,8 @@ static int dfl_spi_altera_probe(struct dfl_device *dfl_dev)
 	if (IS_ERR(aspi->regmap))
 		return PTR_ERR(aspi->regmap);
 
-	if (dfl_feature_revision(aspi->base) == FME_FEATURE_REV_MAX10_SPI_N5010)
+	if (dfl_feature_revision(aspi->base) == FME_FEATURE_REV_MAX10_SPI_N5010 ||
+	    dfl_dev->feature_id == FME_FEATURE_ID_MAX10_SPI_N5010)
 		aspi->altr_spi = create_cntrl(dev, aspi->base, &m10_n5010_bmc_info);
 	else
 		aspi->altr_spi = create_cntrl(dev, aspi->base, &m10_bmc_info);
@@ -215,6 +218,7 @@ static int dfl_spi_altera_remove(struct dfl_device *dfl_dev)
 
 static const struct dfl_device_id dfl_spi_altera_ids[] = {
 	{ FME_ID, FME_FEATURE_ID_MAX10_SPI },
+	{ FME_ID, FME_FEATURE_ID_MAX10_SPI_N5010 },
 	{ }
 };
 
