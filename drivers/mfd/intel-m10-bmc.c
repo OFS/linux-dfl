@@ -43,6 +43,7 @@ static struct mfd_cell m10bmc_pacn3000_subdevs[] = {
 
 static struct mfd_cell m10bmc_n5010_bmc_subdevs[] = {
 	{ .name = "n5010bmc-hwmon" },
+	{ .name = "n5010bmc-secure" },
 };
 
 static const struct regmap_range n3000_fw_handshake_regs[] = {
