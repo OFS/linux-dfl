@@ -31,6 +31,9 @@
 #define MB_BASE_OFF		0x28
 
 #define PHY_BASE_OFF		0x2000
+#define PHY_RX_LOCKED_OFF	0x480
+#define PHY_RX_LOCKED_DATA	(BIT(0) | BIT(1))
+
 #define PHY_RX_SER_LOOP_BACK	0x4e1
 #define PHY_MAX_OFF		0x541
 
@@ -45,15 +48,29 @@
 #define ILL_100G_RX_STATS_CLR	0x945
 
 #define ILL_100G_PHY_BASE_OFF	0x300
-#define ILL_100G_PHY_MAX_OFF	0x3ff
+#define ILL_100G_RX_PCS_ALN_OFF	0x326
+#define ILL_100G_RX_RCS_ALIGNED BIT(0)
+
 #define ILL_100G_LPBK_OFF	0x313
 #define ILL_100G_LPBK_EN_VAL	0xffff
+
+#define ILL_100G_PHY_MAX_OFF	0x3ff
+
+#define ILL_100G_TX_FEC_OFF	0xc00
+#define ILL_100G_TX_FEC_MAX_OFF	0xc07
+
+#define ILL_100G_RX_FEC_OFF	0xd00
+#define ILL_100G_RX_FEC_ST	0xd06
+#define ILL_100G_RX_FEC_ST_ALN	BIT(4)
+#define ILL_100G_RX_FEC_MAX_OFF	0xd08
 
 #define STATS_CLR_INT_US		1
 #define STATS_CLR_INT_TIMEOUT_US	1000
 
 struct s10hssi_drvdata {
 	struct net_device *netdev;
+	struct timer_list poll_timer;
+	struct work_struct poll_workq;
 };
 
 struct s10hssi_ops_params {
@@ -63,13 +80,46 @@ struct s10hssi_ops_params {
 	u32 rx_clr_off;
 	u32 lpbk_off;
 	u32 lpbk_en_val;
+	u32 link_off;
+	u32 link_mask;
 };
 
 struct s10hssi_netdata {
 	struct dfl_device *dfl_dev;
 	struct regmap *regmap;
-	const struct s10hssi_ops_params *ops_params;
+	struct s10hssi_ops_params *ops_params;
+	u32 link_status;
 };
+
+static void poll_work(struct work_struct *arg)
+{
+	struct s10hssi_netdata *npriv;
+	struct s10hssi_drvdata *priv;
+	u32 link_status = 0;
+
+	priv = container_of(arg, struct s10hssi_drvdata, poll_workq);
+	npriv = netdev_priv(priv->netdev);
+
+	regmap_read(npriv->regmap, npriv->ops_params->link_off, &link_status);
+	link_status &= npriv->ops_params->link_mask;
+	if (link_status != npriv->link_status) {
+		npriv->link_status = link_status;
+		dev_dbg(&priv->netdev->dev, "link state: %u\n", link_status);
+
+		if (link_status == npriv->ops_params->link_mask)
+			netif_carrier_on(priv->netdev);
+		else
+			netif_carrier_off(priv->netdev);
+	}
+}
+
+static void poll_timerf(struct timer_list *timer_arg)
+{
+	struct s10hssi_drvdata *priv = from_timer(priv, timer_arg, poll_timer);
+
+	schedule_work(&priv->poll_workq);
+	mod_timer(&priv->poll_timer, jiffies + msecs_to_jiffies(1000));
+}
 
 static int netdev_change_mtu(struct net_device *netdev, int new_mtu)
 {
@@ -296,6 +346,8 @@ static const struct s10hssi_ops_params s10hssi_params = {
 	.rx_clr_off = ILL_10G_RX_STATS_CLR,
 	.lpbk_off = PHY_BASE_OFF + PHY_RX_SER_LOOP_BACK,
 	.lpbk_en_val = 1,
+	.link_off = PHY_BASE_OFF + PHY_RX_LOCKED_OFF,
+	.link_mask = PHY_RX_LOCKED_DATA,
 };
 
 static const struct regmap_range regmap_range_10g[] = {
@@ -384,6 +436,8 @@ static const struct s10hssi_ops_params intel_ll_100g_params = {
 static const struct regmap_range regmap_range_100g[] = {
 	regmap_reg_range(ILL_100G_PHY_BASE_OFF, ILL_100G_PHY_MAX_OFF),
 	regmap_reg_range(ILL_100G_BASE_OFF, ILL_100G_MAX_OFF),
+	regmap_reg_range(ILL_100G_TX_FEC_OFF, ILL_100G_TX_FEC_MAX_OFF),
+	regmap_reg_range(ILL_100G_RX_FEC_OFF, ILL_100G_RX_FEC_MAX_OFF),
 };
 
 static const struct regmap_access_table access_table_100g = {
@@ -448,16 +502,30 @@ static int s10hssi_mac_probe(struct dfl_device *dfl_dev)
 
 	if (pcs_speed == CAP_RATE_10G) {
 		dev_info(dev, "%s found 10G\n", __func__);
-		npriv->ops_params = &s10hssi_params;
+		npriv->ops_params = (struct s10hssi_ops_params *)&s10hssi_params;
 		cfg.wr_table = &access_table_10g;
 		cfg.rd_table = &access_table_10g;
 		cfg.max_register = PHY_BASE_OFF + PHY_MAX_OFF;
 	} else if (pcs_speed == CAP_RATE_100G) {
 		dev_info(dev, "%s found 100G\n", __func__);
-		npriv->ops_params = &intel_ll_100g_params;
+		npriv->ops_params = devm_kmalloc(dev, sizeof(*npriv->ops_params), GFP_KERNEL);
+		if (!npriv->ops_params)
+			return -ENOMEM;
+
+		*npriv->ops_params = intel_ll_100g_params;
+		if (FIELD_GET(CAP_CONTAINS_FEC, val)) {
+			dev_info(dev, "%s contains FEC\n", __func__);
+			npriv->ops_params->link_off = ILL_100G_RX_FEC_ST;
+			npriv->ops_params->link_mask = ILL_100G_RX_FEC_ST_ALN;
+		} else {
+			dev_info(dev, "%s no FEC\n", __func__);
+			npriv->ops_params->link_off = ILL_100G_RX_PCS_ALN_OFF;
+			npriv->ops_params->link_mask = ILL_100G_RX_RCS_ALIGNED;
+		}
+
 		cfg.wr_table = &access_table_100g;
 		cfg.rd_table = &access_table_100g;
-		cfg.max_register = ILL_100G_MAX_OFF;
+		cfg.max_register = ILL_100G_RX_FEC_MAX_OFF;
 	} else {
 		dev_err(dev, "%s unsupported pcs data rate 0x%llx\n",
 			__func__, pcs_speed);
@@ -490,6 +558,13 @@ static int s10hssi_mac_probe(struct dfl_device *dfl_dev)
 		dev_err(&dfl_dev->dev, "failed to register %s: %d",
 			priv->netdev->name, ret);
 
+	dev_info(&dfl_dev->dev, "setting carrier off\n");
+	netif_carrier_off(priv->netdev);
+
+	INIT_WORK(&priv->poll_workq, poll_work);
+	timer_setup(&priv->poll_timer, poll_timerf, 0);
+	mod_timer(&priv->poll_timer, jiffies + msecs_to_jiffies(1000));
+
 	return ret;
 }
 
@@ -498,6 +573,8 @@ static void s10hssi_mac_remove(struct dfl_device *dfl_dev)
 	struct s10hssi_drvdata *priv = dev_get_drvdata(&dfl_dev->dev);
 
 	unregister_netdev(priv->netdev);
+
+	del_timer_sync(&priv->poll_timer);
 }
 
 #define FME_FEATURE_ID_LL_10G_MAC 0xf
