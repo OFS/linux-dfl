@@ -61,6 +61,13 @@ config SFP
 	depends on HWMON || HWMON=n
 	select MDIO_I2C
 
+config QSFP_MEM
+	tristate "Memory based QSFP support"
+	depends on HWMON || HWMON=n
+	help
+	  Adds support for a QSFP controller that shadows the QSFP module's
+	  memory pages in memory.
+
 comment "MII PHY device drivers"
 
 config AMD_PHY
