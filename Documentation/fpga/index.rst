@@ -9,6 +9,7 @@ fpga
 
     dfl
     dfl-n3000-nios
+    fpga-sec-mgr
 
 .. only::  subproject and html
 
