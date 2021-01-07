@@ -573,6 +573,8 @@ static void s10hssi_mac_remove(struct dfl_device *dfl_dev)
 	struct s10hssi_drvdata *priv = dev_get_drvdata(&dfl_dev->dev);
 
 	unregister_netdev(priv->netdev);
+
+	del_timer_sync(&priv->poll_timer);
 }
 
 #define FME_FEATURE_ID_LL_10G_MAC 0xf
