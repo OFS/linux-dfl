@@ -1694,6 +1694,8 @@ int dfl_fpga_cdev_config_ports_vf(struct dfl_fpga_cdev *cdev, int num_vfs)
 	int ret = 0;
 
 	mutex_lock(&cdev->lock);
+	if (list_empty(&cdev->port_dev_list))
+		goto done;
 	/*
 	 * can't turn multiple ports into 1 VF device, only 1 port for 1 VF
 	 * device, so if released port number doesn't match VF device number,
