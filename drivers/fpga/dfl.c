@@ -1886,6 +1886,8 @@ int dfl_fpga_cdev_config_ports_vf(struct dfl_fpga_cdev *cdev, int num_vfs)
 	int ret = 0, port_count = 0;
 
 	mutex_lock(&cdev->lock);
+	if (list_empty(&cdev->port_dev_list))
+		goto done;
 
 	list_for_each_entry(fdata, &cdev->port_dev_list, node) {
 		if (fdata->dev)
