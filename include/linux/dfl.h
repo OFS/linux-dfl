@@ -83,4 +83,6 @@ void dfl_driver_unregister(struct dfl_driver *dfl_drv);
 	module_driver(__dfl_driver, dfl_driver_register, \
 		      dfl_driver_unregister)
 
+struct device *dfl_dev_get_base_dev(struct dfl_device *dfl_dev);
+
 #endif /* __LINUX_DFL_H */
