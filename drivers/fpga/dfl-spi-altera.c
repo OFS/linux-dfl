@@ -22,6 +22,11 @@
 #include <linux/spi/altera.h>
 #include <linux/dfl.h>
 
+#include "dfl.h"
+
+#define FME_FEATURE_ID_MAX10_SPI	0xe
+#define FME_FEATURE_REV_MAX10_SPI_N5010	0x1
+
 struct dfl_altera_spi {
 	void __iomem *base;
 	struct regmap *regmap;
@@ -117,6 +122,13 @@ static struct spi_board_info m10_bmc_info = {
 	.chip_select = 0,
 };
 
+static struct spi_board_info m10_n5010_bmc_info = {
+	.modalias = "m10-n5010",
+	.max_speed_hz = 12500000,
+	.bus_num = 0,
+	.chip_select = 0,
+};
+
 static struct platform_device *create_cntrl(struct device *dev,
 					    void __iomem *base,
 					    struct spi_board_info *m10_info)
@@ -180,7 +192,10 @@ static int dfl_spi_altera_probe(struct dfl_device *dfl_dev)
 	if (IS_ERR(aspi->regmap))
 		return PTR_ERR(aspi->regmap);
 
-	aspi->altr_spi = create_cntrl(dev, aspi->base, &m10_bmc_info);
+	if (dfl_feature_revision(aspi->base) == FME_FEATURE_REV_MAX10_SPI_N5010)
+		aspi->altr_spi = create_cntrl(dev, aspi->base, &m10_n5010_bmc_info);
+	else
+		aspi->altr_spi = create_cntrl(dev, aspi->base, &m10_bmc_info);
 
 	if (IS_ERR(aspi->altr_spi)) {
 		dev_err(dev, "%s failed to create spi platform driver\n",
@@ -197,8 +212,6 @@ static void dfl_spi_altera_remove(struct dfl_device *dfl_dev)
 
 	platform_device_unregister(aspi->altr_spi);
 }
-
-#define FME_FEATURE_ID_MAX10_SPI        0xe
 
 static const struct dfl_device_id dfl_spi_altera_ids[] = {
 	{ FME_ID, FME_FEATURE_ID_MAX10_SPI },
