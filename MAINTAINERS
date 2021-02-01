@@ -16243,6 +16243,12 @@ S:	Maintained
 F:	drivers/input/touchscreen/silead.c
 F:	drivers/platform/x86/touchscreen_dmi.c
 
+SILICOM PAC N5010 DRIVER
+M:	Esa Leskinen <ele@silicom.dk>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	drivers/net/ethernet/silicom/n5010-phy.c
+
 SILICON LABS WIRELESS DRIVERS (for WFxxx series)
 M:	Jérôme Pouiller <jerome.pouiller@silabs.com>
 S:	Supported

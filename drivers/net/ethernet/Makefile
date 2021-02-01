@@ -78,6 +78,7 @@ obj-$(CONFIG_NET_VENDOR_ROCKER) += rocker/
 obj-$(CONFIG_NET_VENDOR_SAMSUNG) += samsung/
 obj-$(CONFIG_NET_VENDOR_SEEQ) += seeq/
 obj-$(CONFIG_NET_VENDOR_SILAN) += silan/
+obj-$(CONFIG_NET_VENDOR_SILICOM) += silicom/
 obj-$(CONFIG_NET_VENDOR_SIS) += sis/
 obj-$(CONFIG_NET_VENDOR_SOLARFLARE) += sfc/
 obj-$(CONFIG_NET_VENDOR_SGI) += sgi/
