@@ -792,6 +792,10 @@ static const struct platform_device_id intel_m10bmc_secure_ids[] = {
 		.name = "d5005bmc-secure",
 		.driver_data = (unsigned long)M10_D5005,
 	},
+	{
+		.name = "n5010bmc-secure",
+		.driver_data = (unsigned long)M10_N5010,
+	},
 	{ }
 };
 
