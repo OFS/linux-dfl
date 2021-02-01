@@ -40,6 +40,7 @@ static const struct regmap_range n3000_fw_handshake_regs[] = {
 
 static struct mfd_cell m10bmc_n5010_subdevs[] = {
 	{ .name = "n5010bmc-hwmon" },
+	{ .name = "n5010bmc-sec-update" },
 };
 
 static const struct regmap_range n5010_fw_handshake_regs[] = {
