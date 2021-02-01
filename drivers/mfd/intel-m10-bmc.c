@@ -49,6 +49,12 @@ static const struct regmap_range n3000_fw_handshake_regs[] = {
 	regmap_reg_range(M10BMC_N3000_TELEM_START, M10BMC_N3000_TELEM_END),
 };
 
+static struct mfd_cell m10bmc_n5010_bmc_subdevs[] = {};
+
+static const struct regmap_range n5010_fw_handshake_regs[] = {
+	regmap_reg_range(M10BMC_N5010_TELEM_START, M10BMC_N5010_TELEM_END),
+};
+
 int m10bmc_fw_state_enter(struct intel_m10bmc *m10bmc,
 			  enum m10bmc_fw_state new_state)
 {
@@ -304,6 +310,13 @@ static int intel_m10_bmc_spi_probe(struct spi_device *spi)
 		ddata->handshake_sys_reg_nranges =
 			ARRAY_SIZE(d5005_fw_handshake_regs);
 		break;
+	case M10_N5010:
+		cells = m10bmc_n5010_bmc_subdevs;
+		n_cell = ARRAY_SIZE(m10bmc_n5010_bmc_subdevs);
+		ddata->handshake_sys_reg_ranges = n5010_fw_handshake_regs;
+		ddata->handshake_sys_reg_nranges =
+			ARRAY_SIZE(n5010_fw_handshake_regs);
+		break;
 	default:
 		return -ENODEV;
 	}
@@ -319,6 +332,7 @@ static int intel_m10_bmc_spi_probe(struct spi_device *spi)
 static const struct spi_device_id m10bmc_spi_id[] = {
 	{ "m10-n3000", M10_N3000 },
 	{ "m10-d5005", M10_D5005 },
+	{ "m10-n5010", M10_N5010 },
 	{ }
 };
 MODULE_DEVICE_TABLE(spi, m10bmc_spi_id);
