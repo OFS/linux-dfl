@@ -24,4 +24,14 @@ config N5010_PHY
 	  and a side-fpga running the board management controller (bmc). This driver
 	  reads status bits and controls link LEDs via the bmc.
 
+config N5010_HSSI
+	tristate "Control Plane Driver for Silicom PAC N5010 HSSI"
+	select N5010_PHY
+	select REGMAP_INDIRECT_REGISTER
+	help
+	  This driver provides control plane support for the Silicom N5010
+	  Programmable Acceleration Card. This driver adds network interfaces
+	  for the line-side QFSP modules, supporting various control/status
+	  operations.
+
 endif # NET_VENDOR_SILICOM
