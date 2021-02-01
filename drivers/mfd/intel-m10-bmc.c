@@ -49,7 +49,9 @@ static const struct regmap_range n3000_fw_handshake_regs[] = {
 	regmap_reg_range(M10BMC_N3000_TELEM_START, M10BMC_N3000_TELEM_END),
 };
 
-static struct mfd_cell m10bmc_n5010_bmc_subdevs[] = {};
+static struct mfd_cell m10bmc_n5010_bmc_subdevs[] = {
+	{ .name = "n5010bmc-hwmon" },
+};
 
 static const struct regmap_range n5010_fw_handshake_regs[] = {
 	regmap_reg_range(M10BMC_N5010_TELEM_START, M10BMC_N5010_TELEM_END),
