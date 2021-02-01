@@ -133,6 +133,7 @@ static const struct regmap_range m10bmc_n3000_fw_handshake_regs[] = {
 
 static struct mfd_cell m10bmc_n5010_subdevs[] = {
 	{ .name = "n5010bmc-hwmon" },
+	{ .name = "n5010bmc-sec-update" },
 };
 
 static const struct intel_m10bmc_platform_info m10bmc_spi_n3000 = {
