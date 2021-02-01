@@ -1125,6 +1125,10 @@ static const struct platform_device_id intel_m10bmc_sec_ids[] = {
 		.driver_data = (kernel_ulong_t)&m10sec_d5005_ops,
 	},
 	{
+		.name = "n5010bmc-sec-update",
+		.driver_data = (kernel_ulong_t)&m10sec_d5005_ops,
+	},
+	{
 		.name = "n6000bmc-sec-update",
 		.driver_data = (kernel_ulong_t)&m10sec_n6000_ops,
 	},
