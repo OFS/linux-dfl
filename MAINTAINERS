@@ -16247,6 +16247,7 @@ SILICOM PAC N5010 DRIVER
 M:	Esa Leskinen <ele@silicom.dk>
 L:	netdev@vger.kernel.org
 S:	Maintained
+F:	drivers/net/ethernet/silicom/n5010-hssi.c
 F:	drivers/net/ethernet/silicom/n5010-phy.c
 
 SILICON LABS WIRELESS DRIVERS (for WFxxx series)
