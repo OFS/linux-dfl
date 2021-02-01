@@ -60,8 +60,6 @@ static void cci_pci_free_irq(struct pci_dev *pcidev)
 	pci_free_irq_vectors(pcidev);
 }
 
-/* PCI Vendor ID */
-#define PCI_VENDOR_ID_SILICOM		0x1c2c
 /* PCI Device ID */
 #define PCIE_DEVICE_ID_PF_INT_5_X		0xBCBD
 #define PCIE_DEVICE_ID_PF_INT_6_X		0xBCC0
