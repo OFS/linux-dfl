@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Silicom network device configuration
+#
+
+config NET_VENDOR_SILICOM
+	bool "Silicom devices"
+	default y
+	help
+	  If you have a network (Ethernet) card belonging to this class, say Y.
+
+	  Note that the answer to this question doesn't directly affect the
+	  kernel: saying N will just cause the configurator to skip all
+	  the questions about Silicom cards. If you say Y, you will be asked for
+	  your specific card in the following questions.
+
+if NET_VENDOR_SILICOM
+
+config N5010_PHY
+	tristate "Fixed Phy Driver for Silicom PAC N5010"
+	depends on MFD_INTEL_M10_BMC && FIXED_PHY
+	help
+	  The n5010 card consists of a primary FPGA running the network controller,
+	  and a side-fpga running the board management controller (bmc). This driver
+	  reads status bits and controls link LEDs via the bmc.
+
+endif # NET_VENDOR_SILICOM
