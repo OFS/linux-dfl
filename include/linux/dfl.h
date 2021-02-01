@@ -135,4 +135,6 @@ static inline u8 dfl_feature_revision(void __iomem *base)
 	return (u8)FIELD_GET(DFH_REVISION, readq(base + DFH));
 }
 
+struct device *dfl_dev_get_base_dev(struct dfl_device *dfl_dev);
+
 #endif /* __LINUX_DFL_H */
