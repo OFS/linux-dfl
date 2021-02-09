@@ -83,6 +83,8 @@ enum m10bmc_type {
 /* Telemetry registers */
 #define M10BMC_N3000_TELEM_START	0x100
 #define M10BMC_N3000_TELEM_END		0x250
+#define M10BMC_D5005_TELEM_START	0x100
+#define M10BMC_D5005_TELEM_END		0x300
 
 /* Secure update doorbell register, in system register region */
 #define M10BMC_DOORBELL			0x400
@@ -195,6 +197,8 @@ struct intel_m10bmc {
 	struct regmap *regmap;
 	struct rw_semaphore bmcfw_lock;
 	enum m10bmc_fw_state bmcfw_state;
+	const struct regmap_range *handshake_sys_reg_ranges;
+	unsigned int handshake_sys_reg_nranges;
 };
 
 /*
