@@ -22,6 +22,10 @@ static struct mfd_cell m10bmc_bmc_subdevs[] = {
 	{ .name = "d5005bmc-hwmon" },
 };
 
+static const struct regmap_range d5005_fw_handshake_regs[] = {
+	regmap_reg_range(M10BMC_D5005_TELEM_START, M10BMC_D5005_TELEM_END),
+};
+
 static struct resource retimer0_resources[] = {
 	{M10BMC_PKVL_A_VER, M10BMC_PKVL_A_VER, "version", IORESOURCE_REG, },
 };
@@ -80,10 +84,11 @@ void m10bmc_fw_state_exit(struct intel_m10bmc *m10bmc)
 }
 EXPORT_SYMBOL_GPL(m10bmc_fw_state_exit);
 
-static bool is_handshake_sys_reg(unsigned int offset)
+static bool is_handshake_sys_reg(struct intel_m10bmc *m10bmc,
+				 unsigned int offset)
 {
-	return regmap_reg_in_ranges(offset, n3000_fw_handshake_regs,
-				    ARRAY_SIZE(n3000_fw_handshake_regs));
+	return regmap_reg_in_ranges(offset, m10bmc->handshake_sys_reg_ranges,
+				    m10bmc->handshake_sys_reg_nranges);
 }
 
 int m10bmc_sys_read(struct intel_m10bmc *m10bmc, unsigned int offset,
@@ -91,7 +96,7 @@ int m10bmc_sys_read(struct intel_m10bmc *m10bmc, unsigned int offset,
 {
 	int ret;
 
-	if (!is_handshake_sys_reg(offset))
+	if (!is_handshake_sys_reg(m10bmc, offset))
 		return m10bmc_raw_read(m10bmc, M10BMC_SYS_BASE + (offset), val);
 
 	down_read(&m10bmc->bmcfw_lock);
@@ -112,7 +117,7 @@ int m10bmc_sys_update_bits(struct intel_m10bmc *m10bmc, unsigned int offset,
 {
 	int ret;
 
-	if (!is_handshake_sys_reg(offset))
+	if (!is_handshake_sys_reg(m10bmc, offset))
 		return regmap_update_bits(m10bmc->regmap,
 					  M10BMC_SYS_BASE + (offset), msk, val);
 
@@ -280,10 +285,16 @@ static int intel_m10_bmc_spi_probe(struct spi_device *spi)
 	case M10_N3000:
 		cells = m10bmc_pacn3000_subdevs;
 		n_cell = ARRAY_SIZE(m10bmc_pacn3000_subdevs);
+		ddata->handshake_sys_reg_ranges = n3000_fw_handshake_regs;
+		ddata->handshake_sys_reg_nranges =
+			ARRAY_SIZE(n3000_fw_handshake_regs);
 		break;
 	case M10_D5005:
 		cells = m10bmc_bmc_subdevs;
 		n_cell = ARRAY_SIZE(m10bmc_bmc_subdevs);
+		ddata->handshake_sys_reg_ranges = d5005_fw_handshake_regs;
+		ddata->handshake_sys_reg_nranges =
+			ARRAY_SIZE(d5005_fw_handshake_regs);
 		break;
 	default:
 		return -ENODEV;
