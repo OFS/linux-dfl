@@ -349,7 +349,6 @@ static int rsu_check_complete(struct m10bmc_sec *sec, u32 *doorbell)
 	case RSU_STAT_NIOS_OK:
 	case RSU_STAT_USER_OK:
 	case RSU_STAT_FACTORY_OK:
-	case RSU_STAT_WEAROUT:
 		break;
 	default:
 		return -EINVAL;
