@@ -413,7 +413,8 @@ m10bmc_sec_write_blk(struct fpga_sec_mgr *smgr, u32 offset, u32 size)
 
 	ret = regmap_bulk_write(sec->m10bmc->regmap,
 				M10BMC_STAGING_BASE + offset,
-				(void *)smgr->data + offset, size / stride);
+				(void *)smgr->data + offset,
+				(size + stride - 1) / stride);
 
 	return ret ? FPGA_SEC_ERR_RW_ERROR : FPGA_SEC_ERR_NONE;
 }
