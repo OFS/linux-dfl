@@ -25,124 +25,6 @@ struct fpga_sec_mgr_devres {
 
 #define to_sec_mgr(d) container_of(d, struct fpga_sec_mgr, dev)
 
-static ssize_t
-show_canceled_csk(struct fpga_sec_mgr *smgr,
-		  int (*get_csk)(struct fpga_sec_mgr *smgr,
-				 unsigned long *csk_map, unsigned int nbits),
-		  int (*get_csk_nbits)(struct fpga_sec_mgr *smgr),
-		  char *buf)
-{
-	unsigned long *csk_map = NULL;
-	unsigned int nbits;
-	int ret;
-
-	ret = get_csk_nbits(smgr);
-	if (ret < 0)
-		return ret;
-
-	nbits = (unsigned int)ret;
-	csk_map = vmalloc(sizeof(unsigned long) * BITS_TO_LONGS(nbits));
-	if (!csk_map)
-		return -ENOMEM;
-
-	ret = get_csk(smgr, csk_map, nbits);
-	if (ret)
-		goto vfree_exit;
-
-	ret = bitmap_print_to_pagebuf(1, buf, csk_map, nbits);
-
-vfree_exit:
-	vfree(csk_map);
-	return ret;
-}
-
-static ssize_t
-show_root_entry_hash(struct fpga_sec_mgr *smgr,
-		     int (*get_reh)(struct fpga_sec_mgr *smgr, u8 *hash,
-				    unsigned int size),
-		     int (*get_reh_size)(struct fpga_sec_mgr *smgr),
-		     char *buf)
-{
-	int size, i, cnt, ret;
-	u8 *hash;
-
-	ret = get_reh_size(smgr);
-	if (ret < 0)
-		return ret;
-	else if (!ret)
-		return sysfs_emit(buf, "hash not programmed\n");
-
-	size = ret;
-	hash = vmalloc(size);
-	if (!hash)
-		return -ENOMEM;
-
-	ret = get_reh(smgr, hash, size);
-	if (ret)
-		goto vfree_exit;
-
-	cnt = sprintf(buf, "0x");
-	for (i = 0; i < size; i++)
-		cnt += sprintf(buf + cnt, "%02x", hash[i]);
-	cnt += sprintf(buf + cnt, "\n");
-
-vfree_exit:
-	vfree(hash);
-	return ret ? : cnt;
-}
-
-#define DEVICE_ATTR_SEC_CSK(_name) \
-static ssize_t _name##_canceled_csks_show(struct device *dev, \
-					  struct device_attribute *attr, \
-					  char *buf) \
-{ \
-	struct fpga_sec_mgr *smgr = to_sec_mgr(dev); \
-	return show_canceled_csk(smgr, \
-	       smgr->sops->_name##_canceled_csks, \
-	       smgr->sops->_name##_canceled_csk_nbits, buf); \
-} \
-static DEVICE_ATTR_RO(_name##_canceled_csks)
-
-#define DEVICE_ATTR_SEC_ROOT_ENTRY_HASH(_name) \
-static ssize_t _name##_root_entry_hash_show(struct device *dev, \
-				     struct device_attribute *attr, \
-				     char *buf) \
-{ \
-	struct fpga_sec_mgr *smgr = to_sec_mgr(dev); \
-	return show_root_entry_hash(smgr, \
-	       smgr->sops->_name##_root_entry_hash, \
-	       smgr->sops->_name##_reh_size, buf); \
-} \
-static DEVICE_ATTR_RO(_name##_root_entry_hash)
-
-static ssize_t user_flash_count_show(struct device *dev,
-				     struct device_attribute *attr, char *buf)
-{
-	struct fpga_sec_mgr *smgr = to_sec_mgr(dev);
-	int cnt = smgr->sops->user_flash_count(smgr);
-
-	return cnt < 0 ? cnt : sysfs_emit(buf, "%u\n", cnt);
-}
-static DEVICE_ATTR_RO(user_flash_count);
-
-DEVICE_ATTR_SEC_ROOT_ENTRY_HASH(sr);
-DEVICE_ATTR_SEC_ROOT_ENTRY_HASH(pr);
-DEVICE_ATTR_SEC_ROOT_ENTRY_HASH(bmc);
-DEVICE_ATTR_SEC_CSK(sr);
-DEVICE_ATTR_SEC_CSK(pr);
-DEVICE_ATTR_SEC_CSK(bmc);
-
-static struct attribute *sec_mgr_security_attrs[] = {
-	&dev_attr_user_flash_count.attr,
-	&dev_attr_bmc_root_entry_hash.attr,
-	&dev_attr_sr_root_entry_hash.attr,
-	&dev_attr_pr_root_entry_hash.attr,
-	&dev_attr_sr_canceled_csks.attr,
-	&dev_attr_pr_canceled_csks.attr,
-	&dev_attr_bmc_canceled_csks.attr,
-	NULL,
-};
-
 static void update_progress(struct fpga_sec_mgr *smgr,
 			    enum fpga_sec_prog new_progress)
 {
@@ -273,36 +155,6 @@ idle_exit:
 	put_device(&smgr->dev);
 	progress_complete(smgr);
 }
-
-#define check_attr(attribute, _name) \
-	((attribute) == &dev_attr_##_name.attr && smgr->sops->_name)
-
-static umode_t sec_mgr_visible(struct kobject *kobj,
-			       struct attribute *attr, int n)
-{
-	struct fpga_sec_mgr *smgr = to_sec_mgr(kobj_to_dev(kobj));
-
-	/*
-	 * Only display optional sysfs attributes if a
-	 * corresponding handler is provided
-	 */
-	if (check_attr(attr, user_flash_count) ||
-	    check_attr(attr, bmc_root_entry_hash) ||
-	    check_attr(attr, sr_root_entry_hash) ||
-	    check_attr(attr, pr_root_entry_hash) ||
-	    check_attr(attr, sr_canceled_csks) ||
-	    check_attr(attr, pr_canceled_csks) ||
-	    check_attr(attr, bmc_canceled_csks))
-		return attr->mode;
-
-	return 0;
-}
-
-static struct attribute_group sec_mgr_security_attr_group = {
-	.name = "security",
-	.attrs = sec_mgr_security_attrs,
-	.is_visible = sec_mgr_visible,
-};
 
 static const char * const sec_mgr_prog_str[] = {
 	"idle",			/* FPGA_SEC_PROG_IDLE */
@@ -556,43 +408,9 @@ static struct attribute_group sec_mgr_attr_group = {
 
 static const struct attribute_group *fpga_sec_mgr_attr_groups[] = {
 	&sec_mgr_attr_group,
-	&sec_mgr_security_attr_group,
 	&sec_mgr_update_attr_group,
 	NULL,
 };
-
-static bool check_sysfs_handler(struct device *dev,
-				void *sysfs_handler, void *size_handler,
-				const char *sysfs_handler_name,
-				const char *size_handler_name)
-{
-	/*
-	 * sysfs_handler and size_handler must either both be
-	 * defined or both be NULL.
-	 */
-	if (sysfs_handler && !size_handler) {
-		dev_err(dev, "%s registered without %s\n",
-			sysfs_handler_name, size_handler_name);
-		return false;
-	} else if (!sysfs_handler && size_handler) {
-		dev_err(dev, "%s registered without %s\n",
-			size_handler_name, sysfs_handler_name);
-		return false;
-	}
-	return true;
-}
-
-#define check_reh_handler(_dev, _sops, _name) \
-	check_sysfs_handler(_dev, (_sops)->_name##_root_entry_hash, \
-			    (_sops)->_name##_reh_size, \
-			    __stringify(_name##_root_entry_hash), \
-			    __stringify(_name##_reh_size))
-
-#define check_csk_handler(_dev, _sops, _name) \
-	check_sysfs_handler(_dev, (_sops)->_name##_canceled_csks, \
-			    (_sops)->_name##_canceled_csk_nbits, \
-			    __stringify(_name##_canceled_csks), \
-			    __stringify(_name##_canceled_csk_nbits))
 
 /**
  * fpga_sec_mgr_create - create and initialize an FPGA
@@ -620,15 +438,6 @@ fpga_sec_mgr_create(struct device *dev, const char *name,
 	if (!sops || !sops->cancel || !sops->prepare ||
 	    !sops->write_blk || !sops->poll_complete) {
 		dev_err(dev, "Attempt to register without required ops\n");
-		return NULL;
-	}
-
-	if (!check_reh_handler(dev, sops, bmc) ||
-	    !check_reh_handler(dev, sops, sr) ||
-	    !check_reh_handler(dev, sops, pr) ||
-	    !check_csk_handler(dev, sops, bmc) ||
-	    !check_csk_handler(dev, sops, sr) ||
-	    !check_csk_handler(dev, sops, pr)) {
 		return NULL;
 	}
 

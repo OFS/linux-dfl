@@ -163,8 +163,8 @@ enum m10bmc_type {
 #define PR_PROG_ADDR	0x17ffe000
 #define PR_PROG_MAGIC	0x5250
 
-/* Address of inverted bit vector containing user the image FLASH count */
-#define USER_FLASH_COUNT 0x17ffb000
+/* Address of 4KB inverted bit vector containing staging area FLASH count */
+#define STAGING_FLASH_COUNT	0x17ffb000
 
 /**
  * struct intel_m10bmc_retimer_pdata - subdev retimer platform data

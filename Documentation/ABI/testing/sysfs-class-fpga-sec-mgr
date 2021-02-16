@@ -1,74 +1,12 @@
 What: 		/sys/class/fpga_sec_mgr/fpga_secX/name
-Date:		Oct 2020
-KernelVersion:  5.11
+Date:		January 2021
+KernelVersion:  5.12
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Name of low level fpga security manager driver.
 
-What: 		/sys/class/fpga_sec_mgr/fpga_secX/security/sr_root_entry_hash
-Date:		Oct 2020
-KernelVersion:  5.11
-Contact:	Russ Weight <russell.h.weight@intel.com>
-Description:	Read only. Returns the root entry hash for the static
-		region if one is programmed, else it returns the
-		string: "hash not programmed".  This file is only
-		visible if the underlying device supports it.
-		Format: "0x%x".
-
-What: 		/sys/class/fpga_sec_mgr/fpga_secX/security/pr_root_entry_hash
-Date:		Oct 2020
-KernelVersion:  5.11
-Contact:	Russ Weight <russell.h.weight@intel.com>
-Description:	Read only. Returns the root entry hash for the partial
-		reconfiguration region if one is programmed, else it
-		returns the string: "hash not programmed".  This file
-		is only visible if the underlying device supports it.
-		Format: "0x%x".
-
-What: 		/sys/class/fpga_sec_mgr/fpga_secX/security/bmc_root_entry_hash
-Date:		Oct 2020
-KernelVersion:  5.11
-Contact:	Russ Weight <russell.h.weight@intel.com>
-Description:	Read only. Returns the root entry hash for the BMC image
-		if one is programmed, else it returns the string:
-		"hash not programmed".  This file is only visible if the
-		underlying device supports it.
-		Format: "0x%x".
-
-What: 		/sys/class/fpga_sec_mgr/fpga_secX/security/sr_canceled_csks
-Date:		Oct 2020
-KernelVersion:  5.11
-Contact:	Russ Weight <russell.h.weight@intel.com>
-Description:	Read only. Returns a list of indices for canceled code
-		signing keys for the static region. The standard bitmap
-		list format is used (e.g. "1,2-6,9").
-
-What: 		/sys/class/fpga_sec_mgr/fpga_secX/security/pr_canceled_csks
-Date:		Oct 2020
-KernelVersion:  5.11
-Contact:	Russ Weight <russell.h.weight@intel.com>
-Description:	Read only. Returns a list of indices for canceled code
-		signing keys for the partial reconfiguration region. The
-		standard bitmap list format is used (e.g. "1,2-6,9").
-
-What: 		/sys/class/fpga_sec_mgr/fpga_secX/security/bmc_canceled_csks
-Date:		Oct 2020
-KernelVersion:  5.11
-Contact:	Russ Weight <russell.h.weight@intel.com>
-Description:	Read only. Returns a list of indices for canceled code
-		signing keys for the BMC.  The standard bitmap list format
-		is used (e.g. "1,2-6,9").
-
-What: 		/sys/class/fpga_sec_mgr/fpga_secX/security/user_flash_count
-Date:		Oct 2020
-KernelVersion:  5.11
-Contact:	Russ Weight <russell.h.weight@intel.com>
-Description:	Read only. Returns number of times the user image for the
-		static region has been flashed.
-		Format: "%u".
-
 What: 		/sys/class/fpga_sec_mgr/fpga_secX/update/filename
-Date:		Oct 2020
-KernelVersion:  5.11
+Date:		January 2021
+KernelVersion:  5.12
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Write only. Write the filename of an image
 		file to this sysfs file to initiate a secure
@@ -80,8 +18,8 @@ Description:	Write only. Write the filename of an image
 		Keys (CSK).
 
 What: 		/sys/class/fpga_sec_mgr/fpga_secX/update/cancel
-Date:		Oct 2020
-KernelVersion:  5.11
+Date:		January 2021
+KernelVersion:  5.12
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Write-only. Write a "1" to this file to request
 		that a current update be canceled. This request
@@ -90,8 +28,8 @@ Description:	Write-only. Write a "1" to this file to request
 		update in progress.
 
 What: 		/sys/class/fpga_sec_mgr/fpga_secX/update/status
-Date:		Oct 2020
-KernelVersion:  5.11
+Date:		January 2021
+KernelVersion:  5.12
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read-only. Returns a string describing the current
 		status of an update. The string will be one of the
@@ -101,8 +39,8 @@ Description:	Read-only. Returns a string describing the current
 		state change.
 
 What: 		/sys/class/fpga_sec_mgr/fpga_secX/update/remaining_size
-Date:		Oct 2020
-KernelVersion:  5.11
+Date:		January 2021
+KernelVersion:  5.12
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read-only. Returns the size of data that remains to
 		be written to the secure update engine. The size
@@ -112,8 +50,8 @@ Description:	Read-only. Returns the size of data that remains to
 		Format: "%u".
 
 What: 		/sys/class/fpga_sec_mgr/fpga_secX/update/error
-Date:		Oct 2020
-KernelVersion:  5.11
+Date:		January 2021
+KernelVersion:  5.12
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read-only. Returns a string describing the failure
 		of a secure update. This string will be in the form
@@ -129,8 +67,8 @@ Description:	Read-only. Returns a string describing the failure
 		EBUSY.
 
 What: 		/sys/class/fpga_sec_mgr/fpga_secX/update/hw_errinfo
-Date:		Oct 2020
-KernelVersion:  5.11
+Date:		January 2021
+KernelVersion:  5.12
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read-only. Returns a 64 bit error value providing
 		hardware specific information that may be useful in
