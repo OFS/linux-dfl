@@ -781,7 +781,7 @@ static int m10bmc_secure_probe(struct platform_device *pdev)
 	smgr = devm_fpga_sec_mgr_create(sec->dev, "Max10 BMC Secure Update",
 					sops, sec);
 	if (!smgr) {
-		dev_err(sec->dev, "Security manager failed to start");
+		dev_err(sec->dev, "Security manager failed to start\n");
 		return -ENOMEM;
 	}
 
