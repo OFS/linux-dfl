@@ -2174,5 +2174,14 @@ config MFD_INTEL_M10_BMC_PMCI
 	  additional drivers must be enabled in order to use the functionality
 	  of the device.
 
+config MFD_INTEL_M10_BMC_LOG
+	tristate "Intel MAX 10 Board Management Controller Log Driver"
+	depends on MFD_INTEL_M10_BMC
+	help
+	  Support for the Intel MAX 10 board management controller log
+
+	  This driver provides timestamp synchronization with the MAX10
+	  BMC log.
+
 endmenu
 endif

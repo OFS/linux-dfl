@@ -13,7 +13,8 @@
 
 static struct mfd_cell pmci_bmc_subdevs[] = {
 	{ .name = "intel-pmci-hwmon" },
-	{ .name = "intel-pmci-secure" }
+	{ .name = "intel-pmci-secure" },
+	{ .name = "intel-pmci-log" }
 };
 
 static const struct regmap_range pmci_fw_handshake_regs[] = {
