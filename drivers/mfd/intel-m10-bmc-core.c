@@ -33,7 +33,8 @@ static const struct m10bmc_csr m10bmc_spi_csr = {
 
 static struct mfd_cell m10bmc_n6010_bmc_subdevs[] = {
 	{ .name = "n6010bmc-hwmon" },
-	{ .name = "n6010bmc-secure" }
+	{ .name = "n6010bmc-secure" },
+	{ .name = "n6010bmc-log" }
 };
 
 static const struct regmap_range n6010_fw_handshake_regs[] = {
