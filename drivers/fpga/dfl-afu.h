@@ -83,7 +83,7 @@ struct dfl_afu {
 };
 
 /* hold fdata->lock when call __afu_port_enable/disable */
-void __afu_port_enable(struct dfl_feature_dev_data *fdata);
+int __afu_port_enable(struct dfl_feature_dev_data *fdata);
 int __afu_port_disable(struct dfl_feature_dev_data *fdata);
 
 void afu_mmio_region_init(struct dfl_feature_dev_data *fdata);

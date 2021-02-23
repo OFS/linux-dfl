@@ -21,6 +21,9 @@
 
 #include "dfl-afu.h"
 
+#define RST_POLL_INVL 10 /* us */
+#define RST_POLL_TIMEOUT 1000 /* us */
+
 /**
  * __afu_port_enable - enable a port by clear reset
  * @fdata: port feature dev data.
@@ -32,7 +35,7 @@
  *
  * The caller needs to hold lock for protection.
  */
-void __afu_port_enable(struct dfl_feature_dev_data *fdata)
+int __afu_port_enable(struct dfl_feature_dev_data *fdata)
 {
 	void __iomem *base;
 	u64 v;
@@ -40,7 +43,7 @@ void __afu_port_enable(struct dfl_feature_dev_data *fdata)
 	WARN_ON(!fdata->disable_count);
 
 	if (--fdata->disable_count != 0)
-		return;
+		return 0;
 
 	base = dfl_get_feature_ioaddr_by_id(fdata, PORT_FEATURE_ID_HEADER);
 
@@ -48,10 +51,21 @@ void __afu_port_enable(struct dfl_feature_dev_data *fdata)
 	v = readq(base + PORT_HDR_CTRL);
 	v &= ~PORT_CTRL_SFTRST;
 	writeq(v, base + PORT_HDR_CTRL);
-}
 
-#define RST_POLL_INVL 10 /* us */
-#define RST_POLL_TIMEOUT 1000 /* us */
+	/*
+	 * HW clears the ack bit to indicate that the port is fully out
+	 * of reset.
+	 */
+	if (readq_poll_timeout(base + PORT_HDR_CTRL, v,
+			       !(v & PORT_CTRL_SFTRST_ACK),
+			       RST_POLL_INVL, RST_POLL_TIMEOUT)) {
+		dev_err(fdata->dfl_cdev->parent,
+			"timeout, failure to enable device\n");
+		return -ETIMEDOUT;
+	}
+
+	return 0;
+}
 
 /**
  * __afu_port_disable - disable a port by hold reset
@@ -85,7 +99,7 @@ int __afu_port_disable(struct dfl_feature_dev_data *fdata)
 			       v & PORT_CTRL_SFTRST_ACK,
 			       RST_POLL_INVL, RST_POLL_TIMEOUT)) {
 		dev_err(fdata->dfl_cdev->parent,
-			"timeout, fail to reset device\n");
+			"timeout, failure to disable device\n");
 		return -ETIMEDOUT;
 	}
 
@@ -110,9 +124,9 @@ static int __port_reset(struct dfl_feature_dev_data *fdata)
 
 	ret = __afu_port_disable(fdata);
 	if (!ret)
-		__afu_port_enable(fdata);
+		return ret;
 
-	return ret;
+	return __afu_port_enable(fdata);
 }
 
 static int port_reset(struct platform_device *pdev)
@@ -887,11 +901,11 @@ static int afu_dev_destroy(struct platform_device *pdev)
 
 static int port_enable_set(struct dfl_feature_dev_data *fdata, bool enable)
 {
-	int ret = 0;
+	int ret;
 
 	mutex_lock(&fdata->lock);
 	if (enable)
-		__afu_port_enable(fdata);
+		ret = __afu_port_enable(fdata);
 	else
 		ret = __afu_port_disable(fdata);
 	mutex_unlock(&fdata->lock);

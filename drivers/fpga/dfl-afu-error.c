@@ -51,7 +51,7 @@ static int afu_port_err_clear(struct device *dev, u64 err)
 {
 	struct dfl_feature_dev_data *fdata = to_dfl_feature_dev_data(dev);
 	void __iomem *base_err, *base_hdr;
-	int ret = -EBUSY;
+	int enable_ret = 0, ret = -EBUSY;
 	u64 v;
 
 	base_err = dfl_get_feature_ioaddr_by_id(fdata, PORT_FEATURE_ID_ERROR);
@@ -95,18 +95,20 @@ static int afu_port_err_clear(struct device *dev, u64 err)
 		v = readq(base_err + PORT_FIRST_ERROR);
 		writeq(v, base_err + PORT_FIRST_ERROR);
 	} else {
+		dev_warn(dev, "%s: received 0x%llx, expected 0x%llx\n",
+			 __func__, v, err);
 		ret = -EINVAL;
 	}
 
 	/* Clear mask */
 	__afu_port_err_mask(fdata, false);
 
-	/* Enable the Port by clear the reset */
-	__afu_port_enable(fdata);
+	/* Enable the Port by clearing the reset */
+	enable_ret = __afu_port_enable(fdata);
 
 done:
 	mutex_unlock(&fdata->lock);
-	return ret;
+	return enable_ret ? enable_ret : ret;
 }
 
 static ssize_t errors_show(struct device *dev, struct device_attribute *attr,
