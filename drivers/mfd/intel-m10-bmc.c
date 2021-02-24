@@ -40,7 +40,7 @@ m10bmc_init_cells_platdata(struct intel_m10bmc_platdata *pdata,
 }
 
 static const struct regmap_range n3000_fw_handshake_regs[] = {
-	regmap_reg_range(M10BMC_TELEM_START, M10BMC_TELEM_END),
+	regmap_reg_range(M10BMC_N3000_TELEM_START, M10BMC_N3000_TELEM_END),
 };
 
 int m10bmc_fw_state_enter(struct intel_m10bmc *m10bmc,
