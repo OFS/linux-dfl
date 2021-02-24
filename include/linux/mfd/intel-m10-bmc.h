@@ -71,8 +71,8 @@
 #define M10BMC_PKVL_PRELOAD_TIMEOUT_US	(30 * 1000 * 1000)
 
 /* Telemetry registers */
-#define M10BMC_TELEM_START		0x100
-#define M10BMC_TELEM_END		0x33c
+#define M10BMC_N3000_TELEM_START	0x100
+#define M10BMC_N3000_TELEM_END		0x250
 
 /* Secure update doorbell register, in system register region */
 #define M10BMC_DOORBELL			0x400
