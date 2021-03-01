@@ -1,0 +1,12 @@
+What: /sys/bus/platform/devices/intel-m10-bmc-log.*.auto/time_sync_frequency
+Date:		Mar 2021
+KernelVersion:	5.12
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read/write. This sysfs node controls the frequency (in
+		seconds) that the host writes to the MAX10 BMC registers
+		to synchronize the timestamp registers used for the BMC
+		error log. Write zero to stop the timestamp synchronization.
+		Write a non-zero integer value to restart or modify the
+		update frequency. Reading from this file will return the
+		same integer value.
+		Format: "%u".
