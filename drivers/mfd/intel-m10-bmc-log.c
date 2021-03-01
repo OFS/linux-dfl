@@ -47,6 +47,42 @@ static void m10bmc_log_time_sync(struct work_struct *work)
 	schedule_delayed_work(&log->dwork, log->freq_s * HZ);
 }
 
+static ssize_t
+time_sync_frequency_store(struct device *dev, struct device_attribute *attr,
+			  const char *buf, size_t count)
+{
+	struct m10bmc_log *ddata = dev_get_drvdata(dev);
+	unsigned int ret, old_freq = ddata->freq_s;
+
+	ret = kstrtouint(buf, 0, &ddata->freq_s);
+	if (ret)
+		return ret;
+
+	if (old_freq)
+		cancel_delayed_work_sync(&ddata->dwork);
+
+	if (ddata->freq_s)
+		m10bmc_log_time_sync(&ddata->dwork.work);
+
+	return count;
+}
+
+static ssize_t
+time_sync_frequency_show(struct device *dev, struct device_attribute *attr,
+			 char *buf)
+{
+	struct m10bmc_log *ddata = dev_get_drvdata(dev);
+
+	return sysfs_emit(buf, "%u\n", ddata->freq_s);
+}
+static DEVICE_ATTR_RW(time_sync_frequency);
+
+static struct attribute *m10bmc_log_attrs[] = {
+	&dev_attr_time_sync_frequency.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(m10bmc_log);
+
 static int m10bmc_log_probe(struct platform_device *pdev)
 {
 	struct m10bmc_log *ddata;
@@ -77,6 +113,9 @@ int m10bmc_log_remove(struct platform_device *pdev)
 static struct platform_driver intel_m10bmc_log_driver = {
 	.probe = m10bmc_log_probe,
 	.remove = m10bmc_log_remove,
+	.driver = {
+		.dev_groups = m10bmc_log_groups,
+	},
 };
 module_platform_driver(intel_m10bmc_log_driver);
 
