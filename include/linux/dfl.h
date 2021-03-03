@@ -34,7 +34,6 @@ enum dfl_id_type {
  * @num_irqs: number of IRQs supported by this dfl device.
  * @cdev: pointer to DFL FPGA container device this dfl device belongs to.
  * @id_entry: matched id entry in dfl driver's id table.
- * @driver_override: driver name to force a match
  */
 struct dfl_device {
 	struct device dev;
@@ -46,7 +45,6 @@ struct dfl_device {
 	unsigned int num_irqs;
 	struct dfl_fpga_cdev *cdev;
 	const struct dfl_device_id *id_entry;
-	char *driver_override;
 };
 
 /**
