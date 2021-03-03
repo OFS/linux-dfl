@@ -7,7 +7,6 @@ Authors:
 - Enno Luebbers <enno.luebbers@intel.com>
 - Xiao Guangrong <guangrong.xiao@linux.intel.com>
 - Wu Hao <hao.wu@intel.com>
-- Xu Yilun <yilun.xu@intel.com>
 
 The Device Feature List (DFL) FPGA framework (and drivers according to
 this framework) hides the very details of low layer hardwares and provides
@@ -501,29 +500,6 @@ mmio resources can be found under FIU platform device created by DFL framework.
 Developer only needs to provide a sub feature driver with matched feature id.
 FME Partial Reconfiguration Sub Feature driver (see drivers/fpga/dfl-fme-pr.c)
 could be a reference.
-
-
-Userspace driver support for DFL devices
-========================================
-The purpose of an FPGA is to be reprogrammed with newly developed hardware
-components. New hardware can instantiate a new private feature in the DFL, and
-then get a DFL device in their system. In some cases users may need a userspace
-driver for the DFL device:
-
-* Users may need to run some diagnostic test for their hardwares.
-* Users may prototype the kernel driver in user space.
-* Some hardware is designed for specific purposes and does not fit into one of
-  the standard kernel subsystems.
-
-This requires the direct access to the MMIO space and interrupt handling in
-userspace. The dfl-uio-pdev module exposes the UIO device interfaces for this
-purpose. It adds the uio_pdrv_genirq platform device with the resources of
-the DFL feature, and lets the generic UIO platform device driver provide UIO
-support to userspace.
-
-FPGA_DFL_UIO_PDEV should be selected to enable the dfl-uio-pdev module driver.
-To support a new DFL feature been directly accessed via UIO, its feature id
-should be added to the driver's id_table.
 
 
 Open discussion
