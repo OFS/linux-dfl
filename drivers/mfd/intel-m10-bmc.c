@@ -23,14 +23,26 @@ static struct mfd_cell m10bmc_d5005_subdevs[] = {
 	{ .name = "d5005bmc-hwmon" },
 };
 
+static const struct regmap_range d5005_fw_handshake_regs[] = {
+	regmap_reg_range(M10BMC_D5005_TELEM_START, M10BMC_D5005_TELEM_END),
+};
+
 static struct mfd_cell m10bmc_pacn3000_subdevs[] = {
 	{ .name = "n3000bmc-hwmon" },
 	{ .name = "n3000bmc-retimer" },
 	{ .name = "n3000bmc-sec-update" },
 };
 
+static const struct regmap_range n3000_fw_handshake_regs[] = {
+	regmap_reg_range(M10BMC_N3000_TELEM_START, M10BMC_N3000_TELEM_END),
+};
+
 static struct mfd_cell m10bmc_n5010_subdevs[] = {
 	{ .name = "n5010bmc-hwmon" },
+};
+
+static const struct regmap_range n5010_fw_handshake_regs[] = {
+	regmap_reg_range(M10BMC_N5010_TELEM_START, M10BMC_N5010_TELEM_END),
 };
 
 static const struct regmap_range m10bmc_regmap_range[] = {
@@ -43,6 +55,88 @@ static const struct regmap_access_table m10bmc_access_table = {
 	.yes_ranges	= m10bmc_regmap_range,
 	.n_yes_ranges	= ARRAY_SIZE(m10bmc_regmap_range),
 };
+
+int m10bmc_fw_state_enter(struct intel_m10bmc *m10bmc,
+			  enum m10bmc_fw_state new_state)
+{
+	int ret = 0;
+
+	if (new_state == M10BMC_FW_STATE_NORMAL)
+		return -EINVAL;
+
+	down_write(&m10bmc->bmcfw_lock);
+
+	if (m10bmc->bmcfw_state == M10BMC_FW_STATE_NORMAL)
+		m10bmc->bmcfw_state = new_state;
+	else if (m10bmc->bmcfw_state != new_state)
+		ret = -EBUSY;
+
+	up_write(&m10bmc->bmcfw_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(m10bmc_fw_state_enter);
+
+void m10bmc_fw_state_exit(struct intel_m10bmc *m10bmc)
+{
+	down_write(&m10bmc->bmcfw_lock);
+
+	m10bmc->bmcfw_state = M10BMC_FW_STATE_NORMAL;
+
+	up_write(&m10bmc->bmcfw_lock);
+}
+EXPORT_SYMBOL_GPL(m10bmc_fw_state_exit);
+
+static bool is_handshake_sys_reg(struct intel_m10bmc *m10bmc,
+				 unsigned int offset)
+{
+	return regmap_reg_in_ranges(offset, m10bmc->handshake_sys_reg_ranges,
+				    m10bmc->handshake_sys_reg_nranges);
+}
+
+int m10bmc_sys_read(struct intel_m10bmc *m10bmc, unsigned int offset,
+		    unsigned int *val)
+{
+	int ret;
+
+	if (!is_handshake_sys_reg(m10bmc, offset))
+		return m10bmc_raw_read(m10bmc, M10BMC_SYS_BASE + (offset), val);
+
+	down_read(&m10bmc->bmcfw_lock);
+
+	if (m10bmc->bmcfw_state == M10BMC_FW_STATE_SEC_UPDATE)
+		ret = -EBUSY;
+	else
+		ret = m10bmc_raw_read(m10bmc, M10BMC_SYS_BASE + (offset), val);
+
+	up_read(&m10bmc->bmcfw_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(m10bmc_sys_read);
+
+int m10bmc_sys_update_bits(struct intel_m10bmc *m10bmc, unsigned int offset,
+			   unsigned int msk, unsigned int val)
+{
+	int ret;
+
+	if (!is_handshake_sys_reg(m10bmc, offset))
+		return regmap_update_bits(m10bmc->regmap,
+					  M10BMC_SYS_BASE + (offset), msk, val);
+
+	down_read(&m10bmc->bmcfw_lock);
+
+	if (m10bmc->bmcfw_state == M10BMC_FW_STATE_SEC_UPDATE)
+		ret = -EBUSY;
+	else
+		ret = regmap_update_bits(m10bmc->regmap,
+					 M10BMC_SYS_BASE + (offset), msk, val);
+
+	up_read(&m10bmc->bmcfw_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(m10bmc_sys_update_bits);
 
 static struct regmap_config intel_m10bmc_regmap_config = {
 	.reg_bits = 32,
@@ -170,6 +264,7 @@ static int intel_m10_bmc_spi_probe(struct spi_device *spi)
 	if (!ddata)
 		return -ENOMEM;
 
+	init_rwsem(&ddata->bmcfw_lock);
 	ddata->dev = dev;
 
 	ddata->regmap =
@@ -192,14 +287,23 @@ static int intel_m10_bmc_spi_probe(struct spi_device *spi)
 	case M10_N3000:
 		cells = m10bmc_pacn3000_subdevs;
 		n_cell = ARRAY_SIZE(m10bmc_pacn3000_subdevs);
+		ddata->handshake_sys_reg_ranges = n3000_fw_handshake_regs;
+		ddata->handshake_sys_reg_nranges =
+			ARRAY_SIZE(n3000_fw_handshake_regs);
 		break;
 	case M10_D5005:
 		cells = m10bmc_d5005_subdevs;
 		n_cell = ARRAY_SIZE(m10bmc_d5005_subdevs);
+		ddata->handshake_sys_reg_ranges = d5005_fw_handshake_regs;
+		ddata->handshake_sys_reg_nranges =
+			ARRAY_SIZE(d5005_fw_handshake_regs);
 		break;
 	case M10_N5010:
 		cells = m10bmc_n5010_subdevs;
 		n_cell = ARRAY_SIZE(m10bmc_n5010_subdevs);
+		ddata->handshake_sys_reg_ranges = n5010_fw_handshake_regs;
+		ddata->handshake_sys_reg_nranges =
+			ARRAY_SIZE(n5010_fw_handshake_regs);
 		break;
 	default:
 		return -ENODEV;
