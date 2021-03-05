@@ -36,6 +36,37 @@ struct m10bmc_sec {
 	const struct m10bmc_sec_ops *ops;
 };
 
+static void log_error_regs(struct m10bmc_sec *sec, u32 doorbell)
+{
+	const struct m10bmc_csr_map *csr_map = sec->m10bmc->info->csr_map;
+	u32 auth_result;
+
+	dev_err(sec->dev, "Doorbell: 0x%08x\n", doorbell);
+
+	if (!m10bmc_sys_read(sec->m10bmc, csr_map->auth_result, &auth_result))
+		dev_err(sec->dev, "RSU auth result: 0x%08x\n", auth_result);
+}
+
+static int m10bmc_sec_progress_status(struct m10bmc_sec *sec, u32 *doorbell_reg,
+				      u32 *progress, u32 *status)
+{
+	const struct m10bmc_csr_map *csr_map = sec->m10bmc->info->csr_map;
+	int ret;
+
+	ret = m10bmc_sys_read(sec->m10bmc, csr_map->doorbell, doorbell_reg);
+	if (ret)
+		return ret;
+
+	ret = sec->ops->rsu_status(sec);
+	if (ret < 0)
+		return ret;
+
+	*status = ret;
+	*progress = rsu_prog(*doorbell_reg);
+
+	return 0;
+}
+
 static int m10bmc_sec_bmc_image_load(struct m10bmc_sec *sec, unsigned int val)
 {
 	const struct m10bmc_csr_map *csr_map = sec->m10bmc->info->csr_map;
@@ -143,6 +174,151 @@ static int pmci_sec_fpga_image_load_2(struct m10bmc_sec *sec)
 	return pmci_sec_fpga_image_load(sec, 2);
 }
 
+static int retimer_check_idle(struct m10bmc_sec *sec)
+{
+	const struct m10bmc_csr_map *csr_map = sec->m10bmc->info->csr_map;
+	u32 doorbell;
+	int ret;
+
+	ret = m10bmc_sys_read(sec->m10bmc, csr_map->doorbell, &doorbell);
+	if (ret)
+		return -EIO;
+
+	if (rsu_prog(doorbell) != RSU_PROG_IDLE &&
+	    rsu_prog(doorbell) != RSU_PROG_RSU_DONE &&
+	    rsu_prog(doorbell) != RSU_PROG_PKVL_PROM_DONE) {
+		log_error_regs(sec, doorbell);
+		return -EBUSY;
+	}
+
+	return 0;
+}
+
+static int trigger_retimer_eeprom_load(struct m10bmc_sec *sec)
+{
+	const struct m10bmc_csr_map *csr_map = sec->m10bmc->info->csr_map;
+	struct intel_m10bmc *m10bmc = sec->m10bmc;
+	unsigned int val;
+	int ret;
+
+	ret = m10bmc_sys_update_bits(m10bmc, csr_map->doorbell,
+				     DRBL_PKVL_EEPROM_LOAD_SEC,
+				     DRBL_PKVL_EEPROM_LOAD_SEC);
+	if (ret)
+		return ret;
+
+	/*
+	 * If the current NIOS FW supports this retimer update feature, then
+	 * it will clear the same PKVL_EEPROM_LOAD bit in 2 seconds. Otherwise
+	 * the driver needs to clear the PKVL_EEPROM_LOAD bit manually and
+	 * return an error code.
+	 */
+	ret = regmap_read_poll_timeout(m10bmc->regmap,
+				       csr_map->base + csr_map->doorbell,
+				       val,
+				       (!(val & DRBL_PKVL_EEPROM_LOAD_SEC)),
+				       M10BMC_PKVL_LOAD_INTERVAL_US,
+				       M10BMC_PKVL_LOAD_TIMEOUT_US);
+	if (ret == -ETIMEDOUT) {
+		dev_err(sec->dev, "PKVL_EEPROM_LOAD clear timedout\n");
+		m10bmc_sys_update_bits(m10bmc, csr_map->doorbell,
+				       DRBL_PKVL_EEPROM_LOAD_SEC, 0);
+		ret = -ENODEV;
+	} else if (ret) {
+		dev_err(sec->dev, "Poll EEPROM_LOAD error %d\n", ret);
+	}
+
+	return ret;
+}
+
+static int poll_retimer_eeprom_load_done(struct m10bmc_sec *sec)
+{
+	u32 doorbell_reg, progress, status;
+	int ret, err;
+
+	/*
+	 * RSU_STAT_PKVL_REJECT indicates that the current image is
+	 * already programmed. RSU_PROG_PKVL_PROM_DONE that the firmware
+	 * update process has finished, but does not necessarily indicate
+	 * a successful update.
+	 */
+	ret = read_poll_timeout(m10bmc_sec_progress_status, err,
+				err < 0 ||
+				progress == RSU_PROG_PKVL_PROM_DONE ||
+				status == RSU_STAT_PKVL_REJECT,
+				M10BMC_PKVL_PRELOAD_INTERVAL_US,
+				M10BMC_PKVL_PRELOAD_TIMEOUT_US,
+				false,
+				sec, &doorbell_reg, &progress, &status);
+	if (ret == -ETIMEDOUT) {
+		dev_err(sec->dev, "Doorbell check timedout: 0x%08x\n", doorbell_reg);
+		return ret;
+	} else if (err) {
+		dev_err(sec->dev, "Poll Doorbell error\n");
+		return ret;
+	}
+
+	if (status == RSU_STAT_PKVL_REJECT) {
+		dev_err(sec->dev, "duplicate image rejected\n");
+		return -ECANCELED;
+	}
+
+	return 0;
+}
+
+static int poll_retimer_preload_done(struct m10bmc_sec *sec)
+{
+	const struct m10bmc_csr_map *csr_map = sec->m10bmc->info->csr_map;
+	struct intel_m10bmc *m10bmc = sec->m10bmc;
+	unsigned int val;
+	int ret;
+
+	/*
+	 * Wait for the updated firmware to be loaded by the PKVL device
+	 * and confirm that the updated firmware is operational
+	 */
+	ret = regmap_read_poll_timeout(m10bmc->regmap,
+				       csr_map->base + M10BMC_PKVL_POLL_CTRL, val,
+				       ((val & M10BMC_PKVL_PRELOAD) == M10BMC_PKVL_PRELOAD),
+				       M10BMC_PKVL_PRELOAD_INTERVAL_US,
+				       M10BMC_PKVL_PRELOAD_TIMEOUT_US);
+	if (ret) {
+		dev_err(sec->dev, "Poll M10BMC_PKVL_PRELOAD error %d\n", ret);
+		return ret;
+	}
+
+	if ((val & M10BMC_PKVL_UPG_STATUS_MASK) != M10BMC_PKVL_UPG_STATUS_GOOD) {
+		dev_err(sec->dev, "Error detected during M10BMC PKVL upgrade\n");
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static int m10bmc_sec_retimer_eeprom_load(struct m10bmc_sec *sec)
+{
+	int ret;
+
+	m10bmc_fw_state_set(sec->m10bmc, M10BMC_FW_RETIMER_EEPROM_LOAD);
+
+	ret = retimer_check_idle(sec);
+	if (ret)
+		goto fw_state_exit;
+
+	ret = trigger_retimer_eeprom_load(sec);
+	if (ret)
+		goto fw_state_exit;
+
+	ret = poll_retimer_eeprom_load_done(sec);
+	if (ret)
+		goto fw_state_exit;
+
+	ret = poll_retimer_preload_done(sec);
+
+fw_state_exit:
+	m10bmc_fw_state_set(sec->m10bmc, M10BMC_FW_STATE_NORMAL);
+	return ret;
+}
 
 static struct image_load n3000_image_load_hndlrs[] = {
 	{
@@ -152,6 +328,10 @@ static struct image_load n3000_image_load_hndlrs[] = {
 	{
 		.name = "bmc_user",
 		.load_image = m10bmc_sec_bmc_image_load_0,
+	},
+	{
+		.name = "retimer_fw",
+		.load_image = m10bmc_sec_retimer_eeprom_load,
 	},
 	{}
 };
@@ -468,17 +648,6 @@ static const struct attribute_group *m10bmc_sec_attr_groups[] = {
 	NULL,
 };
 
-static void log_error_regs(struct m10bmc_sec *sec, u32 doorbell)
-{
-	const struct m10bmc_csr_map *csr_map = sec->m10bmc->info->csr_map;
-	u32 auth_result;
-
-	dev_err(sec->dev, "Doorbell: 0x%08x\n", doorbell);
-
-	if (!m10bmc_sys_read(sec->m10bmc, csr_map->auth_result, &auth_result))
-		dev_err(sec->dev, "RSU auth result: 0x%08x\n", auth_result);
-}
-
 static int m10bmc_sec_n3000_rsu_status(struct m10bmc_sec *sec)
 {
 	const struct m10bmc_csr_map *csr_map = sec->m10bmc->info->csr_map;
@@ -525,26 +694,6 @@ static bool rsu_progress_busy(u32 progress)
 		progress == RSU_PROG_COPYING ||
 		progress == RSU_PROG_UPDATE_CANCEL ||
 		progress == RSU_PROG_PROGRAM_KEY_HASH);
-}
-
-static int m10bmc_sec_progress_status(struct m10bmc_sec *sec, u32 *doorbell_reg,
-				      u32 *progress, u32 *status)
-{
-	const struct m10bmc_csr_map *csr_map = sec->m10bmc->info->csr_map;
-	int ret;
-
-	ret = m10bmc_sys_read(sec->m10bmc, csr_map->doorbell, doorbell_reg);
-	if (ret)
-		return ret;
-
-	ret = sec->ops->rsu_status(sec);
-	if (ret < 0)
-		return ret;
-
-	*status = ret;
-	*progress = rsu_prog(*doorbell_reg);
-
-	return 0;
 }
 
 static enum fw_upload_err rsu_check_idle(struct m10bmc_sec *sec)
