@@ -8,6 +8,7 @@
 #define __MFD_INTEL_M10_BMC_H
 
 #include <linux/regmap.h>
+#include <linux/rwsem.h>
 
 #define M10BMC_LEGACY_BUILD_VER		0x300468
 #define M10BMC_SYS_BASE			0x300800
@@ -35,6 +36,10 @@
 #define M10BMC_VER_MAJOR_MSK		GENMASK(23, 16)
 #define M10BMC_VER_PCB_INFO_MSK		GENMASK(31, 24)
 #define M10BMC_VER_LEGACY_INVALID	0xffffffff
+
+/* Telemetry registers */
+#define M10BMC_N3000_TELEM_START	0x100
+#define M10BMC_N3000_TELEM_END		0x250
 
 /* Secure update doorbell register, in system register region */
 #define M10BMC_DOORBELL			0x400
@@ -118,14 +123,23 @@
 /* Address of 4KB inverted bit vector containing staging area FLASH count */
 #define STAGING_FLASH_COUNT	0x17ffb000
 
+enum m10bmc_fw_state {
+	M10BMC_FW_STATE_NORMAL,
+	M10BMC_FW_STATE_SEC_UPDATE,
+};
+
 /**
  * struct intel_m10bmc - Intel MAX 10 BMC parent driver data structure
  * @dev: this device
  * @regmap: the regmap used to access registers by m10bmc itself
+ * @bmcfw_lock: read/write semaphore to BMC firmware running state
+ * @bmcfw_state: BMC firmware running state
  */
 struct intel_m10bmc {
 	struct device *dev;
 	struct regmap *regmap;
+	struct rw_semaphore bmcfw_lock;
+	enum m10bmc_fw_state bmcfw_state;
 };
 
 /*
@@ -133,6 +147,7 @@ struct intel_m10bmc {
  *
  * m10bmc_raw_read - read m10bmc register per addr
  * m10bmc_sys_read - read m10bmc system register per offset
+ * m10bmc_sys_update_bits - update m10bmc system register per offset
  */
 static inline int
 m10bmc_raw_read(struct intel_m10bmc *m10bmc, unsigned int addr,
@@ -148,15 +163,22 @@ m10bmc_raw_read(struct intel_m10bmc *m10bmc, unsigned int addr,
 	return ret;
 }
 
+int m10bmc_sys_read(struct intel_m10bmc *m10bmc, unsigned int offset,
+		    unsigned int *val);
+
+int m10bmc_sys_update_bits(struct intel_m10bmc *m10bmc, unsigned int offset,
+			   unsigned int msk, unsigned int val);
+
 /*
- * The base of the system registers could be configured by HW developers, and
- * in HW SPEC, the base is not added to the addresses of the system registers.
+ * Track the state of the firmware, as it is not available for
+ * register handshakes during secure updates.
  *
- * This macro helps to simplify the accessing of the system registers. And if
- * the base is reconfigured in HW, SW developers could simply change the
- * M10BMC_SYS_BASE accordingly.
+ * m10bmc_fw_state_enter - firmware is unavailable for handshakes
+ * m10bmc_fw_state_exit  - firmware is available for handshakes
  */
-#define m10bmc_sys_read(m10bmc, offset, val) \
-	m10bmc_raw_read(m10bmc, M10BMC_SYS_BASE + (offset), val)
+int m10bmc_fw_state_enter(struct intel_m10bmc *m10bmc,
+			  enum m10bmc_fw_state new_state);
+
+void m10bmc_fw_state_exit(struct intel_m10bmc *m10bmc);
 
 #endif /* __MFD_INTEL_M10_BMC_H */
