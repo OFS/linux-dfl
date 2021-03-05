@@ -510,16 +510,76 @@ static u64 m10bmc_sec_hw_errinfo(struct fpga_sec_mgr *smgr)
 	}
 }
 
-static const struct fpga_sec_mgr_ops m10bmc_sops = {
-	.prepare = m10bmc_sec_prepare,
-	.write_blk = m10bmc_sec_write_blk,
-	.poll_complete = m10bmc_sec_poll_complete,
-	.cancel = m10bmc_sec_cancel,
-	.get_hw_errinfo = m10bmc_sec_hw_errinfo,
+static int m10bmc_sec_bmc_image_load(struct fpga_sec_mgr *smgr,
+				     unsigned int val)
+{
+	struct m10bmc_sec *sec = smgr->priv;
+	u32 doorbell;
+	int ret;
+
+	if (val > 1) {
+		dev_err(sec->dev, "%s invalid reload val = %d\n",
+			__func__, val);
+		return -EINVAL;
+	}
+
+	ret = m10bmc_sys_read(sec->m10bmc, M10BMC_DOORBELL, &doorbell);
+	if (ret)
+		return ret;
+
+	if (doorbell & DRBL_REBOOT_DISABLED)
+		return -EBUSY;
+
+	return m10bmc_sys_update_bits(sec->m10bmc, M10BMC_DOORBELL,
+				     DRBL_CONFIG_SEL | DRBL_REBOOT_REQ,
+				     FIELD_PREP(DRBL_CONFIG_SEL, val) |
+				     DRBL_REBOOT_REQ);
+}
+
+static int m10bmc_sec_bmc_image_load_0(struct fpga_sec_mgr *smgr)
+{
+	return m10bmc_sec_bmc_image_load(smgr, 0);
+}
+
+static int m10bmc_sec_bmc_image_load_1(struct fpga_sec_mgr *smgr)
+{
+	return m10bmc_sec_bmc_image_load(smgr, 1);
+}
+
+static struct image_load n3000_image_load_hndlrs[] = {
+	{
+		.name = "bmc_factory",
+		.load_image = m10bmc_sec_bmc_image_load_1,
+	},
+	{
+		.name = "bmc_user",
+		.load_image = m10bmc_sec_bmc_image_load_0,
+	},
+	{}
 };
+
+static struct fpga_sec_mgr_ops *
+m10bmc_sops_create(struct device *dev)
+{
+	struct fpga_sec_mgr_ops *sops;
+
+	sops = devm_kzalloc(dev, sizeof(*sops), GFP_KERNEL);
+	if (!sops)
+		return NULL;
+
+	sops->prepare = m10bmc_sec_prepare;
+	sops->write_blk = m10bmc_sec_write_blk;
+	sops->poll_complete = m10bmc_sec_poll_complete;
+	sops->cancel = m10bmc_sec_cancel;
+	sops->get_hw_errinfo = m10bmc_sec_hw_errinfo;
+	sops->image_load = n3000_image_load_hndlrs;
+
+	return sops;
+}
 
 static int m10bmc_secure_probe(struct platform_device *pdev)
 {
+	struct fpga_sec_mgr_ops *sops;
 	struct fpga_sec_mgr *smgr;
 	struct m10bmc_sec *sec;
 
@@ -527,12 +587,16 @@ static int m10bmc_secure_probe(struct platform_device *pdev)
 	if (!sec)
 		return -ENOMEM;
 
+	sops = m10bmc_sops_create(&pdev->dev);
+	if (!sops)
+		return -ENOMEM;
+
 	sec->dev = &pdev->dev;
 	sec->m10bmc = dev_get_drvdata(pdev->dev.parent);
 	dev_set_drvdata(&pdev->dev, sec);
 
 	smgr = devm_fpga_sec_mgr_create(sec->dev, "Max10 BMC Secure Update",
-					&m10bmc_sops, sec);
+					sops, sec);
 	if (!smgr) {
 		dev_err(sec->dev, "Security manager failed to start\n");
 		return -ENOMEM;
