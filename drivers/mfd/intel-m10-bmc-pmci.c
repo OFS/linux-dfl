@@ -352,6 +352,8 @@ static struct mfd_cell m10bmc_pmci_n6000_bmc_subdevs[] = {
 	{ .name = "n6000bmc-sec-update" },
 };
 
+static const struct regmap_range null_fw_handshake_regs[0];
+
 static const struct m10bmc_csr_map m10bmc_n6000_csr_map = {
 	.base = M10BMC_N6000_SYS_BASE,
 	.build_version = M10BMC_N6000_BUILD_VER,
@@ -375,6 +377,8 @@ static const struct m10bmc_csr_map m10bmc_n6000_csr_map = {
 static const struct intel_m10bmc_platform_info m10bmc_pmci_n6000 = {
 	.cells = m10bmc_pmci_n6000_bmc_subdevs,
 	.n_cells = ARRAY_SIZE(m10bmc_pmci_n6000_bmc_subdevs),
+	.handshake_sys_reg_ranges = null_fw_handshake_regs,
+	.handshake_sys_reg_nranges = 0,
 	.csr_map = &m10bmc_n6000_csr_map,
 };
 
