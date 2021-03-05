@@ -79,3 +79,24 @@ Description:	Read-only. Returns a 64 bit error value providing
 		If this file is read while a secure update is in
 		progress, then the read will fail with EBUSY.
 		Format: "0x%llx".
+
+What: 		/sys/class/fpga_sec_mgr/fpga_secX/update/available_images
+Date:		Sep 2020
+KernelVersion:  5.10
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read-only. This file returns a space separated list of
+		key words that may be written into the image_load file
+		described below. These keywords decribe an FPGA, BMC,
+		or firmware image in FLASH or EEPROM storage that may
+		be loaded.
+
+What: 		/sys/class/fpga_sec_mgr/fpga_secX/update/image_load
+Date:		Sep 2020
+KernelVersion:  5.10
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Write-only. A key word may be written to this file to
+		trigger a reload of an FPGA, BMC, or firmware image from
+		FLASH or EEPROM. Refer to the available_images file for a
+		list of supported key words for the underlying device.
+		Writing an unsupported string to this file will result in
+		EINVAL being returned.
