@@ -317,12 +317,54 @@ static ssize_t cancel_store(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_WO(cancel);
 
+static ssize_t available_images_show(struct device *dev,
+				     struct device_attribute *attr, char *buf)
+{
+	struct fpga_sec_mgr *smgr = to_sec_mgr(dev);
+	const struct image_load *hndlr;
+	ssize_t count = 0;
+
+	for (hndlr = smgr->sops->image_load; hndlr->name; hndlr++) {
+		count += scnprintf(buf + count, PAGE_SIZE - count,
+				   "%s ", hndlr->name);
+	}
+
+	buf[count - 1] = '\n';
+
+	return count;
+}
+static DEVICE_ATTR_RO(available_images);
+
+static ssize_t image_load_store(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	struct fpga_sec_mgr *smgr = to_sec_mgr(dev);
+	const struct image_load *hndlr;
+	int ret = -EINVAL;
+
+	for (hndlr = smgr->sops->image_load; hndlr->name; hndlr++) {
+		if (sysfs_streq(buf, hndlr->name)) {
+			ret = hndlr->load_image(smgr);
+			break;
+		}
+	}
+
+	return ret ? : count;
+}
+static DEVICE_ATTR_WO(image_load);
+
 static umode_t
 sec_mgr_update_visible(struct kobject *kobj, struct attribute *attr, int n)
 {
 	struct fpga_sec_mgr *smgr = to_sec_mgr(kobj_to_dev(kobj));
 
 	if (attr == &dev_attr_hw_errinfo.attr && !smgr->sops->get_hw_errinfo)
+		return 0;
+
+	if ((!smgr->sops->image_load || !smgr->sops->image_load->name) &&
+	    (attr == &dev_attr_available_images.attr ||
+	     attr == &dev_attr_image_load.attr))
 		return 0;
 
 	return attr->mode;
@@ -335,6 +377,8 @@ static struct attribute *sec_mgr_update_attrs[] = {
 	&dev_attr_error.attr,
 	&dev_attr_remaining_size.attr,
 	&dev_attr_hw_errinfo.attr,
+	&dev_attr_available_images.attr,
+	&dev_attr_image_load.attr,
 	NULL,
 };
 
@@ -387,6 +431,7 @@ struct fpga_sec_mgr *
 fpga_sec_mgr_create(struct device *dev, const char *name,
 		    const struct fpga_sec_mgr_ops *sops, void *priv)
 {
+	const struct image_load *hndlr;
 	struct fpga_sec_mgr *smgr;
 	int id, ret;
 
@@ -394,6 +439,16 @@ fpga_sec_mgr_create(struct device *dev, const char *name,
 	    !sops->write_blk || !sops->poll_complete) {
 		dev_err(dev, "Attempt to register without required ops\n");
 		return NULL;
+	}
+
+	if (sops->image_load) {
+		for (hndlr = sops->image_load; hndlr->name; hndlr++) {
+			if (!hndlr->load_image) {
+				dev_err(dev, "No image_load trigger for %s\n",
+					hndlr->name);
+				return ERR_PTR(-EINVAL);
+			}
+		}
 	}
 
 	if (!name || !strlen(name)) {
