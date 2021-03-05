@@ -546,6 +546,161 @@ static int m10bmc_sec_bmc_image_load_1(struct fpga_sec_mgr *smgr)
 	return m10bmc_sec_bmc_image_load(smgr, 1);
 }
 
+static int retimer_check_idle(struct m10bmc_sec *sec)
+{
+	u32 doorbell;
+	int ret;
+
+	ret = m10bmc_sys_read(sec->m10bmc, M10BMC_DOORBELL, &doorbell);
+	if (ret)
+		return -EIO;
+
+	if (rsu_prog(doorbell) != RSU_PROG_IDLE &&
+	    rsu_prog(doorbell) != RSU_PROG_RSU_DONE &&
+	    rsu_prog(doorbell) != RSU_PROG_PKVL_PROM_DONE) {
+		log_error_regs(sec, doorbell);
+		return -EBUSY;
+	}
+
+	return 0;
+}
+
+static int trigger_retimer_eeprom_load(struct m10bmc_sec *sec)
+{
+	struct intel_m10bmc *m10bmc = sec->m10bmc;
+	unsigned int val;
+	int ret;
+
+	ret = m10bmc_sys_update_bits(m10bmc, M10BMC_DOORBELL,
+				     DRBL_PKVL_EEPROM_LOAD_SEC,
+				     DRBL_PKVL_EEPROM_LOAD_SEC);
+	if (ret)
+		return ret;
+
+	/*
+	 * If the current NIOS FW supports this retimer update feature, then
+	 * it will clear the same PKVL_EEPROM_LOAD bit in 2 seconds. Otherwise
+	 * the driver needs to clear the PKVL_EEPROM_LOAD bit manually and
+	 * return an error code.
+	 */
+	ret = regmap_read_poll_timeout(m10bmc->regmap,
+				       M10BMC_SYS_BASE + M10BMC_DOORBELL,
+				       val,
+				       (!(val & DRBL_PKVL_EEPROM_LOAD_SEC)),
+				       M10BMC_PKVL_LOAD_INTERVAL_US,
+				       M10BMC_PKVL_LOAD_TIMEOUT_US);
+	if (ret == -ETIMEDOUT) {
+		dev_err(sec->dev, "%s PKVL_EEPROM_LOAD clear timedout\n",
+			__func__);
+		m10bmc_sys_update_bits(m10bmc, M10BMC_DOORBELL,
+				       DRBL_PKVL_EEPROM_LOAD_SEC, 0);
+		ret = -ENODEV;
+	} else if (ret) {
+		dev_err(sec->dev, "%s poll EEPROM_LOAD error %d\n",
+			__func__, ret);
+	}
+
+	return ret;
+}
+
+static int poll_retimer_eeprom_load_done(struct m10bmc_sec *sec)
+{
+	struct intel_m10bmc *m10bmc = sec->m10bmc;
+	unsigned int doorbell;
+	int ret;
+
+	/*
+	 * RSU_STAT_PKVL_REJECT indicates that the current image is
+	 * already programmed. RSU_PROG_PKVL_PROM_DONE that the firmware
+	 * update process has finished, but does not necessarily indicate
+	 * a successful update.
+	 */
+	ret = regmap_read_poll_timeout(m10bmc->regmap,
+				       M10BMC_SYS_BASE + M10BMC_DOORBELL,
+				       doorbell,
+				       ((rsu_prog(doorbell) ==
+					 RSU_PROG_PKVL_PROM_DONE) ||
+					(rsu_stat(doorbell) ==
+					 RSU_STAT_PKVL_REJECT)),
+				       M10BMC_PKVL_PRELOAD_INTERVAL_US,
+				       M10BMC_PKVL_PRELOAD_TIMEOUT_US);
+	if (ret) {
+		if (ret == -ETIMEDOUT)
+			dev_err(sec->dev,
+				"%s Doorbell check timedout: 0x%08x\n",
+				__func__, doorbell);
+		else
+			dev_err(sec->dev, "%s poll Doorbell error\n",
+				__func__);
+		return ret;
+	}
+
+	if (rsu_stat(doorbell) == RSU_STAT_PKVL_REJECT) {
+		dev_err(sec->dev, "%s duplicate image rejected\n", __func__);
+		return -ECANCELED;
+	}
+
+	return 0;
+}
+
+static int poll_retimer_preload_done(struct m10bmc_sec *sec)
+{
+	struct intel_m10bmc *m10bmc = sec->m10bmc;
+	unsigned int val;
+	int ret;
+
+	/*
+	 * Wait for the updated firmware to be loaded by the PKVL device
+	 * and confirm that the updated firmware is operational
+	 */
+	ret = regmap_read_poll_timeout(m10bmc->regmap,
+				       M10BMC_SYS_BASE + M10BMC_PKVL_POLL_CTRL, val,
+				       ((val & M10BMC_PKVL_PRELOAD) == M10BMC_PKVL_PRELOAD),
+				       M10BMC_PKVL_PRELOAD_INTERVAL_US,
+				       M10BMC_PKVL_PRELOAD_TIMEOUT_US);
+	if (ret) {
+		dev_err(sec->dev, "%s poll M10BMC_PKVL_PRELOAD error %d\n",
+			__func__, ret);
+		return ret;
+	}
+
+	if ((val & M10BMC_PKVL_UPG_STATUS_MASK) != M10BMC_PKVL_UPG_STATUS_GOOD) {
+		dev_err(sec->dev, "%s error detected during upgrade\n",
+			__func__);
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static int m10bmc_sec_retimer_eeprom_load(struct fpga_sec_mgr *smgr)
+{
+	struct m10bmc_sec *sec = smgr->priv;
+	int ret;
+
+	ret = m10bmc_fw_state_enter(sec->m10bmc, M10BMC_FW_STATE_SEC_UPDATE);
+	if (ret)
+		return -EBUSY;
+
+	ret = retimer_check_idle(sec);
+	if (ret)
+		goto fw_state_exit;
+
+	ret = trigger_retimer_eeprom_load(sec);
+	if (ret)
+		goto fw_state_exit;
+
+	ret = poll_retimer_eeprom_load_done(sec);
+	if (ret)
+		goto fw_state_exit;
+
+	ret = poll_retimer_preload_done(sec);
+
+fw_state_exit:
+	m10bmc_fw_state_exit(sec->m10bmc);
+	return ret;
+}
+
 static struct image_load n3000_image_load_hndlrs[] = {
 	{
 		.name = "bmc_factory",
@@ -554,6 +709,10 @@ static struct image_load n3000_image_load_hndlrs[] = {
 	{
 		.name = "bmc_user",
 		.load_image = m10bmc_sec_bmc_image_load_0,
+	},
+	{
+		.name = "retimer_fw",
+		.load_image = m10bmc_sec_retimer_eeprom_load,
 	},
 	{}
 };
