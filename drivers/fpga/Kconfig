@@ -244,6 +244,15 @@ config FPGA_SEC_MGR
 	  region and for the BMC. Select this option to enable
 	  updates for secure FPGA devices.
 
+config FPGA_IMAGE_LOAD
+	tristate "FPGA Image Load Framework"
+	help
+	  The FPGA Image Load framework presents a common user API for
+	  uploading an image file to an FPGA device. The image file is
+	  expected to be self-describing. It is up to the lower level
+	  device driver and/or the device itself to authenticate and
+	  disposition the image data.
+
 config IFPGA_M10_BMC_SECURE
 	tristate "Intel MAX10 BMC Secure Update driver"
 	depends on MFD_INTEL_M10_BMC_CORE && FPGA_SEC_MGR
