@@ -249,12 +249,11 @@ static enum fw_upload_err rsu_update_init(struct m10bmc_sec *sec)
 	u32 doorbell, status;
 	int ret;
 
-	ret = regmap_update_bits(sec->m10bmc->regmap,
-				 M10BMC_SYS_BASE + M10BMC_DOORBELL,
-				 DRBL_RSU_REQUEST | DRBL_HOST_STATUS,
-				 DRBL_RSU_REQUEST |
-				 FIELD_PREP(DRBL_HOST_STATUS,
-					    HOST_STATUS_IDLE));
+	ret = m10bmc_sys_update_bits(sec->m10bmc, M10BMC_DOORBELL,
+				     DRBL_RSU_REQUEST | DRBL_HOST_STATUS,
+				     DRBL_RSU_REQUEST |
+				     FIELD_PREP(DRBL_HOST_STATUS,
+						HOST_STATUS_IDLE));
 	if (ret)
 		return FW_UPLOAD_ERR_RW_ERROR;
 
@@ -322,11 +321,10 @@ static enum fw_upload_err rsu_send_data(struct m10bmc_sec *sec)
 	u32 doorbell;
 	int ret;
 
-	ret = regmap_update_bits(sec->m10bmc->regmap,
-				 M10BMC_SYS_BASE + M10BMC_DOORBELL,
-				 DRBL_HOST_STATUS,
-				 FIELD_PREP(DRBL_HOST_STATUS,
-					    HOST_STATUS_WRITE_DONE));
+	ret = m10bmc_sys_update_bits(sec->m10bmc, M10BMC_DOORBELL,
+				     DRBL_HOST_STATUS,
+				     FIELD_PREP(DRBL_HOST_STATUS,
+						HOST_STATUS_WRITE_DONE));
 	if (ret)
 		return FW_UPLOAD_ERR_RW_ERROR;
 
@@ -399,11 +397,10 @@ static enum fw_upload_err rsu_cancel(struct m10bmc_sec *sec)
 	if (rsu_prog(doorbell) != RSU_PROG_READY)
 		return FW_UPLOAD_ERR_BUSY;
 
-	ret = regmap_update_bits(sec->m10bmc->regmap,
-				 M10BMC_SYS_BASE + M10BMC_DOORBELL,
-				 DRBL_HOST_STATUS,
-				 FIELD_PREP(DRBL_HOST_STATUS,
-					    HOST_STATUS_ABORT_RSU));
+	ret = m10bmc_sys_update_bits(sec->m10bmc, M10BMC_DOORBELL,
+				     DRBL_HOST_STATUS,
+				     FIELD_PREP(DRBL_HOST_STATUS,
+						HOST_STATUS_ABORT_RSU));
 	if (ret)
 		return FW_UPLOAD_ERR_RW_ERROR;
 
@@ -425,18 +422,24 @@ static enum fw_upload_err m10bmc_sec_prepare(struct fw_upload *fwl,
 	if (ret != FW_UPLOAD_ERR_NONE)
 		return ret;
 
+	ret = m10bmc_fw_state_enter(sec->m10bmc, M10BMC_FW_STATE_SEC_UPDATE);
+	if (ret)
+		return FW_UPLOAD_ERR_BUSY;
+
 	ret = rsu_update_init(sec);
 	if (ret != FW_UPLOAD_ERR_NONE)
-		return ret;
+		goto fw_state_exit;
 
 	ret = rsu_prog_ready(sec);
 	if (ret != FW_UPLOAD_ERR_NONE)
-		return ret;
+		goto fw_state_exit;
 
 	if (sec->cancel_request)
-		return rsu_cancel(sec);
+		ret = rsu_cancel(sec);
 
-	return FW_UPLOAD_ERR_NONE;
+fw_state_exit:
+	m10bmc_fw_state_exit(sec->m10bmc);
+	return ret;
 }
 
 #define WRITE_BLOCK_SIZE 0x4000	/* Default write-block size is 0x4000 bytes */
@@ -497,9 +500,13 @@ static enum fw_upload_err m10bmc_sec_poll_complete(struct fw_upload *fwl)
 	if (sec->cancel_request)
 		return rsu_cancel(sec);
 
+	ret = m10bmc_fw_state_enter(sec->m10bmc, M10BMC_FW_STATE_SEC_UPDATE);
+	if (ret)
+		return FW_UPLOAD_ERR_BUSY;
+
 	result = rsu_send_data(sec);
 	if (result != FW_UPLOAD_ERR_NONE)
-		return result;
+		goto fw_state_exit;
 
 	poll_timeout = jiffies + msecs_to_jiffies(RSU_COMPLETE_TIMEOUT_MS);
 	do {
@@ -509,15 +516,17 @@ static enum fw_upload_err m10bmc_sec_poll_complete(struct fw_upload *fwl)
 
 	if (ret == -EAGAIN) {
 		log_error_regs(sec, doorbell);
-		return FW_UPLOAD_ERR_TIMEOUT;
+		result = FW_UPLOAD_ERR_TIMEOUT;
 	} else if (ret == -EIO) {
-		return FW_UPLOAD_ERR_RW_ERROR;
+		result = FW_UPLOAD_ERR_RW_ERROR;
 	} else if (ret) {
 		log_error_regs(sec, doorbell);
-		return FW_UPLOAD_ERR_HW_ERROR;
+		result = FW_UPLOAD_ERR_HW_ERROR;
 	}
 
-	return FW_UPLOAD_ERR_NONE;
+fw_state_exit:
+	m10bmc_fw_state_exit(sec->m10bmc);
+	return result;
 }
 
 /*
