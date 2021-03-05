@@ -33,3 +33,9 @@ being updated. This is an exclusive operation; an attempt to start
 concurrent image uploads for the same device will fail with EBUSY. An
 eventfd file descriptor parameter is provided to this IOCTL. It will be
 signalled at the completion of the image upload.
+
+FPGA_IMAGE_LOAD_STATUS:
+
+Collect status for an on-going image upload. The status returned includes
+how much data remains to be transferred, the progress of the image upload,
+and error information in the case of a failure.
