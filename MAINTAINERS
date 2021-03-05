@@ -7728,8 +7728,10 @@ FPGA IMAGE UPLOAD DRIVERS
 M:	Russ Weight <russell.h.weight@intel.com>
 L:	linux-fpga@vger.kernel.org
 S:	Maintained
+F:	Documentation/ABI/testing/sysfs-driver-intel-m10-bmc-sec-update
 F:	Documentation/fpga/fpga-image-load.rst
 F:	drivers/fpga/fpga-image-load.c
+F:	drivers/fpga/intel-m10-bmc-sec-update.c
 F:	include/linux/fpga/fpga-image-load.h
 F:	include/uapi/linux/fpga-image-load.h
 
