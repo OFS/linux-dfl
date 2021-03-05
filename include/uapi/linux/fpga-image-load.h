@@ -51,4 +51,22 @@ struct fpga_image_write {
 
 #define FPGA_IMAGE_LOAD_WRITE	_IOW(FPGA_IMAGE_LOAD_MAGIC, 0, struct fpga_image_write)
 
+/**
+ * FPGA_IMAGE_LOAD_STATUS - _IOR(FPGA_IMAGE_LOAD_MAGIC, 1,
+ *				 struct fpga_image_status)
+ *
+ * Request status information for an ongoing update.
+ *
+ * Return: 0 on success, -errno on failure.
+ */
+struct fpga_image_status {
+	/* Output */
+	__u32 remaining_size;	/* size remaining to transfer */
+	__u32 progress;		/* current progress of image load */
+	__u32 err_progress;	/* progress at time of error */
+	__u32 err_code;		/* error code */
+};
+
+#define FPGA_IMAGE_LOAD_STATUS	_IOR(FPGA_IMAGE_LOAD_MAGIC, 1, struct fpga_image_status)
+
 #endif /* _UAPI_LINUX_FPGA_IMAGE_LOAD_H */

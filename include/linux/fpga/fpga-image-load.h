@@ -49,6 +49,7 @@ struct fpga_image_load {
 	const u8 *data;			/* pointer to update data */
 	u32 remaining_size;		/* size remaining to transfer */
 	u32 progress;
+	u32 err_progress;		/* progress at time of error */
 	u32 err_code;			/* image load error code */
 	bool driver_unload;
 	struct eventfd_ctx *finished;
