@@ -174,9 +174,25 @@ enum m10bmc_type {
 #define M10BMC_PMCI_TELEM_START		0x100
 #define M10BMC_PMCI_TELEM_END		0x33c
 
+#define M10BMC_PMCI_BUILD_VER   0x0
+#define NIOS2_PMCI_FW_VERSION   0x4
+#define M10BMC_PMCI_MAC_LOW    0x20
+#define M10BMC_PMCI_MAC_HIGH    0x24
+
 enum m10bmc_fw_state {
 	M10BMC_FW_STATE_NORMAL,
 	M10BMC_FW_STATE_SEC_UPDATE,
+};
+
+/**
+ * struct m10bmc_csr - Intel MAX 10 BMC CSR register
+ */
+struct m10bmc_csr {
+	unsigned int base;
+	unsigned int build_version;
+	unsigned int fw_version;
+	unsigned int mac_low;
+	unsigned int mac_high;
 };
 
 /**
@@ -188,6 +204,7 @@ enum m10bmc_fw_state {
  * @type: the type of MAX10 BMC
  * @handshake_sys_reg_ranges: array of register ranges for fw handshake regs
  * @handshake_sys_reg_nranges: number of register ranges for fw handshake regs
+ * @csr: the register definition of MAX10 BMC
  */
 struct intel_m10bmc {
 	struct device *dev;
@@ -197,6 +214,7 @@ struct intel_m10bmc {
 	enum m10bmc_type type;
 	const struct regmap_range *handshake_sys_reg_ranges;
 	unsigned int handshake_sys_reg_nranges;
+	const struct m10bmc_csr *csr;
 };
 
 /*
