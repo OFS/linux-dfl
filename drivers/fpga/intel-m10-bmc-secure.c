@@ -31,7 +31,6 @@ show_root_entry_hash(struct device *dev, u32 exp_magic,
 		     u32 prog_addr, u32 reh_addr, char *buf)
 {
 	struct m10bmc_sec *sec = dev_get_drvdata(dev);
-	unsigned int stride = regmap_get_reg_stride(sec->m10bmc->regmap);
 	int sha_num_bytes, i, cnt, ret;
 	u8 hash[REH_SHA384_SIZE];
 	u32 magic;
@@ -53,12 +52,10 @@ show_root_entry_hash(struct device *dev, u32 exp_magic,
 		return -EINVAL;
 	}
 
-	WARN_ON(sha_num_bytes % stride);
-	ret = regmap_bulk_read(sec->m10bmc->regmap, reh_addr,
-			       hash, sha_num_bytes / stride);
+	ret = sec->m10bmc->ops.flash_read(sec->m10bmc, hash, reh_addr,
+					   sha_num_bytes);
 	if (ret) {
-		dev_err(dev, "failed to read root entry hash: %x cnt %x: %d\n",
-			reh_addr, sha_num_bytes / stride, ret);
+		dev_err(dev, "failed to read root entry hash\n");
 		return ret;
 	}
 
@@ -87,21 +84,16 @@ DEVICE_ATTR_SEC_REH_RO(pr, PR_PROG_MAGIC, PR_PROG_ADDR, PR_REH_ADDR);
 static ssize_t
 show_canceled_csk(struct device *dev, u32 addr, char *buf)
 {
-	unsigned int i, stride, size = CSK_32ARRAY_SIZE * sizeof(u32);
+	unsigned int i, size = CSK_32ARRAY_SIZE * sizeof(u32);
 	struct m10bmc_sec *sec = dev_get_drvdata(dev);
 	DECLARE_BITMAP(csk_map, CSK_BIT_LEN);
 	__le32 csk_le32[CSK_32ARRAY_SIZE];
 	u32 csk32[CSK_32ARRAY_SIZE];
 	int ret;
 
-	stride = regmap_get_reg_stride(sec->m10bmc->regmap);
-
-	WARN_ON(size % stride);
-	ret = regmap_bulk_read(sec->m10bmc->regmap, addr, csk_le32,
-			       size / stride);
+	ret = sec->m10bmc->ops.flash_read(sec->m10bmc, csk_le32, addr, size);
 	if (ret) {
-		dev_err(sec->dev, "failed to read CSK vector: %x cnt %x: %d\n",
-			addr, size / stride, ret);
+		dev_err(sec->dev, "failed to read CSK vector\n");
 		return ret;
 	}
 
@@ -132,24 +124,21 @@ static ssize_t flash_count_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
 	struct m10bmc_sec *sec = dev_get_drvdata(dev);
-	unsigned int stride, num_bits;
+	unsigned int num_bits;
 	u8 *flash_buf;
 	int cnt, ret;
 
-	stride = regmap_get_reg_stride(sec->m10bmc->regmap);
 	num_bits = FLASH_COUNT_SIZE * 8;
 
 	flash_buf = kmalloc(FLASH_COUNT_SIZE, GFP_KERNEL);
 	if (!flash_buf)
 		return -ENOMEM;
 
-	WARN_ON(FLASH_COUNT_SIZE % stride);
-	ret = regmap_bulk_read(sec->m10bmc->regmap, STAGING_FLASH_COUNT,
-			       flash_buf, FLASH_COUNT_SIZE / stride);
+	ret = sec->m10bmc->ops.flash_read(sec->m10bmc, flash_buf,
+					   STAGING_FLASH_COUNT,
+					   FLASH_COUNT_SIZE);
 	if (ret) {
-		dev_err(sec->dev,
-			"failed to read flash count: %x cnt %x: %d\n",
-			STAGING_FLASH_COUNT, FLASH_COUNT_SIZE / stride, ret);
+		dev_err(sec->dev, "failed to read flash count\n");
 		goto exit_free;
 	}
 	cnt = num_bits - bitmap_weight((unsigned long *)flash_buf, num_bits);
@@ -390,6 +379,8 @@ static enum fpga_sec_err m10bmc_sec_prepare(struct fpga_sec_mgr *smgr)
 		goto fw_state_exit;
 
 	ret = rsu_prog_ready(sec);
+	if (ret == FPGA_SEC_ERR_NONE)
+		goto fw_state_exit;
 
 fw_state_exit:
 	m10bmc_fw_state_exit(sec->m10bmc);
