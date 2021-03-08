@@ -192,6 +192,9 @@ enum m10bmc_type {
 #define FLASH_NIOS_REQUEST BIT(4)
 #define FLASH_HOST_REQUEST BIT(5)
 
+#define M10BMC_PMCI_DOORBELL 0x1c0
+#define M10BMC_PMCI_AUTH_RESULT 0x1c4
+
 #define M10_FLASH_INT_US       1
 #define M10_FLASH_TIMEOUT_US   10000
 
@@ -207,6 +210,10 @@ enum m10bmc_type {
 #define PMCI_PR_REH_ADDR  0x7ffe004
 #define PMCI_PR_PROG_ADDR 0x7ffe000
 #define PMCI_PR_PROG_MAGIC 0x5250
+
+#define m10bmc_base(m10bmc) ((m10bmc)->csr->base)
+#define doorbell_reg(m10bmc) ((m10bmc)->csr->doorbell)
+#define auth_result_reg(m10bmc) ((m10bmc)->csr->auth_result)
 
 #define bmc_prog_addr(m10bmc) ((m10bmc)->csr->bmc_prog_addr)
 #define bmc_reh_addr(m10bmc) ((m10bmc)->csr->bmc_reh_addr)
@@ -232,6 +239,8 @@ struct m10bmc_csr {
 	unsigned int fw_version;
 	unsigned int mac_low;
 	unsigned int mac_high;
+	unsigned int doorbell;
+	unsigned int auth_result;
 	unsigned int bmc_prog_addr;
 	unsigned int bmc_reh_addr;
 	unsigned int bmc_magic;
