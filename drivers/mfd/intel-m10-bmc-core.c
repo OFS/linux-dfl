@@ -55,6 +55,60 @@ static const struct regmap_range n3000_fw_handshake_regs[] = {
 	regmap_reg_range(M10BMC_N3000_TELEM_START, M10BMC_N3000_TELEM_END),
 };
 
+static int
+m10bmc_flash_read(struct intel_m10bmc *m10bmc, void *buf, u32 addr, u32 size)
+{
+	unsigned int stride = regmap_get_reg_stride(m10bmc->regmap);
+	int ret;
+
+	WARN_ON(size % stride);
+	ret = regmap_bulk_read(m10bmc->regmap, addr, buf, size / stride);
+	if (ret)
+		dev_err(m10bmc->dev,
+			"failed to read flash block data: %x cnt %x: %d\n",
+			addr, size / stride, ret);
+	return ret;
+}
+
+static int
+m10bmc_pmci_set_flash_host_mux(struct intel_m10bmc *m10bmc, bool request)
+{
+	u32 ctrl;
+	int ret;
+
+	ret = regmap_update_bits(m10bmc->regmap, PMCI_M10BMC_FLASH_CTRL,
+				 FLASH_HOST_REQUEST, request);
+	if (ret)
+		return ret;
+
+	return regmap_read_poll_timeout(m10bmc->regmap,
+					PMCI_M10BMC_FLASH_CTRL, ctrl,
+					request ? (get_flash_mux(ctrl) == FLASH_MUX_HOST) :
+					(get_flash_mux(ctrl) != FLASH_MUX_HOST),
+					M10_FLASH_INT_US, M10_FLASH_TIMEOUT_US);
+}
+
+static int
+m10bmc_pmci_flash_read(struct intel_m10bmc *m10bmc, void *buffer,
+		       u32 addr, u32 size)
+{
+	int ret;
+
+	ret = m10bmc_pmci_set_flash_host_mux(m10bmc, true);
+	if (ret)
+		return ret;
+
+	ret = m10bmc->flash_ops->read_blk(m10bmc, buffer, addr, size);
+	if (ret)
+		goto read_fail;
+
+	return m10bmc_pmci_set_flash_host_mux(m10bmc, false);
+
+read_fail:
+	m10bmc_pmci_set_flash_host_mux(m10bmc, false);
+	return ret;
+}
+
 int m10bmc_fw_state_enter(struct intel_m10bmc *m10bmc,
 			  enum m10bmc_fw_state new_state)
 {
@@ -261,12 +315,20 @@ int m10bmc_dev_init(struct intel_m10bmc *m10bmc)
 	init_rwsem(&m10bmc->bmcfw_lock);
 	dev_set_drvdata(m10bmc->dev, m10bmc);
 
-	if (type == M10_N3000 || type == M10_D5005) {
+	if (m10bmc->type == M10_PMCI) {
+		if (!m10bmc->flash_ops) {
+			dev_err(m10bmc->dev,
+				"No flash-ops provided\n");
+			return -EINVAL;
+		}
+		m10bmc->ops.flash_read = m10bmc_pmci_flash_read;
+	} else {
 		ret = check_m10bmc_version(m10bmc);
 		if (ret) {
 			dev_err(m10bmc->dev, "Failed to identify m10bmc hardware\n");
 			return ret;
 		}
+		m10bmc->ops.flash_read = m10bmc_flash_read;
 	}
 
 	switch (type) {

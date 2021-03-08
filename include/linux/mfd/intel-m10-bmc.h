@@ -178,6 +178,20 @@ enum m10bmc_type {
 #define PMCI_M10BMC_MAC_LOW    0x20
 #define PMCI_M10BMC_MAC_HIGH    0x24
 
+#define PMCI_M10BMC_FLASH_CTRL 0x1d0
+#define FLASH_MUX_SELECTION GENMASK(2, 0)
+#define FLASH_MUX_IDLE 0
+#define FLASH_MUX_NIOS 1
+#define FLASH_MUX_HOST 2
+#define FLASH_MUX_PFL  4
+#define get_flash_mux(mux)      FIELD_GET(FLASH_MUX_SELECTION, mux)
+
+#define FLASH_NIOS_REQUEST BIT(4)
+#define FLASH_HOST_REQUEST BIT(5)
+
+#define M10_FLASH_INT_US       1
+#define M10_FLASH_TIMEOUT_US   10000
+
 enum m10bmc_fw_state {
 	M10BMC_FW_STATE_NORMAL,
 	M10BMC_FW_STATE_SEC_UPDATE,
@@ -205,6 +219,15 @@ struct fpga_flash_ops {
 };
 
 /**
+ * struct m10bmc_ops - device specific operations
+ * @flash_read: read a block of data from flash
+ */
+struct m10bmc_ops {
+	int (*flash_read)(struct intel_m10bmc *m10bmc, void *buf,
+			  u32 addr, u32 size);
+};
+
+/**
  * struct intel_m10bmc - Intel MAX 10 BMC parent driver data structure
  * @dev: this device
  * @regmap: the regmap used to access registers by m10bmc itself
@@ -215,6 +238,7 @@ struct fpga_flash_ops {
  * @handshake_sys_reg_nranges: number of register ranges for fw handshake regs
  * @csr: the register definition of MAX10 BMC
  * @flash_ops: optional device specific operations for flash R/W
+ * @ops: device specific operations
  */
 struct intel_m10bmc {
 	struct device *dev;
@@ -226,6 +250,7 @@ struct intel_m10bmc {
 	unsigned int handshake_sys_reg_nranges;
 	const struct m10bmc_csr *csr;
 	struct fpga_flash_ops *flash_ops;
+	struct m10bmc_ops ops;
 };
 
 /*
