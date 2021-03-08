@@ -1,6 +1,6 @@
 What:		/sys/bus/platform/drivers/intel-m10bmc-secure/.../security/sr_root_entry_hash
-Date:		June 2021
-KernelVersion:	5.14
+Date:		Oct 2021
+KernelVersion:	5.15
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Returns the root entry hash for the static
 		region if one is programmed, else it returns the
@@ -9,8 +9,8 @@ Description:	Read only. Returns the root entry hash for the static
 		Format: "0x%x".
 
 What:		/sys/bus/platform/drivers/intel-m10bmc-secure/.../security/pr_root_entry_hash
-Date:		June 2021
-KernelVersion:	5.14
+Date:		Oct 2021
+KernelVersion:	5.15
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Returns the root entry hash for the partial
 		reconfiguration region if one is programmed, else it
@@ -19,8 +19,8 @@ Description:	Read only. Returns the root entry hash for the partial
 		Format: "0x%x".
 
 What:		/sys/bus/platform/drivers/intel-m10bmc-secure/.../security/bmc_root_entry_hash
-Date:		June 2021
-KernelVersion:	5.14
+Date:		Oct 2021
+KernelVersion:	5.15
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Returns the root entry hash for the BMC image
 		if one is programmed, else it returns the string:
@@ -29,33 +29,58 @@ Description:	Read only. Returns the root entry hash for the BMC image
 		Format: "0x%x".
 
 What:		/sys/bus/platform/drivers/intel-m10bmc-secure/.../security/sr_canceled_csks
-Date:		June 2021
-KernelVersion:	5.14
+Date:		Oct 2021
+KernelVersion:	5.15
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Returns a list of indices for canceled code
 		signing keys for the static region. The standard bitmap
 		list format is used (e.g. "1,2-6,9").
 
 What:		/sys/bus/platform/drivers/intel-m10bmc-secure/.../security/pr_canceled_csks
-Date:		June 2021
-KernelVersion:	5.14
+Date:		Oct 2021
+KernelVersion:	5.15
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Returns a list of indices for canceled code
 		signing keys for the partial reconfiguration region. The
 		standard bitmap list format is used (e.g. "1,2-6,9").
 
 What:		/sys/bus/platform/drivers/intel-m10bmc-secure/.../security/bmc_canceled_csks
-Date:		June 2021
-KernelVersion:	5.14
+Date:		Oct 2021
+KernelVersion:	5.15
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Returns a list of indices for canceled code
 		signing keys for the BMC.  The standard bitmap list format
 		is used (e.g. "1,2-6,9").
 
 What:		/sys/bus/platform/drivers/intel-m10bmc-secure/.../security/flash_count
-Date:		June 2021
-KernelVersion:	5.14
+Date:		Oct 2021
+KernelVersion:	5.15
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Returns number of times the secure update
 		staging area has been flashed.
 		Format: "%u".
+
+What:		/sys/bus/platform/drivers/intel-m10bmc-secure/.../available_fpga_images
+Date:		Oct 2021
+KernelVersion:  5.15
+Contact:	Tianfei zhang <tianfei.zhang@intel.com>
+Description:	Read-only. This file returns a space separated list of
+		key words that may be written into the power_on_image file
+		described below. These keywords identify the possible fpga
+		images that may be used as a default on the next boot of
+		the FPGA card.
+
+What:           /sys/bus/platform/drivers/intel-m10bmc-secure/.../power_on_image
+Date:		Oct 2021
+KernelVersion:  5.15
+Contact:	Tianfei zhang <tianfei.zhang@intel.com>
+Description:	Write-only. A key word from the available_fpga_images file
+		may be written to this file to select the FPGA image to be
+		configured on the next boot of the FPGA card. One or more
+		additional keywords may be specified, separated by spaces,
+		to identify a sequence of fall-back images in the event that
+		the selected FPGA image fails to load. Your specific device
+		may not support all possible fall-back sequences. The EINVAL
+		error code will be returned if you attempt to select an
+		unsupported image or fall-back sequence. Consult your product
+		documentation for supported configurations.
