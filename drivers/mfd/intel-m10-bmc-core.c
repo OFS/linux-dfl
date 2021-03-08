@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Intel MAX 10 Board Management Controller chip
+ * Intel MAX 10 Board Management Controller chip - common code
  *
- * Copyright (C) 2018-2020 Intel Corporation. All rights reserved.
+ * Copyright (C) 2018-2021 Intel Corporation. All rights reserved.
  */
+
 #include <linux/bitfield.h>
-#include <linux/init.h>
+#include <linux/device.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/intel-m10-bmc.h>
 #include <linux/module.h>
-#include <linux/mutex.h>
-#include <linux/regmap.h>
-#include <linux/spi/spi.h>
 
 static struct mfd_cell m10bmc_bmc_subdevs[] = {
 	{ .name = "d5005bmc-hwmon" },
@@ -26,17 +24,6 @@ static struct mfd_cell m10bmc_pacn3000_subdevs[] = {
 	{ .name = "n3000bmc-hwmon" },
 	{ .name = "n3000bmc-retimer" },
 	{ .name = "n3000bmc-secure" },
-};
-
-static const struct regmap_range m10bmc_regmap_range[] = {
-	regmap_reg_range(M10BMC_LEGACY_BUILD_VER, M10BMC_LEGACY_BUILD_VER),
-	regmap_reg_range(M10BMC_SYS_BASE, M10BMC_SYS_END),
-	regmap_reg_range(M10BMC_FLASH_BASE, M10BMC_FLASH_END),
-};
-
-static const struct regmap_access_table m10bmc_access_table = {
-	.yes_ranges	= m10bmc_regmap_range,
-	.n_yes_ranges	= ARRAY_SIZE(m10bmc_regmap_range),
 };
 
 static const struct regmap_range n3000_fw_handshake_regs[] = {
@@ -125,15 +112,6 @@ int m10bmc_sys_update_bits(struct intel_m10bmc *m10bmc, unsigned int offset,
 }
 EXPORT_SYMBOL_GPL(m10bmc_sys_update_bits);
 
-static struct regmap_config intel_m10bmc_regmap_config = {
-	.reg_bits = 32,
-	.val_bits = 32,
-	.reg_stride = 4,
-	.wr_table = &m10bmc_access_table,
-	.rd_table = &m10bmc_access_table,
-	.max_register = M10BMC_MEM_END,
-};
-
 static ssize_t bmc_version_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
@@ -212,7 +190,16 @@ static struct attribute *m10bmc_attrs[] = {
 	&dev_attr_mac_count.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(m10bmc);
+
+static const struct attribute_group m10bmc_group = {
+	.attrs = m10bmc_attrs,
+};
+
+const struct attribute_group *m10bmc_dev_groups[] = {
+	&m10bmc_group,
+	NULL,
+};
+EXPORT_SYMBOL_GPL(m10bmc_dev_groups);
 
 static int check_m10bmc_version(struct intel_m10bmc *ddata)
 {
@@ -240,82 +227,50 @@ static int check_m10bmc_version(struct intel_m10bmc *ddata)
 	return 0;
 }
 
-static int intel_m10_bmc_spi_probe(struct spi_device *spi)
+int m10bmc_dev_init(struct intel_m10bmc *m10bmc)
 {
-	const struct spi_device_id *id = spi_get_device_id(spi);
-	struct device *dev = &spi->dev;
+	enum m10bmc_type type = m10bmc->type;
 	struct mfd_cell *cells;
-	struct intel_m10bmc *ddata;
 	int ret, n_cell;
 
-	ddata = devm_kzalloc(dev, sizeof(*ddata), GFP_KERNEL);
-	if (!ddata)
-		return -ENOMEM;
+	init_rwsem(&m10bmc->bmcfw_lock);
+	dev_set_drvdata(m10bmc->dev, m10bmc);
 
-	init_rwsem(&ddata->bmcfw_lock);
-	ddata->dev = dev;
-
-	ddata->regmap =
-		devm_regmap_init_spi_avmm(spi, &intel_m10bmc_regmap_config);
-	if (IS_ERR(ddata->regmap)) {
-		ret = PTR_ERR(ddata->regmap);
-		dev_err(dev, "Failed to allocate regmap: %d\n", ret);
-		return ret;
-	}
-
-	spi_set_drvdata(spi, ddata);
-
-	ret = check_m10bmc_version(ddata);
+	ret = check_m10bmc_version(m10bmc);
 	if (ret) {
-		dev_err(dev, "Failed to identify m10bmc hardware\n");
+		dev_err(m10bmc->dev, "Failed to identify m10bmc hardware\n");
 		return ret;
 	}
 
-	switch (id->driver_data) {
+	switch (type) {
 	case M10_N3000:
 		cells = m10bmc_pacn3000_subdevs;
 		n_cell = ARRAY_SIZE(m10bmc_pacn3000_subdevs);
-		ddata->handshake_sys_reg_ranges = n3000_fw_handshake_regs;
-		ddata->handshake_sys_reg_nranges =
+		m10bmc->handshake_sys_reg_ranges = n3000_fw_handshake_regs;
+		m10bmc->handshake_sys_reg_nranges =
 			ARRAY_SIZE(n3000_fw_handshake_regs);
 		break;
 	case M10_D5005:
 		cells = m10bmc_bmc_subdevs;
 		n_cell = ARRAY_SIZE(m10bmc_bmc_subdevs);
-		ddata->handshake_sys_reg_ranges = d5005_fw_handshake_regs;
-		ddata->handshake_sys_reg_nranges =
+		m10bmc->handshake_sys_reg_ranges = d5005_fw_handshake_regs;
+		m10bmc->handshake_sys_reg_nranges =
 			ARRAY_SIZE(d5005_fw_handshake_regs);
 		break;
 	default:
 		return -ENODEV;
 	}
 
-	ret = devm_mfd_add_devices(dev, PLATFORM_DEVID_AUTO, cells, n_cell,
-				   NULL, 0, NULL);
+	ret = devm_mfd_add_devices(m10bmc->dev, PLATFORM_DEVID_AUTO,
+				   cells, n_cell, NULL, 0, NULL);
 	if (ret)
-		dev_err(dev, "Failed to register sub-devices: %d\n", ret);
+		dev_err(m10bmc->dev, "Failed to register sub-devices: %d\n",
+			ret);
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(m10bmc_dev_init);
 
-static const struct spi_device_id m10bmc_spi_id[] = {
-	{ "m10-n3000", M10_N3000 },
-	{ "m10-d5005", M10_D5005 },
-	{ }
-};
-MODULE_DEVICE_TABLE(spi, m10bmc_spi_id);
-
-static struct spi_driver intel_m10bmc_spi_driver = {
-	.driver = {
-		.name = "intel-m10-bmc",
-		.dev_groups = m10bmc_groups,
-	},
-	.probe = intel_m10_bmc_spi_probe,
-	.id_table = m10bmc_spi_id,
-};
-module_spi_driver(intel_m10bmc_spi_driver);
-
-MODULE_DESCRIPTION("Intel MAX 10 BMC Device Driver");
+MODULE_DESCRIPTION("Intel MAX 10 BMC core MFD driver");
 MODULE_AUTHOR("Intel Corporation");
 MODULE_LICENSE("GPL v2");
-MODULE_ALIAS("spi:intel-m10-bmc");

@@ -7,6 +7,7 @@
 #ifndef __MFD_INTEL_M10_BMC_H
 #define __MFD_INTEL_M10_BMC_H
 
+#include <linux/dev_printk.h>
 #include <linux/regmap.h>
 #include <linux/rwsem.h>
 
@@ -173,6 +174,7 @@ enum m10bmc_fw_state {
  * @regmap: the regmap used to access registers by m10bmc itself
  * @bmcfw_lock: read/write semaphore to BMC firmware running state
  * @bmcfw_state: BMC firmware running state
+ * @type: the type of MAX10 BMC
  * @handshake_sys_reg_ranges: array of register ranges for fw handshake regs
  * @handshake_sys_reg_nranges: number of register ranges for fw handshake regs
  */
@@ -181,6 +183,7 @@ struct intel_m10bmc {
 	struct regmap *regmap;
 	struct rw_semaphore bmcfw_lock;
 	enum m10bmc_fw_state bmcfw_state;
+	enum m10bmc_type type;
 	const struct regmap_range *handshake_sys_reg_ranges;
 	unsigned int handshake_sys_reg_nranges;
 };
@@ -223,5 +226,11 @@ int m10bmc_fw_state_enter(struct intel_m10bmc *m10bmc,
 			  enum m10bmc_fw_state new_state);
 
 void m10bmc_fw_state_exit(struct intel_m10bmc *m10bmc);
+
+/*
+ * MAX10 BMC Core support
+ */
+int m10bmc_dev_init(struct intel_m10bmc *m10bmc);
+extern const struct attribute_group *m10bmc_dev_groups[];
 
 #endif /* __MFD_INTEL_M10_BMC_H */
