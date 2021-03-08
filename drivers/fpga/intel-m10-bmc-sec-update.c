@@ -66,13 +66,56 @@ static int m10bmc_sec_bmc_image_load(struct m10bmc_sec *sec,
 	if (ret)
 		return ret;
 
-	if (doorbell & DRBL_REBOOT_DISABLED)
-		return -EBUSY;
+	switch (sec->type) {
+	case N3000BMC_SEC:
+	case D5005BMC_SEC:
+	case N5010BMC_SEC:
+		if (doorbell & DRBL_REBOOT_DISABLED)
+			return -EBUSY;
 
-	return m10bmc_sys_update_bits(sec->m10bmc, doorbell_reg(sec->m10bmc),
-				     DRBL_CONFIG_SEL | DRBL_REBOOT_REQ,
-				     FIELD_PREP(DRBL_CONFIG_SEL, val) |
-				     DRBL_REBOOT_REQ);
+		return m10bmc_sys_update_bits(sec->m10bmc, doorbell_reg(sec->m10bmc),
+					      DRBL_CONFIG_SEL | DRBL_REBOOT_REQ,
+					      FIELD_PREP(DRBL_CONFIG_SEL, val) |
+					      DRBL_REBOOT_REQ);
+	case N6000BMC_SEC:
+		if (doorbell & PMCI_DRBL_REBOOT_DISABLED)
+			return -EBUSY;
+
+		return regmap_update_bits(sec->m10bmc->regmap,
+					  m10bmc_base(sec->m10bmc) +
+					  M10BMC_PMCI_MAX10_RECONF,
+					  PMCI_MAX10_REBOOT_REQ | PMCI_MAX10_REBOOT_PAGE,
+					  FIELD_PREP(PMCI_MAX10_REBOOT_PAGE, val) |
+					  PMCI_MAX10_REBOOT_REQ);
+
+	default:
+		return -EINVAL;
+	}
+}
+
+static int pmci_sec_fpga_image_load(struct m10bmc_sec *sec,
+				    unsigned int val)
+{
+	int ret;
+
+	if (val > 2) {
+		dev_err(sec->dev, "%s invalid reload val = %d\n",
+			__func__, val);
+		return -EINVAL;
+	}
+
+	ret = regmap_update_bits(sec->m10bmc->regmap,
+				 m10bmc_base(sec->m10bmc) + M10BMC_PMCI_FPGA_RECONF,
+				 PMCI_FPGA_RP_LOAD, 0);
+	if (ret)
+		return ret;
+
+	return regmap_update_bits(sec->m10bmc->regmap,
+				  m10bmc_base(sec->m10bmc) +
+				  M10BMC_PMCI_FPGA_RECONF,
+				  PMCI_FPGA_RECONF_PAGE | PMCI_FPGA_RP_LOAD,
+				  FIELD_PREP(PMCI_FPGA_RECONF_PAGE, val) |
+				  PMCI_FPGA_RP_LOAD);
 }
 
 static int m10bmc_sec_bmc_image_load_0(struct m10bmc_sec *sec)
@@ -83,6 +126,31 @@ static int m10bmc_sec_bmc_image_load_0(struct m10bmc_sec *sec)
 static int m10bmc_sec_bmc_image_load_1(struct m10bmc_sec *sec)
 {
 	return m10bmc_sec_bmc_image_load(sec, 1);
+}
+
+static int pmci_sec_bmc_image_load_0(struct m10bmc_sec *sec)
+{
+	return m10bmc_sec_bmc_image_load(sec, 0);
+}
+
+static int pmci_sec_bmc_image_load_1(struct m10bmc_sec *sec)
+{
+	return m10bmc_sec_bmc_image_load(sec, 1);
+}
+
+static int pmci_sec_fpga_image_load_0(struct m10bmc_sec *sec)
+{
+	return pmci_sec_fpga_image_load(sec, 0);
+}
+
+static int pmci_sec_fpga_image_load_1(struct m10bmc_sec *sec)
+{
+	return pmci_sec_fpga_image_load(sec, 1);
+}
+
+static int pmci_sec_fpga_image_load_2(struct m10bmc_sec *sec)
+{
+	return pmci_sec_fpga_image_load(sec, 2);
 }
 
 static int retimer_check_idle(struct m10bmc_sec *sec)
@@ -263,6 +331,30 @@ static struct image_load d5005_image_load_hndlrs[] = {
 	{
 		.name = "bmc_user",
 		.load_image = m10bmc_sec_bmc_image_load_1,
+	},
+	{}
+};
+
+static struct image_load pmci_image_load_hndlrs[] = {
+	{
+		.name = "bmc_factory",
+		.load_image = pmci_sec_bmc_image_load_0,
+	},
+	{
+		.name = "bmc_user",
+		.load_image = pmci_sec_bmc_image_load_1,
+	},
+	{
+		.name = "fpga_factory",
+		.load_image = pmci_sec_fpga_image_load_0,
+	},
+	{
+		.name = "fpga_user1",
+		.load_image = pmci_sec_fpga_image_load_1,
+	},
+	{
+		.name = "fpga_user2",
+		.load_image = pmci_sec_fpga_image_load_2,
 	},
 	{}
 };
@@ -973,6 +1065,8 @@ static int m10bmc_sec_probe(struct platform_device *pdev)
 		sec->image_load = n3000_image_load_hndlrs;
 	else if (type == D5005BMC_SEC || type == N5010BMC_SEC)
 		sec->image_load = d5005_image_load_hndlrs;
+	else if (type == N6000BMC_SEC)
+		sec->image_load = pmci_image_load_hndlrs;
 
 	if (type == N6000BMC_SEC && !sec->m10bmc->flash_ops) {
 		dev_err(sec->dev, "No flash-ops provided for security manager\n");
