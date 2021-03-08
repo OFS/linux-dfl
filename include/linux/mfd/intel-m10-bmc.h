@@ -167,6 +167,13 @@ enum m10bmc_type {
 /* Address of 4KB inverted bit vector containing staging area FLASH count */
 #define STAGING_FLASH_COUNT	0x17ffb000
 
+#define M10BMC_PMCI_SYS_BASE 0x0
+#define M10BMC_PMCI_SYS_END  0xfff
+
+/* Telemetry registers */
+#define M10BMC_PMCI_TELEM_START		0x400
+#define M10BMC_PMCI_TELEM_END		0x78c
+
 enum m10bmc_fw_state {
 	M10BMC_FW_STATE_NORMAL,
 	M10BMC_FW_STATE_SEC_UPDATE,
