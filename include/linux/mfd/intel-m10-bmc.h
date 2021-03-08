@@ -189,8 +189,15 @@ enum m10bmc_type {
 #define FLASH_NIOS_REQUEST BIT(4)
 #define FLASH_HOST_REQUEST BIT(5)
 
+#define PMCI_M10BMC_DOORBELL 0x1c0
+#define PMCI_M10BMC_AUTH_RESULT 0x1c4
+
 #define M10_FLASH_INT_US       1
 #define M10_FLASH_TIMEOUT_US   10000
+
+#define m10bmc_base(m10bmc) ((m10bmc)->csr->base)
+#define doorbell_reg(m10bmc) ((m10bmc)->csr->doorbell)
+#define auth_result_reg(m10bmc) ((m10bmc)->csr->auth_result)
 
 enum m10bmc_fw_state {
 	M10BMC_FW_STATE_NORMAL,
@@ -206,6 +213,8 @@ struct m10bmc_csr {
 	unsigned int fw_version;
 	unsigned int mac_low;
 	unsigned int mac_high;
+	unsigned int doorbell;
+	unsigned int auth_result;
 };
 
 /**
