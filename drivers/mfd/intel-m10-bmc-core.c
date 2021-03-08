@@ -11,6 +11,15 @@
 #include <linux/mfd/intel-m10-bmc.h>
 #include <linux/module.h>
 
+static struct mfd_cell pmci_bmc_subdevs[] = {
+	{ .name = "intel-pmci-hwmon" },
+	{ .name = "intel-pmci-secure" }
+};
+
+static const struct regmap_range pmci_fw_handshake_regs[] = {
+	regmap_reg_range(PMCI_M10BMC_TELEM_START, PMCI_M10BMC_TELEM_END),
+};
+
 static struct mfd_cell m10bmc_bmc_subdevs[] = {
 	{ .name = "d5005bmc-hwmon" },
 	{ .name = "d5005bmc-secure" }
@@ -236,10 +245,12 @@ int m10bmc_dev_init(struct intel_m10bmc *m10bmc)
 	init_rwsem(&m10bmc->bmcfw_lock);
 	dev_set_drvdata(m10bmc->dev, m10bmc);
 
-	ret = check_m10bmc_version(m10bmc);
-	if (ret) {
-		dev_err(m10bmc->dev, "Failed to identify m10bmc hardware\n");
-		return ret;
+	if (type == M10_N3000 || type == M10_D5005) {
+		ret = check_m10bmc_version(m10bmc);
+		if (ret) {
+			dev_err(m10bmc->dev, "Failed to identify m10bmc hardware\n");
+			return ret;
+		}
 	}
 
 	switch (type) {
@@ -256,6 +267,13 @@ int m10bmc_dev_init(struct intel_m10bmc *m10bmc)
 		m10bmc->handshake_sys_reg_ranges = d5005_fw_handshake_regs;
 		m10bmc->handshake_sys_reg_nranges =
 			ARRAY_SIZE(d5005_fw_handshake_regs);
+		break;
+	case M10_PMCI:
+		cells = pmci_bmc_subdevs;
+		n_cell = ARRAY_SIZE(pmci_bmc_subdevs);
+		m10bmc->handshake_sys_reg_ranges = pmci_fw_handshake_regs;
+		m10bmc->handshake_sys_reg_nranges =
+			ARRAY_SIZE(pmci_fw_handshake_regs);
 		break;
 	default:
 		return -ENODEV;
