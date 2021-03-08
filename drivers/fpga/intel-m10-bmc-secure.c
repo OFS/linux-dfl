@@ -20,6 +20,8 @@ struct m10bmc_sec {
 	enum fpga_sec_type type;
 };
 
+static const struct image_load *curr_poc;
+
 /* Root Entry Hash (REH) support */
 #define REH_SHA256_SIZE		32
 #define REH_SHA384_SIZE		48
@@ -150,6 +152,177 @@ exit_free:
 }
 static DEVICE_ATTR_RO(flash_count);
 
+static ssize_t
+available_power_on_images_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	struct fpga_sec_mgr *smgr = to_sec_mgr(dev);
+	const struct image_load *hndlr;
+	ssize_t count = 0;
+
+	for (hndlr = smgr->sops->power_on_image; hndlr->name; hndlr++) {
+		count += scnprintf(buf + count, PAGE_SIZE - count,
+				   "%s ", hndlr->name);
+	}
+
+	buf[count - 1] = '\n';
+
+	return count;
+}
+static DEVICE_ATTR_RO(available_power_on_images);
+
+static ssize_t
+power_on_image_show(struct device *dev,
+		    struct device_attribute *attr, char *buf)
+{
+	ssize_t count = 0;
+
+	if (!curr_poc)
+		return -EINVAL;
+
+	count = scnprintf(buf + count, PAGE_SIZE - count,
+			  "%s ", curr_poc->name);
+	buf[count - 1] = '\n';
+
+	return count;
+}
+
+static ssize_t
+power_on_image_store(struct device *dev,
+		     struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct fpga_sec_mgr *smgr = to_sec_mgr(dev);
+	const struct image_load *hndlr;
+	int ret = -EINVAL;
+
+	for (hndlr = smgr->sops->power_on_image; hndlr->name; hndlr++) {
+		if (sysfs_streq(buf, hndlr->name)) {
+			ret = hndlr->load_image(smgr);
+			curr_poc = hndlr;
+			break;
+		}
+	}
+
+	return ret ? : count;
+}
+static DEVICE_ATTR_RW(power_on_image);
+
+static int pmci_sec_power_on_image(struct fpga_sec_mgr *smgr, unsigned char boot_image)
+{
+	struct m10bmc_sec *sec = smgr->priv;
+	u32 poc = 0;
+	int ret;
+
+	if (boot_image > FPGA_POC_FACTORY_U2) {
+		dev_err(sec->dev, "%s invalid boot image = %d\n", __func__, boot_image);
+		return -EINVAL;
+	}
+
+	switch (boot_image) {
+	case FPGA_POC_USER_IMAGE_1:
+		poc |= FIELD_PREP(PMCI_USER_IMAGE_PAGE, POC_USER_IMAGE_1);
+		break;
+	case FPGA_POC_USER_IMAGE_2:
+		poc |= FIELD_PREP(PMCI_USER_IMAGE_PAGE, POC_USER_IMAGE_2);
+		break;
+	case FPGA_POC_FACTORY_U1:
+		poc |= PMCI_FACTORY_IMAGE_PAGE | FIELD_PREP(PMCI_USER_IMAGE_PAGE,
+							    POC_USER_IMAGE_1);
+		break;
+	case FPGA_POC_FACTORY_U2:
+		poc |= PMCI_FACTORY_IMAGE_PAGE | FIELD_PREP(PMCI_USER_IMAGE_PAGE,
+							    POC_USER_IMAGE_2);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	ret = m10bmc_sys_update_bits(sec->m10bmc,
+				     m10bmc_base(sec->m10bmc) + PMCI_M10BMC_FPGA_POC,
+				     PMCI_FPGA_POC |
+				     PMCI_USER_IMAGE_PAGE |
+				     PMCI_FACTORY_IMAGE_PAGE,
+				     poc | PMCI_FPGA_POC);
+	if (ret)
+		return ret;
+
+	ret = regmap_read_poll_timeout(sec->m10bmc->regmap,
+				       m10bmc_base(sec->m10bmc) + PMCI_M10BMC_FPGA_POC,
+				       poc,
+				       (!(poc & PMCI_FPGA_POC)),
+				       NIOS_HANDSHAKE_INTERVAL_US,
+				       NIOS_HANDSHAKE_TIMEOUT_US);
+	if (ret || (FIELD_GET(PMCI_NIOS_STATUS, poc) != NIOS_STATUS_SUCCESS))
+		return -EIO;
+
+	return 0;
+}
+
+static int pmci_sec_power_on_image_0(struct fpga_sec_mgr *smgr)
+{
+	return pmci_sec_power_on_image(smgr, FPGA_POC_USER_IMAGE_1);
+}
+
+static int pmci_sec_power_on_image_1(struct fpga_sec_mgr *smgr)
+{
+	return pmci_sec_power_on_image(smgr, FPGA_POC_USER_IMAGE_2);
+}
+
+static int pmci_sec_power_on_image_2(struct fpga_sec_mgr *smgr)
+{
+	return pmci_sec_power_on_image(smgr, FPGA_POC_FACTORY_U1);
+}
+
+static int pmci_sec_power_on_image_3(struct fpga_sec_mgr *smgr)
+{
+	return pmci_sec_power_on_image(smgr, FPGA_POC_FACTORY_U2);
+}
+
+static struct image_load pmci_power_on_image_hndlrs[] = {
+	{
+		.name = "fpga_user1",
+		.load_image = pmci_sec_power_on_image_0,
+	},
+	{
+		.name = "fpga_user2",
+		.load_image = pmci_sec_power_on_image_1,
+	},
+	{
+		.name = "fpga_factory",
+		.load_image = pmci_sec_power_on_image_2,
+	},
+	{
+		.name = "fpga_factory_option1",
+		.load_image = pmci_sec_power_on_image_3,
+	},
+	{}
+};
+
+static umode_t
+m10bmc_image_visible(struct kobject *kobj,
+		     struct attribute *attr, int n)
+{
+	struct fpga_sec_mgr *smgr = to_sec_mgr(kobj_to_dev(kobj));
+	struct m10bmc_sec *sec = smgr->priv;
+	enum fpga_sec_type type = sec->m10bmc->type;
+
+	if (type == PMCI_SEC)
+		return attr->mode;
+
+	return 0;
+}
+
+static struct attribute *m10bmc_image_attrs[] = {
+	&dev_attr_power_on_image.attr,
+	&dev_attr_available_power_on_images.attr,
+	NULL,
+};
+
+static struct attribute_group m10bmc_image_attr_group = {
+	.attrs = m10bmc_image_attrs,
+	.is_visible = m10bmc_image_visible,
+};
+
 static struct attribute *m10bmc_security_attrs[] = {
 	&dev_attr_flash_count.attr,
 	&dev_attr_bmc_root_entry_hash.attr,
@@ -168,6 +341,7 @@ static struct attribute_group m10bmc_security_attr_group = {
 
 static const struct attribute_group *m10bmc_sec_attr_groups[] = {
 	&m10bmc_security_attr_group,
+	&m10bmc_image_attr_group,
 	NULL,
 };
 
@@ -922,6 +1096,7 @@ m10bmc_sops_create(struct device *dev, enum fpga_sec_type type)
 	if (type == PMCI_SEC) {
 		sops->write_blk = pmci_sec_write_blk;
 		sops->image_load = pmci_image_load_hndlrs;
+		sops->power_on_image = pmci_power_on_image_hndlrs;
 	} else {
 		sops->write_blk = m10bmc_sec_write_blk;
 	}

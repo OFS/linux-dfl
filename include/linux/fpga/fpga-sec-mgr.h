@@ -64,6 +64,10 @@ struct image_load {
  *			    { } member terminated. These structures describe
  *			    image load triggers for BMC, FPGA, or firmware
  *			    images.
+ * @power_on_image:         pointer to array of image_load structures,
+ *			    { } member terminated. These structures describe
+ *			    image setting which be configured of the FPGA during
+ *			    next boot.
  */
 struct fpga_sec_mgr_ops {
 	enum fpga_sec_err (*prepare)(struct fpga_sec_mgr *smgr);
@@ -74,6 +78,7 @@ struct fpga_sec_mgr_ops {
 	void (*cleanup)(struct fpga_sec_mgr *smgr);
 	u64 (*get_hw_errinfo)(struct fpga_sec_mgr *smgr);
 	struct image_load *image_load;	/* terminated with { } member */
+	struct image_load *power_on_image;	/* terminated with { } member */
 };
 
 /* Update progress codes */
@@ -104,6 +109,8 @@ struct fpga_sec_mgr {
 	bool driver_unload;
 	void *priv;
 };
+
+#define to_sec_mgr(d) container_of(d, struct fpga_sec_mgr, dev)
 
 struct fpga_sec_mgr *
 fpga_sec_mgr_create(struct device *dev, const char *name,

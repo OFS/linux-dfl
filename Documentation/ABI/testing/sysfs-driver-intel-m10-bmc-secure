@@ -59,3 +59,21 @@ Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Returns number of times the secure update
 		staging area has been flashed.
 		Format: "%u".
+
+What:
+/sys/bus/platform/devices/n3000bmc-secure.*.auto/available_power_on_images
+Date:		January 2021
+KernelVersion:  5.12
+Contact:	Tianfei zhang <tianfei.zhang@intel.com>
+Description:	Read-only. This file returns a space separated list of
+		key words that may be written into the power_on_image file
+		described below. These keywords decribe an default image on
+		next boot-up.
+
+What:           /sys/bus/platform/devices/n3000bmc-secure.*.auto/power_on_image
+Date:		January 2021
+KernelVersion:  5.12
+Contact:	Tianfei zhang <tianfei.zhang@intel.com>
+Description:	Read/Write. A key word may be written to this file to
+		trigger the image which will be configured of the FPGA during next boot.
+		Read this entry will return which image has been configured.

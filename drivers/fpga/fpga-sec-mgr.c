@@ -23,8 +23,6 @@ struct fpga_sec_mgr_devres {
 
 #define WRITE_BLOCK_SIZE 0x4000	/* Update remaining_size every 0x4000 bytes */
 
-#define to_sec_mgr(d) container_of(d, struct fpga_sec_mgr, dev)
-
 static void update_progress(struct fpga_sec_mgr *smgr,
 			    enum fpga_sec_prog new_progress)
 {

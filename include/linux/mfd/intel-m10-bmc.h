@@ -201,6 +201,18 @@ enum m10bmc_type {
 #define PMCI_MAX10_REBOOT_REQ BIT(0)
 #define PMCI_MAX10_REBOOT_PAGE BIT(1)
 
+#define PMCI_M10BMC_FPGA_POC 0xb0
+#define PMCI_FPGA_POC BIT(0)
+#define PMCI_NIOS_REQ_CLEAR BIT(1)
+#define PMCI_NIOS_STATUS GENMASK(5, 4)
+#define NIOS_STATUS_IDLE 0
+#define NIOS_STATUS_SUCCESS 1
+#define NIOS_STATUS_FAIL 2
+#define PMCI_USER_IMAGE_PAGE GENMASK(10, 8)
+#define POC_USER_IMAGE_1  1
+#define POC_USER_IMAGE_2  2
+#define PMCI_FACTORY_IMAGE_PAGE BIT(31)
+
 #define PMCI_M10BMC_FPGA_RECONF 0xb8
 #define PMCI_FPGA_RECONF_PAGE  GENMASK(22, 20)
 #define PMCI_FPGA_RP_LOAD      BIT(23)
@@ -208,6 +220,13 @@ enum m10bmc_type {
 #define m10bmc_base(m10bmc) ((m10bmc)->csr->base)
 #define doorbell_reg(m10bmc) ((m10bmc)->csr->doorbell)
 #define auth_result_reg(m10bmc) ((m10bmc)->csr->auth_result)
+
+enum m10bmc_fpga_poc {
+	FPGA_POC_USER_IMAGE_1,
+	FPGA_POC_USER_IMAGE_2,
+	FPGA_POC_FACTORY_U1,
+	FPGA_POC_FACTORY_U2
+};
 
 enum m10bmc_fw_state {
 	M10BMC_FW_STATE_NORMAL,
