@@ -181,6 +181,20 @@ enum m10bmc_type {
 #define M10BMC_PMCI_MAC_LOW    0x20
 #define M10BMC_PMCI_MAC_HIGH    0x24
 
+#define M10BMC_PMCI_FLASH_CTRL 0x1d0
+#define FLASH_MUX_SELECTION GENMASK(2, 0)
+#define FLASH_MUX_IDLE 0
+#define FLASH_MUX_NIOS 1
+#define FLASH_MUX_HOST 2
+#define FLASH_MUX_PFL  4
+#define get_flash_mux(mux)      FIELD_GET(FLASH_MUX_SELECTION, mux)
+
+#define FLASH_NIOS_REQUEST BIT(4)
+#define FLASH_HOST_REQUEST BIT(5)
+
+#define M10_FLASH_INT_US       1
+#define M10_FLASH_TIMEOUT_US   10000
+
 /* Addresses for security related data in FLASH */
 #define PMCI_BMC_REH_ADDR 0x7ffc004
 #define PMCI_BMC_PROG_ADDR 0x7ffc000
@@ -237,10 +251,21 @@ struct m10bmc_csr {
  * struct fpga_flash_ops - device specific operations for flash R/W
  * @write_blk: write a block of data to flash
  * @read_blk: read a block of data from flash
+ * @mux_lock: Prevent concurrent flash burst reads
  */
 struct fpga_flash_ops {
 	int (*write_blk)(struct intel_m10bmc *m10bmc, void *buf, u32 size);
 	int (*read_blk)(struct intel_m10bmc *m10bmc, void *buf, u32 addr, u32 size);
+	struct mutex mux_lock;	/* Prevent concurrent flash burst reads */
+};
+
+/**
+ * struct m10bmc_ops - device specific operations
+ * @flash_read: read a block of data from flash
+ */
+struct m10bmc_ops {
+	int (*flash_read)(struct intel_m10bmc *m10bmc, void *buf,
+			  u32 addr, u32 size);
 };
 
 /**
@@ -254,6 +279,7 @@ struct fpga_flash_ops {
  * @handshake_sys_reg_nranges: number of register ranges for fw handshake regs
  * @csr: the register definition of MAX10 BMC
  * @flash_ops: optional device specific operations for flash R/W
+ * @ops: device specific operations
  */
 struct intel_m10bmc {
 	struct device *dev;
@@ -265,6 +291,7 @@ struct intel_m10bmc {
 	unsigned int handshake_sys_reg_nranges;
 	const struct m10bmc_csr *csr;
 	struct fpga_flash_ops *flash_ops;
+	struct m10bmc_ops ops;
 };
 
 /*
