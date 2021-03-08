@@ -19,6 +19,7 @@ enum fpga_sec_type {
 	N3000BMC_SEC,
 	D5005BMC_SEC,
 	N5010BMC_SEC,
+	N6000BMC_SEC
 };
 
 struct image_load;
@@ -782,6 +783,38 @@ static enum fw_upload_err m10bmc_sec_write(struct fw_upload *fwl, const u8 *data
 	return FW_UPLOAD_ERR_NONE;
 }
 
+static enum fw_upload_err pmci_sec_write(struct fw_upload *fwl, const u8 *data,
+					 u32 offset, u32 size, u32 *written)
+{
+	struct m10bmc_sec *sec = fwl->dd_handle;
+	struct intel_m10bmc *m10bmc;
+	u32 blk_size, doorbell;
+	int ret;
+
+	m10bmc = sec->m10bmc;
+
+	if (sec->cancel_request)
+		return rsu_cancel(sec);
+
+	ret = m10bmc_sys_read(m10bmc, M10BMC_DOORBELL, &doorbell);
+	if (ret) {
+		return FW_UPLOAD_ERR_RW_ERROR;
+	} else if (rsu_prog(doorbell) != RSU_PROG_READY) {
+		log_error_regs(sec, doorbell);
+		return FW_UPLOAD_ERR_HW_ERROR;
+	}
+
+	blk_size = min_t(u32, WRITE_BLOCK_SIZE, size);
+	ret = m10bmc->flash_ops->write_blk(m10bmc, (void *)data + offset,
+					   blk_size);
+
+	if (ret)
+		return FW_UPLOAD_ERR_RW_ERROR;
+
+	*written = blk_size;
+	return FW_UPLOAD_ERR_NONE;
+}
+
 static enum fw_upload_err m10bmc_sec_poll_complete(struct fw_upload *fwl)
 {
 	struct m10bmc_sec *sec = fwl->dd_handle;
@@ -842,13 +875,27 @@ static void m10bmc_sec_cleanup(struct fw_upload *fwl)
 	(void)rsu_cancel(sec);
 }
 
-static const struct fw_upload_ops m10bmc_ops = {
-	.prepare = m10bmc_sec_prepare,
-	.write = m10bmc_sec_write,
-	.poll_complete = m10bmc_sec_poll_complete,
-	.cancel = m10bmc_sec_cancel,
-	.cleanup = m10bmc_sec_cleanup,
-};
+static struct fw_upload_ops *
+m10bmc_ops_create(struct device *dev, enum fpga_sec_type type)
+{
+	struct fw_upload_ops *ops;
+
+	ops = devm_kzalloc(dev, sizeof(*ops), GFP_KERNEL);
+	if (!ops)
+		return NULL;
+
+	ops->prepare = m10bmc_sec_prepare;
+	ops->poll_complete = m10bmc_sec_poll_complete;
+	ops->cancel = m10bmc_sec_cancel;
+	ops->cleanup = m10bmc_sec_cleanup;
+
+	if (type == N6000BMC_SEC)
+		ops->write = pmci_sec_write;
+	else
+		ops->write = m10bmc_sec_write;
+
+	return ops;
+}
 
 #define SEC_UPDATE_LEN_MAX 32
 static int m10bmc_sec_probe(struct platform_device *pdev)
@@ -856,6 +903,7 @@ static int m10bmc_sec_probe(struct platform_device *pdev)
 	const struct platform_device_id *id = platform_get_device_id(pdev);
 	enum fpga_sec_type type = (enum fpga_sec_type)id->driver_data;
 	char buf[SEC_UPDATE_LEN_MAX];
+	struct fw_upload_ops *ops;
 	struct m10bmc_sec *sec;
 	struct fw_upload *fwl;
 	unsigned int len;
@@ -865,14 +913,23 @@ static int m10bmc_sec_probe(struct platform_device *pdev)
 	if (!sec)
 		return -ENOMEM;
 
+	ops = m10bmc_ops_create(&pdev->dev, type);
+	if (!ops)
+		return -ENOMEM;
+
 	sec->dev = &pdev->dev;
 	sec->m10bmc = dev_get_drvdata(pdev->dev.parent);
 	sec->type = type;
 
 	if (type == N3000BMC_SEC)
 		sec->image_load = n3000_image_load_hndlrs;
-	else
+	else if (type == D5005BMC_SEC || type == N5010BMC_SEC)
 		sec->image_load = d5005_image_load_hndlrs;
+
+	if (type == N6000BMC_SEC && !sec->m10bmc->flash_ops) {
+		dev_err(sec->dev, "No flash-ops provided for security manager\n");
+		return -EINVAL;
+	}
 
 	dev_set_drvdata(&pdev->dev, sec);
 
@@ -888,7 +945,7 @@ static int m10bmc_sec_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	fwl = firmware_upload_register(THIS_MODULE, sec->dev, sec->fw_name,
-				       &m10bmc_ops, sec);
+				       ops, sec);
 	if (IS_ERR(fwl)) {
 		dev_err(sec->dev, "Firmware Upload driver failed to start\n");
 		kfree(sec->fw_name);
@@ -923,6 +980,10 @@ static const struct platform_device_id intel_m10bmc_sec_ids[] = {
 	{
 		.name = "n5010bmc-sec-update",
 		.driver_data = (unsigned long)N5010BMC_SEC,
+	},
+	{
+		.name = "n6000bmc-sec-update",
+		.driver_data = (unsigned long)N6000BMC_SEC,
 	},
 	{ }
 };
