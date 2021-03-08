@@ -14,6 +14,8 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 
+struct m10bmc_sec;
+
 /* Supported fpga secure manager types */
 enum fpga_sec_type {
 	N3000BMC_SEC,
@@ -21,10 +23,31 @@ enum fpga_sec_type {
 	PMCI_SEC
 };
 
+/* Supported names for power-on images */
+enum fpga_image {
+	FPGA_FACTORY,
+	FPGA_USER1,
+	FPGA_USER2,
+	FPGA_MAX
+};
+
+static char *fpga_image_names[] = {
+	[FPGA_FACTORY] = "fpga_factory",
+	[FPGA_USER1] = "fpga_user1",
+	[FPGA_USER2] = "fpga_user2"
+};
+
+struct fpga_power_on {
+	u32 image_mask;
+	int (*get_default)(struct m10bmc_sec *sec, char *buf);
+	int (*set_default)(struct m10bmc_sec *sec, enum fpga_image images[]);
+};
+
 struct m10bmc_sec {
 	struct device *dev;
 	struct intel_m10bmc *m10bmc;
 	enum fpga_sec_type type;
+	const struct fpga_power_on *poc;	/* power on image configuration */
 };
 
 /* Root Entry Hash (REH) support */
@@ -157,6 +180,189 @@ exit_free:
 }
 static DEVICE_ATTR_RO(flash_count);
 
+static enum fpga_image
+fpga_image_by_name(struct m10bmc_sec *sec, char *image_name)
+{
+	enum fpga_image i;
+
+	for (i = 0; i < FPGA_MAX; i++)
+		if (sysfs_streq(image_name, fpga_image_names[i]))
+			return i;
+
+	return FPGA_MAX;
+}
+
+static int
+fpga_images(struct m10bmc_sec *sec, char *names, enum fpga_image images[])
+{
+	u32 image_mask = sec->poc->image_mask;
+	enum fpga_image image;
+	char *image_name;
+	int i = 0;
+
+	while ((image_name = strsep(&names, " \n"))) {
+		image = fpga_image_by_name(sec, image_name);
+		if (image >= FPGA_MAX || !(image_mask & BIT(image)))
+			return -EINVAL;
+
+		images[i++] = image;
+		image_mask &= ~BIT(image);
+	}
+
+	return (i == 0) ? -EINVAL : 0;
+}
+
+static int
+pmci_set_power_on_image(struct m10bmc_sec *sec, enum fpga_image images[])
+{
+	u32 poc_mask = PMCI_FACTORY_IMAGE_SEL;
+	int ret, i = 0;
+	u32 poc = 0;
+
+	if (images[1] == FPGA_FACTORY)
+		return -EINVAL;
+
+	if (images[0] == FPGA_FACTORY) {
+		poc = PMCI_FACTORY_IMAGE_SEL;
+		i = 1;
+	}
+
+	if (images[i] == FPGA_USER1 ||  images[i] == FPGA_USER2) {
+		poc_mask |= PMCI_USER_IMAGE_PAGE;
+		if (images[i] == FPGA_USER1)
+			poc |= FIELD_PREP(PMCI_USER_IMAGE_PAGE, POC_USER_IMAGE_1);
+		else
+			poc |= FIELD_PREP(PMCI_USER_IMAGE_PAGE, POC_USER_IMAGE_2);
+	}
+
+	ret = m10bmc_sys_update_bits(sec->m10bmc,
+				     m10bmc_base(sec->m10bmc) + PMCI_M10BMC_FPGA_POC,
+				     poc_mask | PMCI_FPGA_POC, poc | PMCI_FPGA_POC);
+	if (ret)
+		return ret;
+
+	ret = regmap_read_poll_timeout(sec->m10bmc->regmap,
+				       m10bmc_base(sec->m10bmc) + PMCI_M10BMC_FPGA_POC,
+				       poc,
+				       (!(poc & PMCI_FPGA_POC)),
+				       NIOS_HANDSHAKE_INTERVAL_US,
+				       NIOS_HANDSHAKE_TIMEOUT_US);
+
+	if (ret || (FIELD_GET(PMCI_NIOS_STATUS, poc) != NIOS_STATUS_SUCCESS))
+		return -EIO;
+
+	return 0;
+}
+
+static int pmci_get_power_on_image(struct m10bmc_sec *sec, char *buf)
+{
+	char *image_names[FPGA_MAX] = { 0 };
+	int ret, i = 0;
+	u32 poc;
+
+	ret = m10bmc_sys_read(sec->m10bmc, PMCI_M10BMC_FPGA_POC, &poc);
+	if (ret)
+		return ret;
+
+	if (poc & PMCI_FACTORY_IMAGE_SEL)
+		image_names[i++] = fpga_image_names[FPGA_FACTORY];
+
+	if (FIELD_GET(PMCI_USER_IMAGE_PAGE, poc) == POC_USER_IMAGE_1) {
+		image_names[i++] = fpga_image_names[FPGA_USER1];
+		image_names[i++] = fpga_image_names[FPGA_USER2];
+	} else {
+		image_names[i++] = fpga_image_names[FPGA_USER2];
+		image_names[i++] = fpga_image_names[FPGA_USER1];
+	}
+
+	if (!(poc & PMCI_FACTORY_IMAGE_SEL))
+		image_names[i] = fpga_image_names[FPGA_FACTORY];
+
+	return sysfs_emit(buf, "%s %s %s\n", image_names[0],
+			  image_names[1], image_names[2]);
+}
+
+static ssize_t
+available_fpga_images_show(struct device *dev,
+			   struct device_attribute *attr, char *buf)
+{
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);
+	ssize_t count = 0;
+	enum fpga_image i;
+
+	for (i = 0; i < FPGA_MAX; i++)
+		if (BIT(i) & sec->poc->image_mask)
+			count += scnprintf(buf + count, PAGE_SIZE - count,
+					   "%s ", fpga_image_names[i]);
+	buf[count - 1] = '\n';
+
+	return count;
+}
+static DEVICE_ATTR_RO(available_fpga_images);
+
+static ssize_t
+power_on_image_show(struct device *dev,
+		    struct device_attribute *attr, char *buf)
+{
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);
+
+	return sec->poc->get_default(sec, buf);
+}
+
+static ssize_t
+power_on_image_store(struct device *dev,
+		     struct device_attribute *attr, const char *buf, size_t count)
+{
+	enum fpga_image images[FPGA_MAX] = { [0 ... FPGA_MAX - 1] = FPGA_MAX };
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);
+	char *tokens;
+	int ret;
+
+	tokens = kmemdup_nul(buf, count, GFP_KERNEL);
+	if (!tokens)
+		ret = -ENOMEM;
+
+	ret = fpga_images(sec, tokens, images);
+	if (ret)
+		goto free_exit;
+
+	ret = sec->poc->set_default(sec, images);
+
+free_exit:
+	kfree(tokens);
+	return ret ? : count;
+}
+static DEVICE_ATTR_RW(power_on_image);
+
+static umode_t
+m10bmc_is_visible(struct kobject *kobj,
+		  struct attribute *attr, int n)
+{
+	struct m10bmc_sec *sec = dev_get_drvdata(kobj_to_dev(kobj));
+
+	if (sec->type != PMCI_SEC)
+		return 0;
+
+	return attr->mode;
+}
+
+static const struct fpga_power_on pmci_power_on_image = {
+	.image_mask = BIT(FPGA_FACTORY) | BIT(FPGA_USER1) | BIT(FPGA_USER2),
+	.set_default = pmci_set_power_on_image,
+	.get_default = pmci_get_power_on_image,
+};
+
+static struct attribute *m10bmc_image_attrs[] = {
+	&dev_attr_power_on_image.attr,
+	&dev_attr_available_fpga_images.attr,
+	NULL,
+};
+
+static struct attribute_group m10bmc_image_attr_group = {
+	.attrs = m10bmc_image_attrs,
+	.is_visible = m10bmc_is_visible,
+};
+
 static struct attribute *m10bmc_security_attrs[] = {
 	&dev_attr_flash_count.attr,
 	&dev_attr_bmc_root_entry_hash.attr,
@@ -175,6 +381,7 @@ static struct attribute_group m10bmc_security_attr_group = {
 
 static const struct attribute_group *m10bmc_sec_attr_groups[] = {
 	&m10bmc_security_attr_group,
+	&m10bmc_image_attr_group,
 	NULL,
 };
 
@@ -966,6 +1173,9 @@ static int m10bmc_secure_probe(struct platform_device *pdev)
 		dev_err(sec->dev, "No flash-ops provided for security manager\n");
 		return -EINVAL;
 	}
+
+	if (type == PMCI_SEC)
+		sec->poc = &pmci_power_on_image;
 
 	smgr = devm_fpga_sec_mgr_create(sec->dev, "Max10 BMC Secure Update",
 					sops, sec);
