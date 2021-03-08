@@ -18,6 +18,7 @@
 enum fpga_sec_type {
 	N3000BMC_SEC,
 	D5005BMC_SEC,
+	PMCI_SEC
 };
 
 struct m10bmc_sec {
@@ -426,6 +427,28 @@ m10bmc_sec_write_blk(struct fpga_sec_mgr *smgr, u32 offset, u32 size)
 	return ret ? FPGA_SEC_ERR_RW_ERROR : FPGA_SEC_ERR_NONE;
 }
 
+static enum fpga_sec_err
+pmci_sec_write_blk(struct fpga_sec_mgr *smgr, u32 offset, u32 size)
+{
+	struct m10bmc_sec *sec = smgr->priv;
+	struct intel_m10bmc *m10bmc = sec->m10bmc;
+	u32 doorbell;
+	int ret;
+
+	ret = m10bmc_sys_read(m10bmc, M10BMC_DOORBELL, &doorbell);
+	if (ret) {
+		return FPGA_SEC_ERR_RW_ERROR;
+	} else if (rsu_prog(doorbell) != RSU_PROG_READY) {
+		log_error_regs(sec, doorbell);
+		return FPGA_SEC_ERR_HW_ERROR;
+	}
+
+	ret = m10bmc->flash_ops->write_blk(m10bmc,
+					   (void *)smgr->data + offset, size);
+
+	return ret ? FPGA_SEC_ERR_RW_ERROR : FPGA_SEC_ERR_NONE;
+}
+
 /*
  * m10bmc_sec_poll_complete() is called after handing things off to
  * the BMC firmware. Depending on the type of update, it could be
@@ -752,9 +775,14 @@ m10bmc_sops_create(struct device *dev, enum fpga_sec_type type)
 	sops->cancel = m10bmc_sec_cancel;
 	sops->get_hw_errinfo = m10bmc_sec_hw_errinfo;
 
+	if (type == PMCI_SEC)
+		sops->write_blk = pmci_sec_write_blk;
+	else
+		sops->write_blk = m10bmc_sec_write_blk;
+
 	if (type == N3000BMC_SEC)
 		sops->image_load = n3000_image_load_hndlrs;
-	else
+	else if (type == D5005BMC_SEC)
 		sops->image_load = d5005_image_load_hndlrs;
 
 	return sops;
@@ -781,6 +809,11 @@ static int m10bmc_secure_probe(struct platform_device *pdev)
 	sec->type = type;
 	dev_set_drvdata(&pdev->dev, sec);
 
+	if (type == PMCI_SEC && !sec->m10bmc->flash_ops) {
+		dev_err(sec->dev, "No flash-ops provided for security manager\n");
+		return -EINVAL;
+	}
+
 	smgr = devm_fpga_sec_mgr_create(sec->dev, "Max10 BMC Secure Update",
 					sops, sec);
 	if (!smgr) {
@@ -799,6 +832,10 @@ static const struct platform_device_id intel_m10bmc_secure_ids[] = {
 	{
 		.name = "d5005bmc-secure",
 		.driver_data = (unsigned long)D5005BMC_SEC,
+	},
+	{
+		.name = "intel-pmci-secure",
+		.driver_data = (unsigned long)PMCI_SEC,
 	},
 	{ }
 };
