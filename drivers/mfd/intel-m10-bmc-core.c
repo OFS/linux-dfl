@@ -26,6 +26,8 @@ static const struct m10bmc_csr pmci_m10bmc_csr = {
 	.fw_version = PMCI_NIOS2_FW_VERSION,
 	.mac_low = PMCI_M10BMC_MAC_LOW,
 	.mac_high = PMCI_M10BMC_MAC_HIGH,
+	.doorbell = PMCI_M10BMC_DOORBELL,
+	.auth_result = PMCI_M10BMC_AUTH_RESULT,
 };
 
 static const struct m10bmc_csr spi_m10bmc_csr = {
@@ -34,6 +36,8 @@ static const struct m10bmc_csr spi_m10bmc_csr = {
 	.fw_version = NIOS2_FW_VERSION,
 	.mac_low = M10BMC_MAC_LOW,
 	.mac_high = M10BMC_MAC_HIGH,
+	.doorbell = M10BMC_DOORBELL,
+	.auth_result = M10BMC_AUTH_RESULT,
 };
 
 static struct mfd_cell m10bmc_bmc_subdevs[] = {
