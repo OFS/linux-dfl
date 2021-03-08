@@ -175,9 +175,61 @@ enum m10bmc_type {
 #define M10BMC_PMCI_TELEM_START		0x400
 #define M10BMC_PMCI_TELEM_END		0x78c
 
+#define M10BMC_PMCI_BUILD_VER   0x0
+#define NIOS2_PMCI_FW_VERSION   0x4
+#define M10BMC_PMCI_MAC_LOW    0x20
+#define M10BMC_PMCI_MAC_HIGH    0x24
+
+/* Addresses for security related data in FLASH */
+#define PMCI_BMC_REH_ADDR 0x7ffc004
+#define PMCI_BMC_PROG_ADDR 0x7ffc000
+#define PMCI_BMC_PROG_MAGIC 0x5746
+
+#define PMCI_SR_REH_ADDR  0x7ffd004
+#define PMCI_SR_PROG_ADDR  0x7ffd000
+#define PMCI_SR_PROG_MAGIC  0x5253
+
+#define PMCI_PR_REH_ADDR  0x7ffe004
+#define PMCI_PR_PROG_ADDR 0x7ffe000
+#define PMCI_PR_PROG_MAGIC 0x5250
+
+#define PMCI_STAGING_FLASH_COUNT 0x7ff5000
+
+#define bmc_prog_addr(m10bmc) ((m10bmc)->csr->bmc_prog_addr)
+#define bmc_reh_addr(m10bmc) ((m10bmc)->csr->bmc_reh_addr)
+#define bmc_magic(m10bmc) ((m10bmc)->csr->bmc_magic)
+#define sr_prog_addr(m10bmc) ((m10bmc)->csr->sr_prog_addr)
+#define sr_reh_addr(m10bmc) ((m10bmc)->csr->sr_reh_addr)
+#define sr_magic(m10bmc) ((m10bmc)->csr->sr_magic)
+#define pr_prog_addr(m10bmc) ((m10bmc)->csr->pr_prog_addr)
+#define pr_reh_addr(m10bmc) ((m10bmc)->csr->pr_reh_addr)
+#define pr_magic(m10bmc) ((m10bmc)->csr->pr_magic)
+#define rsu_update_counter(m10bmc) ((m10bmc)->csr->rsu_update_counter)
+
 enum m10bmc_fw_state {
 	M10BMC_FW_STATE_NORMAL,
 	M10BMC_FW_STATE_SEC_UPDATE,
+};
+
+/**
+ * struct m10bmc_csr - Intel MAX 10 BMC CSR register
+ */
+struct m10bmc_csr {
+	unsigned int base;
+	unsigned int build_version;
+	unsigned int fw_version;
+	unsigned int mac_low;
+	unsigned int mac_high;
+	unsigned int bmc_prog_addr;
+	unsigned int bmc_reh_addr;
+	unsigned int bmc_magic;
+	unsigned int sr_prog_addr;
+	unsigned int sr_reh_addr;
+	unsigned int sr_magic;
+	unsigned int pr_prog_addr;
+	unsigned int pr_reh_addr;
+	unsigned int pr_magic;
+	unsigned int rsu_update_counter;
 };
 
 /**
@@ -189,6 +241,7 @@ enum m10bmc_fw_state {
  * @type: the type of MAX10 BMC
  * @handshake_sys_reg_ranges: array of register ranges for fw handshake regs
  * @handshake_sys_reg_nranges: number of register ranges for fw handshake regs
+ * @csr: the register definition of MAX10 BMC
  */
 struct intel_m10bmc {
 	struct device *dev;
@@ -198,6 +251,7 @@ struct intel_m10bmc {
 	enum m10bmc_type type;
 	const struct regmap_range *handshake_sys_reg_ranges;
 	unsigned int handshake_sys_reg_nranges;
+	const struct m10bmc_csr *csr;
 };
 
 /*
