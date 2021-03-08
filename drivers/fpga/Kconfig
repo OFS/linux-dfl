@@ -255,7 +255,7 @@ config FPGA_SEC_MGR
 
 config IFPGA_M10_BMC_SECURE
 	tristate "Intel MAX10 BMC Secure Update driver"
-	depends on MFD_INTEL_M10_BMC && FPGA_SEC_MGR
+	depends on MFD_INTEL_M10_BMC_CORE && FPGA_SEC_MGR
 	help
 	  Secure update support for the Intel MAX10 board management
 	  controller.
