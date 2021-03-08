@@ -11,6 +11,8 @@
 #include <linux/regmap.h>
 #include <linux/rwsem.h>
 
+struct intel_m10bmc;
+
 /* Supported MAX10 BMC types */
 enum m10bmc_type {
 	M10_N3000,
@@ -193,6 +195,16 @@ struct m10bmc_csr {
 };
 
 /**
+ * struct fpga_flash_ops - device specific operations for flash R/W
+ * @write_blk: write a block of data to flash
+ * @read_blk: read a block of data from flash
+ */
+struct fpga_flash_ops {
+	int (*write_blk)(struct intel_m10bmc *m10bmc, void *buf, u32 size);
+	int (*read_blk)(struct intel_m10bmc *m10bmc, void *buf, u32 addr, u32 size);
+};
+
+/**
  * struct intel_m10bmc - Intel MAX 10 BMC parent driver data structure
  * @dev: this device
  * @regmap: the regmap used to access registers by m10bmc itself
@@ -202,6 +214,7 @@ struct m10bmc_csr {
  * @handshake_sys_reg_ranges: array of register ranges for fw handshake regs
  * @handshake_sys_reg_nranges: number of register ranges for fw handshake regs
  * @csr: the register definition of MAX10 BMC
+ * @flash_ops: optional device specific operations for flash R/W
  */
 struct intel_m10bmc {
 	struct device *dev;
@@ -212,6 +225,7 @@ struct intel_m10bmc {
 	const struct regmap_range *handshake_sys_reg_ranges;
 	unsigned int handshake_sys_reg_nranges;
 	const struct m10bmc_csr *csr;
+	struct fpga_flash_ops *flash_ops;
 };
 
 /*
