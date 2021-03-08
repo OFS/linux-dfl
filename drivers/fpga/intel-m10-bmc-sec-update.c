@@ -19,6 +19,7 @@ enum fpga_sec_type {
 	N3000BMC_SEC,
 	D5005BMC_SEC,
 	N5010BMC_SEC,
+	N6000BMC_SEC
 };
 
 struct image_load;
@@ -747,6 +748,35 @@ static s32 m10bmc_sec_write(struct fpga_image_load *imgld, const u8 *data,
 	return blk_size;
 }
 
+static s32 pmci_sec_write(struct fpga_image_load *imgld, const u8 *data,
+			  u32 offset, u32 size)
+{
+	struct m10bmc_sec *sec = imgld->priv;
+	struct intel_m10bmc *m10bmc = sec->m10bmc;
+	u32 blk_size, doorbell;
+	int ret;
+
+	if (sec->cancel_request)
+		return -rsu_cancel(sec);
+
+	ret = m10bmc_sys_read(m10bmc, M10BMC_DOORBELL, &doorbell);
+	if (ret) {
+		return -FPGA_IMAGE_ERR_RW_ERROR;
+	} else if (rsu_prog(doorbell) != RSU_PROG_READY) {
+		log_error_regs(sec, doorbell);
+		return -FPGA_IMAGE_ERR_HW_ERROR;
+	}
+
+	blk_size = min_t(u32, WRITE_BLOCK_SIZE, size);
+	ret = m10bmc->flash_ops->write_blk(m10bmc, (void *)data + offset,
+					   blk_size);
+
+	if (ret)
+		return -FPGA_IMAGE_ERR_RW_ERROR;
+
+	return blk_size;
+}
+
 static u32 m10bmc_sec_poll_complete(struct fpga_image_load *imgld)
 {
 	struct m10bmc_sec *sec = imgld->priv;
@@ -807,23 +837,42 @@ static void m10bmc_sec_cleanup(struct fpga_image_load *imgld)
 	(void)rsu_cancel(sec);
 }
 
-static const struct fpga_image_load_ops m10bmc_ops = {
-	.prepare = m10bmc_sec_prepare,
-	.write = m10bmc_sec_write,
-	.poll_complete = m10bmc_sec_poll_complete,
-	.cancel = m10bmc_sec_cancel,
-	.cleanup = m10bmc_sec_cleanup,
-};
+static struct fpga_image_load_ops *
+m10bmc_ops_create(struct device *dev, enum fpga_sec_type type)
+{
+	struct fpga_image_load_ops *ops;
+
+	ops = devm_kzalloc(dev, sizeof(*ops), GFP_KERNEL);
+	if (!ops)
+		return NULL;
+
+	ops->prepare = m10bmc_sec_prepare;
+	ops->poll_complete = m10bmc_sec_poll_complete;
+	ops->cancel = m10bmc_sec_cancel;
+	ops->cleanup = m10bmc_sec_cleanup;
+
+	if (type == N6000BMC_SEC)
+		ops->write = pmci_sec_write;
+	else
+		ops->write = m10bmc_sec_write;
+
+	return ops;
+}
 
 static int m10bmc_sec_probe(struct platform_device *pdev)
 {
 	const struct platform_device_id *id = platform_get_device_id(pdev);
 	enum fpga_sec_type type = (enum fpga_sec_type)id->driver_data;
+	struct fpga_image_load_ops *ops;
 	struct fpga_image_load *imgld;
 	struct m10bmc_sec *sec;
 
 	sec = devm_kzalloc(&pdev->dev, sizeof(*sec), GFP_KERNEL);
 	if (!sec)
+		return -ENOMEM;
+
+	ops = m10bmc_ops_create(&pdev->dev, type);
+	if (!ops)
 		return -ENOMEM;
 
 	sec->dev = &pdev->dev;
@@ -832,12 +881,17 @@ static int m10bmc_sec_probe(struct platform_device *pdev)
 
 	if (type == N3000BMC_SEC)
 		sec->image_load = n3000_image_load_hndlrs;
-	else
+	else if (type == D5005BMC_SEC || type == N5010BMC_SEC)
 		sec->image_load = d5005_image_load_hndlrs;
+
+	if (type == N6000BMC_SEC && !sec->m10bmc->flash_ops) {
+		dev_err(sec->dev, "No flash-ops provided for security manager\n");
+		return -EINVAL;
+	}
 
 	dev_set_drvdata(&pdev->dev, sec);
 
-	imgld = fpga_image_load_register(sec->dev, &m10bmc_ops, sec);
+	imgld = fpga_image_load_register(sec->dev, ops, sec);
 	if (IS_ERR(imgld)) {
 		dev_err(sec->dev, "FPGA Image Load driver failed to start\n");
 		return PTR_ERR(imgld);
@@ -867,6 +921,10 @@ static const struct platform_device_id intel_m10bmc_sec_ids[] = {
 	{
 		.name = "n5010bmc-sec-update",
 		.driver_data = (unsigned long)N5010BMC_SEC,
+	},
+	{
+		.name = "n6000bmc-sec-update",
+		.driver_data = (unsigned long)N6000BMC_SEC,
 	},
 	{ }
 };
