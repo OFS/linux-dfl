@@ -31,6 +31,7 @@ enum fpga_sec_err {
 enum fpga_sec_type {
 	N3000BMC_SEC,
 	D5005BMC_SEC,
+	PMCI_SEC
 };
 
 /**
