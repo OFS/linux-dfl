@@ -480,6 +480,75 @@ static const struct attribute_group *m10bmc_sec_attr_groups[] = {
 	NULL,
 };
 
+static bool rsu_status_ok(u32 status)
+{
+	return (status == RSU_STAT_NORMAL ||
+		status == RSU_STAT_NIOS_OK ||
+		status == RSU_STAT_USER_OK ||
+		status == RSU_STAT_FACTORY_OK);
+}
+
+static bool rsu_progress_done(u32 progress)
+{
+	return (progress == RSU_PROG_IDLE ||
+		progress == RSU_PROG_RSU_DONE);
+}
+
+static bool rsu_progress_busy(u32 progress)
+{
+	return (progress == RSU_PROG_AUTHENTICATING ||
+		progress == RSU_PROG_COPYING ||
+		progress == RSU_PROG_UPDATE_CANCEL ||
+		progress == RSU_PROG_PROGRAM_KEY_HASH);
+}
+
+static int
+m10bmc_sec_status(struct m10bmc_sec *sec, u32 *status)
+{
+	u32 reg_offset, reg_value;
+	int ret;
+
+	reg_offset = (sec->type == N6000BMC_SEC) ?
+		auth_result_reg(sec->m10bmc) : doorbell_reg(sec->m10bmc);
+
+	ret = m10bmc_sys_read(sec->m10bmc, reg_offset, &reg_value);
+	if (ret)
+		return ret;
+
+	*status = rsu_stat(reg_value);
+
+	return 0;
+}
+
+static int
+m10bmc_sec_progress_status(struct m10bmc_sec *sec, u32 *doorbell,
+			   u32 *progress, u32 *status)
+{
+	u32 auth_reg;
+	int ret;
+
+	ret = m10bmc_sys_read(sec->m10bmc,
+			      doorbell_reg(sec->m10bmc),
+			      doorbell);
+	if (ret)
+		return ret;
+
+	*progress = rsu_prog(*doorbell);
+
+	if (sec->type == N6000BMC_SEC) {
+		ret = m10bmc_sys_read(sec->m10bmc,
+				      auth_result_reg(sec->m10bmc),
+				      &auth_reg);
+		if (ret)
+			return ret;
+		*status = rsu_stat(auth_reg);
+	} else {
+		*status = rsu_stat(*doorbell);
+	}
+
+	return 0;
+}
+
 static u32 rsu_check_idle(struct m10bmc_sec *sec)
 {
 	u32 doorbell;
@@ -489,8 +558,7 @@ static u32 rsu_check_idle(struct m10bmc_sec *sec)
 	if (ret)
 		return FPGA_IMAGE_ERR_RW_ERROR;
 
-	if (rsu_prog(doorbell) != RSU_PROG_IDLE &&
-	    rsu_prog(doorbell) != RSU_PROG_RSU_DONE) {
+	if (!rsu_progress_done(rsu_prog(doorbell))) {
 		log_error_regs(sec, doorbell);
 		return FPGA_IMAGE_ERR_BUSY;
 	}
@@ -498,27 +566,46 @@ static u32 rsu_check_idle(struct m10bmc_sec *sec)
 	return 0;
 }
 
-static inline bool rsu_start_done(u32 doorbell)
+static inline bool rsu_start_done(u32 doorbell, u32 progress, u32 status)
 {
-	u32 status, progress;
-
 	if (doorbell & DRBL_RSU_REQUEST)
 		return false;
 
-	status = rsu_stat(doorbell);
 	if (status == RSU_STAT_ERASE_FAIL || status == RSU_STAT_WEAROUT)
 		return true;
 
-	progress = rsu_prog(doorbell);
-	if (progress != RSU_PROG_IDLE && progress != RSU_PROG_RSU_DONE)
+	if (!rsu_progress_done(progress))
 		return true;
 
 	return false;
 }
 
+static int rsu_poll_start_done(struct m10bmc_sec *sec, u32 *doorbell,
+			       u32 *progress, u32 *status)
+{
+	unsigned long poll_timeout;
+	int ret;
+
+	poll_timeout = jiffies + msecs_to_jiffies(NIOS_HANDSHAKE_TIMEOUT_US);
+	do {
+		usleep_range(NIOS_HANDSHAKE_INTERVAL_US,
+			     NIOS_HANDSHAKE_INTERVAL_US + 10);
+
+		if (time_after(jiffies, poll_timeout))
+			return -ETIMEDOUT;
+
+		ret = m10bmc_sec_progress_status(sec, doorbell, progress, status);
+		if (ret)
+			return ret;
+
+	} while (!rsu_start_done(*doorbell, *progress, *status));
+
+	return 0;
+}
+
 static u32 rsu_update_init(struct m10bmc_sec *sec)
 {
-	u32 doorbell, status;
+	u32 doorbell, progress, status;
 	int ret;
 
 	ret = m10bmc_sys_update_bits(sec->m10bmc, doorbell_reg(sec->m10bmc),
@@ -529,14 +616,7 @@ static u32 rsu_update_init(struct m10bmc_sec *sec)
 	if (ret)
 		return FPGA_IMAGE_ERR_RW_ERROR;
 
-	ret = regmap_read_poll_timeout(sec->m10bmc->regmap,
-				       m10bmc_base(sec->m10bmc) +
-				       doorbell_reg(sec->m10bmc),
-				       doorbell,
-				       rsu_start_done(doorbell),
-				       NIOS_HANDSHAKE_INTERVAL_US,
-				       NIOS_HANDSHAKE_TIMEOUT_US);
-
+	ret = rsu_poll_start_done(sec, &doorbell, &progress, &status);
 	if (ret == -ETIMEDOUT) {
 		log_error_regs(sec, doorbell);
 		return FPGA_IMAGE_ERR_TIMEOUT;
@@ -544,7 +624,6 @@ static u32 rsu_update_init(struct m10bmc_sec *sec)
 		return FPGA_IMAGE_ERR_RW_ERROR;
 	}
 
-	status = rsu_stat(doorbell);
 	if (status == RSU_STAT_WEAROUT) {
 		dev_warn(sec->dev, "Excessive flash update count detected\n");
 		return FPGA_IMAGE_ERR_WEAROUT;
@@ -591,7 +670,7 @@ static u32 rsu_prog_ready(struct m10bmc_sec *sec)
 
 static u32 rsu_send_data(struct m10bmc_sec *sec)
 {
-	u32 doorbell;
+	u32 doorbell, status;
 	int ret;
 
 	ret = m10bmc_sys_update_bits(sec->m10bmc, doorbell_reg(sec->m10bmc),
@@ -615,13 +694,11 @@ static u32 rsu_send_data(struct m10bmc_sec *sec)
 		return FPGA_IMAGE_ERR_RW_ERROR;
 	}
 
-	switch (rsu_stat(doorbell)) {
-	case RSU_STAT_NORMAL:
-	case RSU_STAT_NIOS_OK:
-	case RSU_STAT_USER_OK:
-	case RSU_STAT_FACTORY_OK:
-		break;
-	default:
+	ret = m10bmc_sec_status(sec, &status);
+	if (ret)
+		return FPGA_IMAGE_ERR_RW_ERROR;
+
+	if (!rsu_status_ok(status)) {
 		log_error_regs(sec, doorbell);
 		return FPGA_IMAGE_ERR_HW_ERROR;
 	}
@@ -631,31 +708,21 @@ static u32 rsu_send_data(struct m10bmc_sec *sec)
 
 static int rsu_check_complete(struct m10bmc_sec *sec, u32 *doorbell)
 {
-	if (m10bmc_sys_read(sec->m10bmc, doorbell_reg(sec->m10bmc), doorbell))
+	u32 progress, status;
+
+	if (m10bmc_sec_progress_status(sec, doorbell, &progress, &status))
 		return -EIO;
 
-	switch (rsu_stat(*doorbell)) {
-	case RSU_STAT_NORMAL:
-	case RSU_STAT_NIOS_OK:
-	case RSU_STAT_USER_OK:
-	case RSU_STAT_FACTORY_OK:
-		break;
-	default:
+	if (!rsu_status_ok(status))
 		return -EINVAL;
-	}
 
-	switch (rsu_prog(*doorbell)) {
-	case RSU_PROG_IDLE:
-	case RSU_PROG_RSU_DONE:
+	if (rsu_progress_done(progress))
 		return 0;
-	case RSU_PROG_AUTHENTICATING:
-	case RSU_PROG_COPYING:
-	case RSU_PROG_UPDATE_CANCEL:
-	case RSU_PROG_PROGRAM_KEY_HASH:
+
+	if (rsu_progress_busy(progress))
 		return -EAGAIN;
-	default:
-		return -EINVAL;
-	}
+
+	return -EINVAL;
 }
 
 static u32 rsu_cancel(struct m10bmc_sec *sec)
