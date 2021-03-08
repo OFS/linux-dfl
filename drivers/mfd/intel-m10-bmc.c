@@ -177,15 +177,15 @@ static DEVICE_ATTR_RO(bmcfw_version);
 static ssize_t mac_address_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
-	struct intel_m10bmc *max10 = dev_get_drvdata(dev);
+	struct intel_m10bmc *ddata = dev_get_drvdata(dev);
 	unsigned int macaddr1, macaddr2;
 	int ret;
 
-	ret = m10bmc_sys_read(max10, M10BMC_MACADDR1, &macaddr1);
+	ret = m10bmc_sys_read(ddata, M10BMC_MACADDR1, &macaddr1);
 	if (ret)
 		return ret;
 
-	ret = m10bmc_sys_read(max10, M10BMC_MACADDR2, &macaddr2);
+	ret = m10bmc_sys_read(ddata, M10BMC_MACADDR2, &macaddr2);
 	if (ret)
 		return ret;
 
@@ -202,11 +202,11 @@ static DEVICE_ATTR_RO(mac_address);
 static ssize_t mac_count_show(struct device *dev,
 			      struct device_attribute *attr, char *buf)
 {
-	struct intel_m10bmc *max10 = dev_get_drvdata(dev);
+	struct intel_m10bmc *ddata = dev_get_drvdata(dev);
 	unsigned int macaddr2;
 	int ret;
 
-	ret = m10bmc_sys_read(max10, M10BMC_MACADDR2, &macaddr2);
+	ret = m10bmc_sys_read(ddata, M10BMC_MACADDR2, &macaddr2);
 	if (ret)
 		return ret;
 
