@@ -190,10 +190,20 @@ enum m10bmc_type {
 #define FLASH_HOST_REQUEST BIT(5)
 
 #define PMCI_M10BMC_DOORBELL 0x1c0
+#define PMCI_DRBL_REBOOT_DISABLED BIT(1)
+
 #define PMCI_M10BMC_AUTH_RESULT 0x1c4
 
 #define M10_FLASH_INT_US       1
 #define M10_FLASH_TIMEOUT_US   10000
+
+#define PMCI_M10BMC_MAX10_RECONF 0xfc
+#define PMCI_MAX10_REBOOT_REQ BIT(0)
+#define PMCI_MAX10_REBOOT_PAGE BIT(1)
+
+#define PMCI_M10BMC_FPGA_RECONF 0xb8
+#define PMCI_FPGA_RECONF_PAGE  GENMASK(22, 20)
+#define PMCI_FPGA_RP_LOAD      BIT(23)
 
 #define m10bmc_base(m10bmc) ((m10bmc)->csr->base)
 #define doorbell_reg(m10bmc) ((m10bmc)->csr->doorbell)
