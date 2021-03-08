@@ -17,6 +17,7 @@
 struct m10bmc_sec {
 	struct device *dev;
 	struct intel_m10bmc *m10bmc;
+	enum fpga_sec_type type;
 };
 
 /* Root Entry Hash (REH) support */
@@ -731,7 +732,7 @@ static struct image_load d5005_image_load_hndlrs[] = {
 };
 
 static struct fpga_sec_mgr_ops *
-m10bmc_sops_create(struct device *dev, enum m10bmc_type type)
+m10bmc_sops_create(struct device *dev, enum fpga_sec_type type)
 {
 	struct fpga_sec_mgr_ops *sops;
 
@@ -745,7 +746,7 @@ m10bmc_sops_create(struct device *dev, enum m10bmc_type type)
 	sops->cancel = m10bmc_sec_cancel;
 	sops->get_hw_errinfo = m10bmc_sec_hw_errinfo;
 
-	if (type == M10_N3000)
+	if (type == N3000BMC_SEC)
 		sops->image_load = n3000_image_load_hndlrs;
 	else
 		sops->image_load = d5005_image_load_hndlrs;
@@ -756,7 +757,7 @@ m10bmc_sops_create(struct device *dev, enum m10bmc_type type)
 static int m10bmc_secure_probe(struct platform_device *pdev)
 {
 	const struct platform_device_id *id = platform_get_device_id(pdev);
-	enum m10bmc_type type = (enum m10bmc_type)id->driver_data;
+	enum fpga_sec_type type = (enum fpga_sec_type)id->driver_data;
 	struct fpga_sec_mgr_ops *sops;
 	struct fpga_sec_mgr *smgr;
 	struct m10bmc_sec *sec;
@@ -771,6 +772,7 @@ static int m10bmc_secure_probe(struct platform_device *pdev)
 
 	sec->dev = &pdev->dev;
 	sec->m10bmc = dev_get_drvdata(pdev->dev.parent);
+	sec->type = type;
 	dev_set_drvdata(&pdev->dev, sec);
 
 	smgr = devm_fpga_sec_mgr_create(sec->dev, "Max10 BMC Secure Update",
@@ -786,11 +788,11 @@ static int m10bmc_secure_probe(struct platform_device *pdev)
 static const struct platform_device_id intel_m10bmc_secure_ids[] = {
 	{
 		.name = "n3000bmc-secure",
-		.driver_data = (unsigned long)M10_N3000,
+		.driver_data = (unsigned long)N3000BMC_SEC,
 	},
 	{
 		.name = "d5005bmc-secure",
-		.driver_data = (unsigned long)M10_D5005,
+		.driver_data = (unsigned long)D5005BMC_SEC,
 	},
 	{ }
 };

@@ -27,6 +27,12 @@ enum fpga_sec_err {
 	FPGA_SEC_ERR_MAX
 };
 
+/* Supported fpga secure manager types */
+enum fpga_sec_type {
+	N3000BMC_SEC,
+	D5005BMC_SEC,
+};
+
 /**
  * struct image_load - device specific image-load triggers
  * @name:	    Required: keyword used to enable the trigger
