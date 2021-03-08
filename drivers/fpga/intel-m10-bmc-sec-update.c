@@ -29,6 +29,7 @@ struct m10bmc_sec {
 	struct fpga_image_load *imgld;
 	bool cancel_request;
 	struct image_load *image_load;		/* terminated with { } member */
+	enum fpga_sec_type type;
 };
 
 struct image_load {
@@ -817,6 +818,7 @@ static int m10bmc_sec_probe(struct platform_device *pdev)
 
 	sec->dev = &pdev->dev;
 	sec->m10bmc = dev_get_drvdata(pdev->dev.parent);
+	sec->type = type;
 
 	if (type == N3000BMC_SEC)
 		sec->image_load = n3000_image_load_hndlrs;
