@@ -200,7 +200,7 @@ static void log_error_regs(struct m10bmc_sec *sec, u32 doorbell)
 
 	dev_err(sec->dev, "RSU error status: 0x%08x\n", doorbell);
 
-	if (!m10bmc_sys_read(sec->m10bmc, M10BMC_AUTH_RESULT, &auth_result))
+	if (!m10bmc_sys_read(sec->m10bmc, auth_result_reg(sec->m10bmc), &auth_result))
 		dev_err(sec->dev, "RSU auth result: 0x%08x\n", auth_result);
 }
 
@@ -209,7 +209,7 @@ static enum fpga_sec_err rsu_check_idle(struct m10bmc_sec *sec)
 	u32 doorbell;
 	int ret;
 
-	ret = m10bmc_sys_read(sec->m10bmc, M10BMC_DOORBELL, &doorbell);
+	ret = m10bmc_sys_read(sec->m10bmc, doorbell_reg(sec->m10bmc), &doorbell);
 	if (ret)
 		return FPGA_SEC_ERR_RW_ERROR;
 
@@ -245,7 +245,7 @@ static enum fpga_sec_err rsu_update_init(struct m10bmc_sec *sec)
 	u32 doorbell, status;
 	int ret;
 
-	ret = m10bmc_sys_update_bits(sec->m10bmc, M10BMC_DOORBELL,
+	ret = m10bmc_sys_update_bits(sec->m10bmc, doorbell_reg(sec->m10bmc),
 				     DRBL_RSU_REQUEST | DRBL_HOST_STATUS,
 				     DRBL_RSU_REQUEST |
 				     FIELD_PREP(DRBL_HOST_STATUS,
@@ -254,7 +254,8 @@ static enum fpga_sec_err rsu_update_init(struct m10bmc_sec *sec)
 		return FPGA_SEC_ERR_RW_ERROR;
 
 	ret = regmap_read_poll_timeout(sec->m10bmc->regmap,
-				       M10BMC_SYS_BASE + M10BMC_DOORBELL,
+				       m10bmc_base(sec->m10bmc) +
+				       doorbell_reg(sec->m10bmc),
 				       doorbell,
 				       rsu_start_done(doorbell),
 				       NIOS_HANDSHAKE_INTERVAL_US,
@@ -285,7 +286,7 @@ static enum fpga_sec_err rsu_prog_ready(struct m10bmc_sec *sec)
 	u32 doorbell, progress;
 	int ret;
 
-	ret = m10bmc_sys_read(sec->m10bmc, M10BMC_DOORBELL, &doorbell);
+	ret = m10bmc_sys_read(sec->m10bmc, doorbell_reg(sec->m10bmc), &doorbell);
 	if (ret)
 		return FPGA_SEC_ERR_RW_ERROR;
 
@@ -295,7 +296,7 @@ static enum fpga_sec_err rsu_prog_ready(struct m10bmc_sec *sec)
 		if (time_after(jiffies, poll_timeout))
 			break;
 
-		ret = m10bmc_sys_read(sec->m10bmc, M10BMC_DOORBELL, &doorbell);
+		ret = m10bmc_sys_read(sec->m10bmc, doorbell_reg(sec->m10bmc), &doorbell);
 		if (ret)
 			return FPGA_SEC_ERR_RW_ERROR;
 	}
@@ -317,7 +318,7 @@ static enum fpga_sec_err rsu_send_data(struct m10bmc_sec *sec)
 	u32 doorbell;
 	int ret;
 
-	ret = m10bmc_sys_update_bits(sec->m10bmc, M10BMC_DOORBELL,
+	ret = m10bmc_sys_update_bits(sec->m10bmc, doorbell_reg(sec->m10bmc),
 				     DRBL_HOST_STATUS,
 				     FIELD_PREP(DRBL_HOST_STATUS,
 						HOST_STATUS_WRITE_DONE));
@@ -325,7 +326,7 @@ static enum fpga_sec_err rsu_send_data(struct m10bmc_sec *sec)
 		return FPGA_SEC_ERR_RW_ERROR;
 
 	ret = regmap_read_poll_timeout(sec->m10bmc->regmap,
-				       M10BMC_SYS_BASE + M10BMC_DOORBELL,
+				       m10bmc_base(sec->m10bmc) + doorbell_reg(sec->m10bmc),
 				       doorbell,
 				       rsu_prog(doorbell) != RSU_PROG_READY,
 				       NIOS_HANDSHAKE_INTERVAL_US,
@@ -354,7 +355,7 @@ static enum fpga_sec_err rsu_send_data(struct m10bmc_sec *sec)
 
 static int rsu_check_complete(struct m10bmc_sec *sec, u32 *doorbell)
 {
-	if (m10bmc_sys_read(sec->m10bmc, M10BMC_DOORBELL, doorbell))
+	if (m10bmc_sys_read(sec->m10bmc, doorbell_reg(sec->m10bmc), doorbell))
 		return -EIO;
 
 	switch (rsu_stat(*doorbell)) {
@@ -420,7 +421,7 @@ m10bmc_sec_write_blk(struct fpga_sec_mgr *smgr, u32 offset)
 	u32 doorbell, blk_size;
 	int ret;
 
-	ret = m10bmc_sys_read(sec->m10bmc, M10BMC_DOORBELL, &doorbell);
+	ret = m10bmc_sys_read(sec->m10bmc, doorbell_reg(sec->m10bmc), &doorbell);
 	if (ret) {
 		return FPGA_SEC_ERR_RW_ERROR;
 	} else if (rsu_prog(doorbell) != RSU_PROG_READY) {
@@ -449,7 +450,7 @@ pmci_sec_write_blk(struct fpga_sec_mgr *smgr, u32 offset)
 	u32 doorbell, blk_size;
 	int ret;
 
-	ret = m10bmc_sys_read(m10bmc, M10BMC_DOORBELL, &doorbell);
+	ret = m10bmc_sys_read(m10bmc, doorbell_reg(m10bmc), &doorbell);
 	if (ret) {
 		return FPGA_SEC_ERR_RW_ERROR;
 	} else if (rsu_prog(doorbell) != RSU_PROG_READY) {
@@ -524,14 +525,14 @@ static enum fpga_sec_err m10bmc_sec_cancel(struct fpga_sec_mgr *smgr)
 	u32 doorbell;
 	int ret;
 
-	ret = m10bmc_sys_read(sec->m10bmc, M10BMC_DOORBELL, &doorbell);
+	ret = m10bmc_sys_read(sec->m10bmc, doorbell_reg(sec->m10bmc), &doorbell);
 	if (ret)
 		return FPGA_SEC_ERR_RW_ERROR;
 
 	if (rsu_prog(doorbell) != RSU_PROG_READY)
 		return FPGA_SEC_ERR_BUSY;
 
-	ret = m10bmc_sys_update_bits(sec->m10bmc, M10BMC_DOORBELL,
+	ret = m10bmc_sys_update_bits(sec->m10bmc, doorbell_reg(sec->m10bmc),
 				     DRBL_HOST_STATUS,
 				     FIELD_PREP(DRBL_HOST_STATUS,
 						HOST_STATUS_ABORT_RSU));
@@ -551,8 +552,8 @@ static u64 m10bmc_sec_hw_errinfo(struct fpga_sec_mgr *smgr)
 	case FPGA_SEC_ERR_TIMEOUT:
 	case FPGA_SEC_ERR_BUSY:
 	case FPGA_SEC_ERR_WEAROUT:
-		m10bmc_sys_read(sec->m10bmc, M10BMC_DOORBELL, &doorbell);
-		m10bmc_sys_read(sec->m10bmc, M10BMC_AUTH_RESULT, &auth_result);
+		m10bmc_sys_read(sec->m10bmc, doorbell_reg(sec->m10bmc), &doorbell);
+		m10bmc_sys_read(sec->m10bmc, auth_result_reg(sec->m10bmc), &auth_result);
 
 		return (u64)doorbell << 32 | (u64)auth_result;
 	default:
@@ -573,14 +574,14 @@ static int m10bmc_sec_bmc_image_load(struct fpga_sec_mgr *smgr,
 		return -EINVAL;
 	}
 
-	ret = m10bmc_sys_read(sec->m10bmc, M10BMC_DOORBELL, &doorbell);
+	ret = m10bmc_sys_read(sec->m10bmc, doorbell_reg(sec->m10bmc), &doorbell);
 	if (ret)
 		return ret;
 
 	if (doorbell & DRBL_REBOOT_DISABLED)
 		return -EBUSY;
 
-	return m10bmc_sys_update_bits(sec->m10bmc, M10BMC_DOORBELL,
+	return m10bmc_sys_update_bits(sec->m10bmc, doorbell_reg(sec->m10bmc),
 				     DRBL_CONFIG_SEL | DRBL_REBOOT_REQ,
 				     FIELD_PREP(DRBL_CONFIG_SEL, val) |
 				     DRBL_REBOOT_REQ);
@@ -601,7 +602,7 @@ static int retimer_check_idle(struct m10bmc_sec *sec)
 	u32 doorbell;
 	int ret;
 
-	ret = m10bmc_sys_read(sec->m10bmc, M10BMC_DOORBELL, &doorbell);
+	ret = m10bmc_sys_read(sec->m10bmc, doorbell_reg(sec->m10bmc), &doorbell);
 	if (ret)
 		return -EIO;
 
@@ -621,7 +622,7 @@ static int trigger_retimer_eeprom_load(struct m10bmc_sec *sec)
 	unsigned int val;
 	int ret;
 
-	ret = m10bmc_sys_update_bits(m10bmc, M10BMC_DOORBELL,
+	ret = m10bmc_sys_update_bits(m10bmc, doorbell_reg(m10bmc),
 				     DRBL_PKVL_EEPROM_LOAD_SEC,
 				     DRBL_PKVL_EEPROM_LOAD_SEC);
 	if (ret)
@@ -634,7 +635,7 @@ static int trigger_retimer_eeprom_load(struct m10bmc_sec *sec)
 	 * return an error code.
 	 */
 	ret = regmap_read_poll_timeout(m10bmc->regmap,
-				       M10BMC_SYS_BASE + M10BMC_DOORBELL,
+				       m10bmc_base(m10bmc) + doorbell_reg(m10bmc),
 				       val,
 				       (!(val & DRBL_PKVL_EEPROM_LOAD_SEC)),
 				       M10BMC_PKVL_LOAD_INTERVAL_US,
@@ -642,7 +643,7 @@ static int trigger_retimer_eeprom_load(struct m10bmc_sec *sec)
 	if (ret == -ETIMEDOUT) {
 		dev_err(sec->dev, "%s PKVL_EEPROM_LOAD clear timedout\n",
 			__func__);
-		m10bmc_sys_update_bits(m10bmc, M10BMC_DOORBELL,
+		m10bmc_sys_update_bits(m10bmc, doorbell_reg(m10bmc),
 				       DRBL_PKVL_EEPROM_LOAD_SEC, 0);
 		ret = -ENODEV;
 	} else if (ret) {
@@ -666,7 +667,7 @@ static int poll_retimer_eeprom_load_done(struct m10bmc_sec *sec)
 	 * a successful update.
 	 */
 	ret = regmap_read_poll_timeout(m10bmc->regmap,
-				       M10BMC_SYS_BASE + M10BMC_DOORBELL,
+				       m10bmc_base(m10bmc) + doorbell_reg(m10bmc),
 				       doorbell,
 				       ((rsu_prog(doorbell) ==
 					 RSU_PROG_PKVL_PROM_DONE) ||
@@ -704,7 +705,7 @@ static int poll_retimer_preload_done(struct m10bmc_sec *sec)
 	 * and confirm that the updated firmware is operational
 	 */
 	ret = regmap_read_poll_timeout(m10bmc->regmap,
-				       M10BMC_SYS_BASE + M10BMC_PKVL_POLL_CTRL, val,
+				       m10bmc_base(m10bmc) + M10BMC_PKVL_POLL_CTRL, val,
 				       ((val & M10BMC_PKVL_PRELOAD) == M10BMC_PKVL_PRELOAD),
 				       M10BMC_PKVL_PRELOAD_INTERVAL_US,
 				       M10BMC_PKVL_PRELOAD_TIMEOUT_US);
