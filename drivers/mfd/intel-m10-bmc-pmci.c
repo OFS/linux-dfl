@@ -172,6 +172,7 @@ static int pmci_probe(struct dfl_device *ddev)
 
 	pmci_flash_ops->read_blk = pmci_flash_bulk_read;
 	pmci_flash_ops->write_blk = pmci_flash_bulk_write;
+	mutex_init(&pmci_flash_ops->mux_lock);
 
 	pmci->m10bmc.dev = dev;
 	pmci->dev = dev;
@@ -192,6 +193,13 @@ static int pmci_probe(struct dfl_device *ddev)
 	return m10bmc_dev_init(&pmci->m10bmc);
 }
 
+static void pmci_remove(struct dfl_device *ddev)
+{
+	struct intel_m10bmc *m10bmc = dev_get_drvdata(&ddev->dev);
+
+	mutex_destroy(&m10bmc->flash_ops->mux_lock);
+}
+
 #define FME_FEATURE_ID_PMCI_BMC	0x12
 
 static const struct dfl_device_id pmci_ids[] = {
@@ -207,6 +215,7 @@ static struct dfl_driver pmci_driver = {
 	},
 	.id_table = pmci_ids,
 	.probe    = pmci_probe,
+	.remove   = pmci_remove,
 };
 
 module_dfl_driver(pmci_driver);
