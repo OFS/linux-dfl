@@ -80,3 +80,28 @@ Description:	Write-only. A key word may be written to this file to
 		list of supported key words for the underlying device.
 		Writing an unsupported string to this file will result in
 		EINVAL being returned.
+
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../control/available_power_on_images
+Date:		Nov 2021
+KernelVersion:  5.16
+Contact:	Tianfei zhang <tianfei.zhang@intel.com>
+Description:	Read-only. This file returns a space separated list of
+		key words that may be written into the power_on_image file
+		described below. These keywords identify the possible fpga
+		images that may be used as a default on the next boot of
+		the FPGA card.
+
+What:           /sys/bus/platform/drivers/intel-m10bmc-sec-update/.../control/power_on_image
+Date:		Nov 2021
+KernelVersion:  5.16
+Contact:	Tianfei zhang <tianfei.zhang@intel.com>
+Description:	Write-only. A key word from the available_fpga_images file
+		may be written to this file to select the FPGA image to be
+		configured on the next boot of the FPGA card. One or more
+		additional keywords may be specified, separated by spaces,
+		to identify a sequence of fall-back images in the event that
+		the selected FPGA image fails to load. Your specific device
+		may not support all possible fall-back sequences. The EINVAL
+		error code will be returned if you attempt to select an
+		unsupported image or fall-back sequence. Consult your product
+		documentation for supported configurations.
