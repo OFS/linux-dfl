@@ -54,7 +54,6 @@ enum m10bmc_type {
 #define PKVL_B_DATA_TOO_BIG		BIT(26)
 #define PKVL_B_HDR_CHECKSUM		BIT(28)
 #define PKVL_EEPROM_UPG_STATUS		GENMASK(31, 16)
-#define PKVL_LINK_STATUS		0x164
 
 #define PKVL_PRELOAD			(PKVL_A_PRELOAD | PKVL_B_PRELOAD)
 #define PKVL_PRELOAD_TIMEOUT		(PKVL_A_PRELOAD_TIMEOUT | \
@@ -163,19 +162,6 @@ enum m10bmc_type {
 
 /* Address of 4KB inverted bit vector containing staging area FLASH count */
 #define STAGING_FLASH_COUNT	0x17ffb000
-
-/**
- * struct intel_m10bmc_retimer_pdata - subdev retimer platform data
- *
- * @retimer_master: the NIC device which connects to the retimers on m10bmc
- */
-struct intel_m10bmc_retimer_pdata {
-	struct device *retimer_master;
-};
-
-struct intel_m10bmc_platdata {
-	struct intel_m10bmc_retimer_pdata *retimer;
-};
 
 enum m10bmc_fw_state {
 	M10BMC_FW_STATE_NORMAL,
