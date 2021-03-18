@@ -11,8 +11,6 @@
 #include <linux/phy.h>
 #include <linux/platform_device.h>
 
-#include "dfl-eth-group.h"
-
 #define NUM_CHIP	2
 #define MAX_LINK	4
 
@@ -182,7 +180,7 @@ static int m10bmc_retimer_mii_bus_init(struct m10bmc_retimer *retimer)
 	bus->name = M10BMC_RETIMER_MII_NAME;
 	bus->read = m10bmc_retimer_read;
 	bus->write = m10bmc_retimer_write;
-	snprintf(bus->id, MII_BUS_ID_SIZE, DFL_ETH_MII_ID_FMT,
+	snprintf(bus->id, MII_BUS_ID_SIZE, "%s-mii",
 		 dev_name(retimer->base_dev));
 	bus->parent = retimer->dev;
 	bus->phy_mask = ~(BITS_MASK(retimer->num_devs));
