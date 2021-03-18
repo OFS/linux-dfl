@@ -16,6 +16,4 @@ obj-$(CONFIG_IXGB) += ixgb/
 obj-$(CONFIG_IAVF) += iavf/
 obj-$(CONFIG_FM10K) += fm10k/
 obj-$(CONFIG_ICE) += ice/
-
-obj-$(CONFIG_INTEL_M10_BMC_PKVL) += intel-m10-bmc-pkvl.o
 obj-$(CONFIG_S10HSSI) += s10hssi.o
