@@ -342,7 +342,7 @@ static int n3000_nios_init_done_check(struct n3000_nios *nn)
 			return ret;
 
 		/* check if retimers are initialized already */
-		if (val & (N3000_NIOS_INIT_DONE || N3000_NIOS_INIT_START))
+		if (val & (N3000_NIOS_INIT_DONE | N3000_NIOS_INIT_START))
 			goto nios_init_done;
 
 		/* configure FEC mode per module param */
