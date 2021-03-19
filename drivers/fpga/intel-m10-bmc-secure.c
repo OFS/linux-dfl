@@ -592,8 +592,8 @@ static int trigger_retimer_eeprom_load(struct m10bmc_sec *sec)
 				       M10BMC_SYS_BASE + M10BMC_DOORBELL,
 				       val,
 				       (!(val & DRBL_PKVL_EEPROM_LOAD_SEC)),
-				       PKVL_EEPROM_LOAD_INTERVAL_US,
-				       PKVL_EEPROM_LOAD_TIMEOUT_US);
+				       M10BMC_PKVL_LOAD_INTERVAL_US,
+				       M10BMC_PKVL_LOAD_TIMEOUT_US);
 	if (ret == -ETIMEDOUT) {
 		dev_err(sec->dev, "%s PKVL_EEPROM_LOAD clear timedout\n",
 			__func__);
@@ -627,8 +627,8 @@ static int poll_retimer_eeprom_load_done(struct m10bmc_sec *sec)
 					 RSU_PROG_PKVL_PROM_DONE) ||
 					(rsu_stat(doorbell) ==
 					 RSU_STAT_PKVL_REJECT)),
-				       PKVL_PRELOAD_INTERVAL_US,
-				       PKVL_PRELOAD_TIMEOUT_US);
+				       M10BMC_PKVL_PRELOAD_INTERVAL_US,
+				       M10BMC_PKVL_PRELOAD_TIMEOUT_US);
 	if (ret) {
 		if (ret == -ETIMEDOUT)
 			dev_err(sec->dev,
@@ -659,17 +659,17 @@ static int poll_retimer_preload_done(struct m10bmc_sec *sec)
 	 * and confirm that the updated firmware is operational
 	 */
 	ret = regmap_read_poll_timeout(m10bmc->regmap,
-				       M10BMC_SYS_BASE + PKVL_POLLING_CTRL, val,
-				       ((val & PKVL_PRELOAD) == PKVL_PRELOAD),
-				       PKVL_PRELOAD_INTERVAL_US,
-				       PKVL_PRELOAD_TIMEOUT_US);
+				       M10BMC_SYS_BASE + M10BMC_PKVL_POLL_CTRL, val,
+				       ((val & M10BMC_PKVL_PRELOAD) == M10BMC_PKVL_PRELOAD),
+				       M10BMC_PKVL_PRELOAD_INTERVAL_US,
+				       M10BMC_PKVL_PRELOAD_TIMEOUT_US);
 	if (ret) {
-		dev_err(sec->dev, "%s poll PKVL_PRELOAD error %d\n",
+		dev_err(sec->dev, "%s poll M10BMC_PKVL_PRELOAD error %d\n",
 			__func__, ret);
 		return ret;
 	}
 
-	if ((val & PKVL_UPG_STATUS_MASK) != PKVL_UPG_STATUS_GOOD) {
+	if ((val & M10BMC_PKVL_UPG_STATUS_MASK) != M10BMC_PKVL_UPG_STATUS_GOOD) {
 		dev_err(sec->dev, "%s error detected during upgrade\n",
 			__func__);
 		return -EIO;
