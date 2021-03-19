@@ -5,8 +5,8 @@
  * Copyright (C) 2020 Intel Corporation, Inc.
  */
 
-#ifndef __LINUX_FPGA_DFL_H
-#define __LINUX_FPGA_DFL_H
+#ifndef __LINUX_DFL_H
+#define __LINUX_DFL_H
 
 #include <linux/bitfield.h>
 #include <linux/device.h>
@@ -138,4 +138,4 @@ static inline u8 dfl_feature_revision(void __iomem *base)
 	return (u8)FIELD_GET(DFH_REVISION, readq(base + DFH));
 }
 
-#endif /* __LINUX_FPGA_DFL_H */
+#endif /* __LINUX_DFL_H */
