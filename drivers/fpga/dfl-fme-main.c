@@ -47,8 +47,15 @@ static DEVICE_ATTR_RO(ports_num);
 static ssize_t bitstream_id_show(struct device *dev,
 				 struct device_attribute *attr, char *buf)
 {
-	return scnprintf(buf, PAGE_SIZE, "0x%llx\n",
-			 (unsigned long long)dfl_get_bitstream_id(dev));
+	struct dfl_feature_dev_data *fdata = to_dfl_feature_dev_data(dev);
+	void __iomem *base;
+	u64 v;
+
+	base = dfl_get_feature_ioaddr_by_id(fdata, FME_FEATURE_ID_HEADER);
+
+	v = readq(base + FME_HDR_BITSTREAM_ID);
+
+	return scnprintf(buf, PAGE_SIZE, "0x%llx\n", (unsigned long long)v);
 }
 static DEVICE_ATTR_RO(bitstream_id);
 
