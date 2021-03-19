@@ -21,7 +21,7 @@ with the firmware to initiate an update, pass in the necessary data,
 and collect status on the update.
 
 In addition to managing secure updates of the FPGA and BMC images,
-the FPGA Security Manager update process may also used to
+the FPGA Security Manager update process may also be used to
 program root entry hashes and cancellation keys for the FPGA static
 region, the FPGA partial reconfiguration region, and the BMC.
 
@@ -35,15 +35,9 @@ retrieving error information in the event of a failure.
 Sysfs Attributes
 ================
 
-The API consists of two groups of sysfs attributes as described below.
-
-1. Files in the *security* sub-directory can be used to read security
-   information including: Root Entry Hashes (REH), Cancelled Code
-   Signing Keys (CSK), and the flash update count for FPGA images.
-
-2. Files in the *update* sub-directory can be used to instantiate and
-   monitor a secure update.
-
+The API includes a sysfs entry *name* to export the name of the parent
+driver. It also includes an *update* sub-directory that can be used to
+instantiate and monitor a secure update.
 
 See `<../ABI/testing/sysfs-class-fpga-sec-mgr>`__ for a full
 description of the sysfs attributes for the FPGA Security
