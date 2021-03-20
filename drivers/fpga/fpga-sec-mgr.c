@@ -275,7 +275,7 @@ static ssize_t filename_store(struct device *dev, struct device_attribute *attr,
 		goto unlock_exit;
 	}
 
-	smgr->filename = kstrndup(buf, count, GFP_KERNEL);
+	smgr->filename = kmemdup_nul(buf, count, GFP_KERNEL);
 	if (!smgr->filename) {
 		ret = -ENOMEM;
 		goto unlock_exit;
