@@ -494,7 +494,8 @@ static enum fpga_sec_err m10bmc_sec_cancel(struct fpga_sec_mgr *smgr)
 static u64 m10bmc_sec_hw_errinfo(struct fpga_sec_mgr *smgr)
 {
 	struct m10bmc_sec *sec = smgr->priv;
-	u32 doorbell, auth_result;
+	u32 auth_result = HW_ERRINFO_POISON;
+	u32 doorbell = HW_ERRINFO_POISON;
 
 	switch (smgr->err_code) {
 	case FPGA_SEC_ERR_HW_ERROR:
