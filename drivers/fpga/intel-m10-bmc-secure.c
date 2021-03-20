@@ -444,17 +444,15 @@ static enum fpga_sec_err m10bmc_sec_poll_complete(struct fpga_sec_mgr *smgr)
 	if (result != FPGA_SEC_ERR_NONE)
 		goto fw_state_exit;
 
-	ret = rsu_check_complete(sec, &doorbell);
 	poll_timeout = jiffies + msecs_to_jiffies(RSU_COMPLETE_TIMEOUT_MS);
-
-	while (ret == -EAGAIN && !time_after(jiffies, poll_timeout)) {
+	do {
 		msleep(RSU_COMPLETE_INTERVAL_MS);
 		ret = rsu_check_complete(sec, &doorbell);
 		if (smgr->driver_unload) {
 			result = FPGA_SEC_ERR_CANCELED;
 			goto fw_state_exit;
 		}
-	}
+	} while (ret == -EAGAIN && !time_after(jiffies, poll_timeout));
 
 	if (ret == -EAGAIN) {
 		log_error_regs(sec, doorbell);
