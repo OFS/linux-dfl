@@ -708,12 +708,12 @@ fw_state_exit:
 
 static struct image_load n3000_image_load_hndlrs[] = {
 	{
-		.name = "bmc_user",
-		.load_image = m10bmc_sec_bmc_image_load_0,
-	},
-	{
 		.name = "bmc_factory",
 		.load_image = m10bmc_sec_bmc_image_load_1,
+	},
+	{
+		.name = "bmc_user",
+		.load_image = m10bmc_sec_bmc_image_load_0,
 	},
 	{
 		.name = "retimer_fw",
