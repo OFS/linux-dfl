@@ -350,10 +350,10 @@ config S10HSSI
 	  This driver provides control plane support for an Stratix 10
 	  High Speed Serial Interface.
 
-          The Stratix 10 High Speed Serial Interface provides a data
-          path between the FPGA and the external QSFP interfaces.  This
-          data path does not involve packets transferred between host
-          memory and the fpga.  As such a very limited set of networking
-          functionality is provided.
+	  The Stratix 10 High Speed Serial Interface provides a data
+	  path between the FPGA and the external QSFP interfaces.  This
+	  data path does not involve packets transferred between host
+	  memory and the fpga.  As such a very limited set of networking
+	  functionality is provided.
 
 endif # NET_VENDOR_INTEL
