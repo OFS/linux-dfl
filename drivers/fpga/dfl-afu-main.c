@@ -123,7 +123,7 @@ static int __port_reset(struct platform_device *pdev)
 	int ret;
 
 	ret = __afu_port_disable(pdev);
-	if (!ret)
+	if (ret)
 		return ret;
 
 	return __afu_port_enable(pdev);
