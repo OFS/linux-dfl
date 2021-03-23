@@ -123,7 +123,7 @@ static int __port_reset(struct dfl_feature_dev_data *fdata)
 	int ret;
 
 	ret = __afu_port_disable(fdata);
-	if (!ret)
+	if (ret)
 		return ret;
 
 	return __afu_port_enable(fdata);
