@@ -161,10 +161,22 @@ static int netdev_set_mac_address(struct net_device *ndev, void *p)
 	return 0;
 }
 
+static netdev_tx_t s10hssi_dummy_netdev_xmit(struct sk_buff *skb,
+					     struct net_device *dev)
+{
+	if (!dev)
+		return -EINVAL;
+
+	kfree_skb(skb);
+	net_warn_ratelimited("%s(): Dropping skb.\n", __func__);
+	return NETDEV_TX_OK;
+}
+
 static const struct net_device_ops netdev_ops = {
 	.ndo_change_mtu = netdev_change_mtu,
 	.ndo_set_features = netdev_set_features,
 	.ndo_set_mac_address = netdev_set_mac_address,
+	.ndo_start_xmit = s10hssi_dummy_netdev_xmit,
 };
 
 struct stat_info {
