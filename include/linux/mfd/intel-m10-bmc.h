@@ -226,6 +226,15 @@ enum m10bmc_type {
 #define PMCI_FPGA_RECONF_PAGE  GENMASK(22, 20)
 #define PMCI_FPGA_RP_LOAD      BIT(23)
 
+#define PMCI_ERROR_LOG_ADDR  0x7fb0000
+#define PMCI_ERROR_LOG_SIZE  0x40000
+
+#define PMCI_FPGA_IMAGE_DIR_ADDR  0x7ff6000
+#define PMCI_FPGA_IMAGE_DIR_SIZE  0x3000
+
+#define PMCI_BOM_INFO_ADDR  0x7ff0000
+#define PMCI_BOM_INFO_SIZE  0x2000
+
 /* Addresses for security related data in FLASH */
 #define PMCI_BMC_REH_ADDR 0x7ffc004
 #define PMCI_BMC_PROG_ADDR 0x7ffc000
