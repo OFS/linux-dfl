@@ -10,3 +10,27 @@ Description:	Read/write. This sysfs node controls the frequency (in
 		update frequency. Reading from this file will return the
 		same integer value.
 		Format: "%u".
+
+What:		/sys/bus/platform/devices/intel-m10-bmc-log.*.auto/bmc_event_log*/nvmem
+Date:		Oct 2021
+KernelVersion:  5.15
+Contact:	Tianfei zhang <tianfei.zhang@intel.com>
+Description:	Read-only. This file returns the contents of the "error log"
+		partition in flash. This partition includes the error info for
+		the BMC.
+
+What:		/sys/bus/platform/devices/intel-m10-bmc-log.*.auto/fpga_image_directory*/nvmem
+Date:		Oct 2021
+KernelVersion:  5.15
+Contact:	Tianfei zhang <tianfei.zhang@intel.com>
+Description:	Read-only. This file returns the contents of the "FPGA image
+		directory" partition in flash. This partition includes
+		information like the FPGA Image versions and state.
+
+What:		/sys/bus/platform/devices/intel-m10-bmc-log.*.auto/bom_info*/nvmem
+Date:		Oct 2021
+KernelVersion:  5.15
+Contact:	Tianfei zhang <tianfei.zhang@intel.com>
+Description:	Read-only. This file returns the contents of the "BOM info"
+		partition in flash. This partition includes information such
+		as the BOM critical components, PBA#, MMID.
