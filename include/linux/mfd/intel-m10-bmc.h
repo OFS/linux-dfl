@@ -223,6 +223,15 @@ enum m10bmc_type {
 #define PMCI_FPGA_RECONF_PAGE  GENMASK(22, 20)
 #define PMCI_FPGA_RP_LOAD      BIT(23)
 
+#define PMCI_ERROR_LOG_ADDR  0x7fb0000
+#define PMCI_ERROR_LOG_SIZE  0x40000
+
+#define PMCI_FPGA_IMAGE_DIR_ADDR  0x7ff6000
+#define PMCI_FPGA_IMAGE_DIR_SIZE  0x3000
+
+#define PMCI_BOM_INFO_ADDR  0x7ff0000
+#define PMCI_BOM_INFO_SIZE  0x2000
+
 #define m10bmc_base(m10bmc) ((m10bmc)->csr->base)
 #define doorbell_reg(m10bmc) ((m10bmc)->csr->doorbell)
 #define auth_result_reg(m10bmc) ((m10bmc)->csr->auth_result)

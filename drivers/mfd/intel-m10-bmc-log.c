@@ -78,8 +78,60 @@ time_sync_frequency_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RW(time_sync_frequency);
 
+static ssize_t flash_bin_read(struct kobject *kobj, char *buf, u32 addr,
+			      loff_t off, size_t count)
+{
+	struct device *dev = container_of(kobj, struct device, kobj);
+	struct m10bmc_log *ddata = dev_get_drvdata(dev);
+	int ret;
+
+	if (!ddata->m10bmc->ops.flash_read)
+		return -ENODEV;
+
+	ret = ddata->m10bmc->ops.flash_read(ddata->m10bmc, buf,
+					  addr + off, count);
+	if (ret) {
+		dev_err(ddata->dev, "failed to read flash %x\n", addr);
+		return -EIO;
+	}
+
+	return count;
+}
+
+static ssize_t
+bmc_event_log_read(struct file *filp, struct kobject *kobj,
+		   struct bin_attribute *bin_attr, char *buf,
+		   loff_t off, size_t count)
+{
+	return flash_bin_read(kobj, buf, PMCI_ERROR_LOG_ADDR, off,
+			      count);
+}
+static BIN_ATTR_RO(bmc_event_log, PMCI_ERROR_LOG_SIZE);
+
+static ssize_t
+fpga_image_directory_read(struct file *filp, struct kobject *kobj,
+			  struct bin_attribute *bin_attr, char *buf,
+			  loff_t off, size_t count)
+{
+	return flash_bin_read(kobj, buf, PMCI_FPGA_IMAGE_DIR_ADDR, off,
+			      count);
+}
+static BIN_ATTR_RO(fpga_image_directory, PMCI_FPGA_IMAGE_DIR_SIZE);
+
+static ssize_t bom_info_read(struct file *filp, struct kobject *kobj,
+			     struct bin_attribute *bin_attr, char *buf,
+			     loff_t off, size_t count)
+{
+	return flash_bin_read(kobj, buf, PMCI_BOM_INFO_ADDR, off,
+			      count);
+}
+static BIN_ATTR_RO(bom_info, PMCI_BOM_INFO_SIZE);
+
 static struct attribute *m10bmc_log_attrs[] = {
 	&dev_attr_time_sync_frequency.attr,
+	&bin_attr_bmc_event_log.attr,
+	&bin_attr_fpga_image_directory.attr,
+	&bin_attr_bom_info.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(m10bmc_log);
