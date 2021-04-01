@@ -18,7 +18,7 @@ if NET_VENDOR_SILICOM
 
 config N5010_PHY
 	tristate "Fixed Phy Driver for Silicom PAC N5010"
-	depends on MFD_INTEL_M10_BMC && FIXED_PHY
+	depends on MFD_INTEL_M10_BMC_CORE && FIXED_PHY
 	help
 	  The n5010 card consists of a primary FPGA running the network controller,
 	  and a side-fpga running the board management controller (bmc). This driver
