@@ -14,3 +14,6 @@ support the Intel n3000 and d5005 PCIe cards:
 
 n3000_d5005_defconfig
 	Default configuration for Intel n3000 and d5005 PCIe cards.
+
+n5010_defconfig
+	Default configuration for Silicom n5010 PCIe card.
