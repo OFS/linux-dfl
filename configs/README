@@ -1,0 +1,13 @@
+This directory contains the dfl-config file which includes the config
+options required to enable the Device Feature List (DFL) driver support.
+By design the DFL driver collection is extendable and it is anticipated
+that new drivers will be added to the collection.
+
+The dfl related config options are intended to be appended to a base kernel
+configuration. For example the following commands would modify an existing
+kernel configuration to enable support DFL cards.
+
+	# cd kernel_source_directory
+	# cp /boot/config-`uname -r` .config
+	# cat configs/dfl-config >> .config
+	# make olddefconfig
