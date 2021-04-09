@@ -379,6 +379,7 @@ struct regmap *devm_regmap_init_indirect_register(struct device *dev,
 						  struct regmap_config *cfg);
 #endif
 
+#define REGMAP_NAME_SIZE	20
 static struct regmap *n5010_hssi_create_regmap(struct n5010_hssi_drvdata *priv,
 					       u64 port,
 					       enum n5010_hssi_regmap type)
@@ -386,23 +387,26 @@ static struct regmap *n5010_hssi_create_regmap(struct n5010_hssi_drvdata *priv,
 	void __iomem *base = priv->base + port * MB_PORT_SIZE;
 	struct device *dev = &priv->dfl_dev->dev;
 	struct regmap_config cfg = {0};
-	char regmap_name[20];
+	char regmap_name[REGMAP_NAME_SIZE];
 
 	switch (type) {
 	case regmap_mac:
-		sprintf(regmap_name, "n5010_hssi_mac%llu", port);
+		scnprintf(regmap_name, REGMAP_NAME_SIZE,
+			  "n5010_hssi_mac%llu", port);
 		base += MB_MAC_OFFSET;
 		cfg.val_bits = 32;
 		cfg.max_register = 0xbbf;
 		break;
 	case regmap_fec:
-		sprintf(regmap_name, "n5010_hssi_fec%llu", port);
+		scnprintf(regmap_name, REGMAP_NAME_SIZE,
+			  "n5010_hssi_fec%llu", port);
 		base += MB_FEC_OFFSET;
 		cfg.val_bits = 8;
 		cfg.max_register = 0x29c;
 		break;
 	case regmap_phy:
-		sprintf(regmap_name, "n5010_hssi_phy%llu", port);
+		scnprintf(regmap_name, REGMAP_NAME_SIZE,
+			  "n5010_hssi_phy%llu", port);
 		base += MB_PHY_OFFSET;
 		cfg.val_bits = 8;
 		cfg.max_register = 0x40144;
