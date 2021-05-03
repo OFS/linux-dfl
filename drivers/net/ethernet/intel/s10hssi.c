@@ -299,6 +299,7 @@ static u64 read_mac_stat(struct regmap *regmap, unsigned int addr)
 static int ethtool_reset(struct net_device *netdev, u32 *flags)
 {
 	struct s10hssi_netdata *npriv = netdev_priv(netdev);
+	struct device *dev = &npriv->dfl_dev->dev;
 	int ret;
 	u32 val;
 
@@ -310,7 +311,7 @@ static int ethtool_reset(struct net_device *netdev, u32 *flags)
 					       STATS_CLR_INT_TIMEOUT_US);
 
 		if (ret) {
-			dev_err(&netdev->dev, "%s failed to clear tx stats\n", __func__);
+			dev_err(dev, "%s failed to clear tx stats\n", __func__);
 			return ret;
 		}
 
@@ -321,10 +322,10 @@ static int ethtool_reset(struct net_device *netdev, u32 *flags)
 					       STATS_CLR_INT_TIMEOUT_US);
 
 		if (ret) {
-			dev_err(&netdev->dev, "%s failed to clear rx stats\n", __func__);
+			dev_err(dev, "%s failed to clear rx stats\n", __func__);
 			return ret;
 		}
-		dev_info(&netdev->dev, "%s reset statistics registers\n", __func__);
+		dev_info(dev, "%s reset statistics registers\n", __func__);
 	}
 
 	return 0;
