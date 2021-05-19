@@ -13,7 +13,7 @@
 #include <linux/regmap.h>
 #include <linux/spi/spi.h>
 
-static struct mfd_cell m10bmc_bmc_subdevs[] = {
+static struct mfd_cell m10bmc_d5005_subdevs[] = {
 	{ .name = "d5005bmc-hwmon" },
 	{ .name = "d5005bmc-secure" }
 };
@@ -230,13 +230,12 @@ static int check_m10bmc_version(struct intel_m10bmc *ddata)
 	int ret;
 
 	/*
-	 * This check is to filter out the very old legacy BMC versions,
-	 * 0x300400 is the offset to this old block of mmio registers. In the
-	 * old BMC chips, the BMC version info is stored in this old version
-	 * register (0x300400 + 0x68), so its read out value would have not
-	 * been LEGACY_INVALID (0xffffffff). But in new BMC chips that the
-	 * driver supports, the value of this register should be
-	 * LEGACY_INVALID.
+	 * This check is to filter out the very old legacy BMC versions. In the
+	 * old BMC chips, the BMC version info is stored in the old version
+	 * register (M10BMC_LEGACY_BUILD_VER), so its read out value would have
+	 * not been M10BMC_VER_LEGACY_INVALID (0xffffffff). But in new BMC
+	 * chips that the driver supports, the value of this register should be
+	 * M10BMC_VER_LEGACY_INVALID.
 	 */
 	ret = m10bmc_raw_read(ddata, M10BMC_LEGACY_BUILD_VER, &v);
 	if (ret)
@@ -290,8 +289,8 @@ static int intel_m10_bmc_spi_probe(struct spi_device *spi)
 			ARRAY_SIZE(n3000_fw_handshake_regs);
 		break;
 	case M10_D5005:
-		cells = m10bmc_bmc_subdevs;
-		n_cell = ARRAY_SIZE(m10bmc_bmc_subdevs);
+		cells = m10bmc_d5005_subdevs;
+		n_cell = ARRAY_SIZE(m10bmc_d5005_subdevs);
 		ddata->handshake_sys_reg_ranges = d5005_fw_handshake_regs;
 		ddata->handshake_sys_reg_nranges =
 			ARRAY_SIZE(d5005_fw_handshake_regs);
