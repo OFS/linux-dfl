@@ -141,7 +141,7 @@ static struct platform_device *create_cntrl(struct device *dev,
 	pdata.num_devices = 1;
 	pdata.devices = m10_info;
 
-	dev_dbg(dev, "%s cs %u bpm 0x%x mode 0x%x\n", __func__,
+	dev_dbg(dev, "%s cs %hu bpm 0x%x mode 0x%hx\n", __func__,
 		pdata.num_chipselect, pdata.bits_per_word_mask,
 		pdata.mode_bits);
 
