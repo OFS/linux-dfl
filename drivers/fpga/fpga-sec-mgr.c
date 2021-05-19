@@ -21,8 +21,6 @@ struct fpga_sec_mgr_devres {
 	struct fpga_sec_mgr *smgr;
 };
 
-#define WRITE_BLOCK_SIZE 0x4000	/* Update remaining_size every 0x4000 bytes */
-
 #define to_sec_mgr(d) container_of(d, struct fpga_sec_mgr, dev)
 
 static void update_progress(struct fpga_sec_mgr *smgr,
@@ -79,10 +77,10 @@ static void progress_complete(struct fpga_sec_mgr *smgr)
 
 static void fpga_sec_mgr_update(struct work_struct *work)
 {
-	u32 size, blk_size, offset = 0;
 	struct fpga_sec_mgr *smgr;
 	const struct firmware *fw;
 	enum fpga_sec_err ret;
+	u32 offset = 0;
 
 	smgr = container_of(work, struct fpga_sec_mgr, work);
 
@@ -112,18 +110,14 @@ static void fpga_sec_mgr_update(struct work_struct *work)
 	if (progress_transition(smgr, FPGA_SEC_PROG_WRITING))
 		goto done;
 
-	size = smgr->remaining_size;
-	while (size && !smgr->request_cancel) {
-		blk_size = min_t(u32, size, WRITE_BLOCK_SIZE);
-		size -= blk_size;
-		ret = smgr->sops->write_blk(smgr, offset, blk_size);
+	while (smgr->remaining_size && !smgr->request_cancel) {
+		ret = smgr->sops->write_blk(smgr, offset);
 		if (ret != FPGA_SEC_ERR_NONE) {
 			fpga_sec_dev_error(smgr, ret);
 			goto done;
 		}
 
-		smgr->remaining_size = size;
-		offset += blk_size;
+		offset = fw->size - smgr->remaining_size;
 	}
 
 	if (progress_transition(smgr, FPGA_SEC_PROG_PROGRAMMING))

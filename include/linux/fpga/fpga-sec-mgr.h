@@ -60,8 +60,7 @@ struct image_load {
  */
 struct fpga_sec_mgr_ops {
 	enum fpga_sec_err (*prepare)(struct fpga_sec_mgr *smgr);
-	enum fpga_sec_err (*write_blk)(struct fpga_sec_mgr *smgr,
-				       u32 offset, u32 size);
+	enum fpga_sec_err (*write_blk)(struct fpga_sec_mgr *smgr, u32 offset);
 	enum fpga_sec_err (*poll_complete)(struct fpga_sec_mgr *smgr);
 	enum fpga_sec_err (*cancel)(struct fpga_sec_mgr *smgr);
 	void (*cleanup)(struct fpga_sec_mgr *smgr);
