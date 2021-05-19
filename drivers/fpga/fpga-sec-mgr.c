@@ -151,23 +151,23 @@ idle_exit:
 }
 
 static const char * const sec_mgr_prog_str[] = {
-	"idle",			/* FPGA_SEC_PROG_IDLE */
-	"reading",		/* FPGA_SEC_PROG_READING */
-	"preparing",		/* FPGA_SEC_PROG_PREPARING */
-	"writing",		/* FPGA_SEC_PROG_WRITING */
-	"programming"		/* FPGA_SEC_PROG_PROGRAMMING */
+	[FPGA_SEC_PROG_IDLE]	    = "idle",
+	[FPGA_SEC_PROG_READING]	    = "reading",
+	[FPGA_SEC_PROG_PREPARING]   = "preparing",
+	[FPGA_SEC_PROG_WRITING]	    = "writing",
+	[FPGA_SEC_PROG_PROGRAMMING] = "programming"
 };
 
 static const char * const sec_mgr_err_str[] = {
-	"none",			/* FPGA_SEC_ERR_NONE */
-	"hw-error",		/* FPGA_SEC_ERR_HW_ERROR */
-	"timeout",		/* FPGA_SEC_ERR_TIMEOUT */
-	"user-abort",		/* FPGA_SEC_ERR_CANCELED */
-	"device-busy",		/* FPGA_SEC_ERR_BUSY */
-	"invalid-file-size",	/* FPGA_SEC_ERR_INVALID_SIZE */
-	"read-write-error",	/* FPGA_SEC_ERR_RW_ERROR */
-	"flash-wearout",	/* FPGA_SEC_ERR_WEAROUT */
-	"file-read-error"	/* FPGA_SEC_ERR_FILE_READ */
+	[FPGA_SEC_ERR_NONE]	    = "none",
+	[FPGA_SEC_ERR_HW_ERROR]	    = "hw-error",
+	[FPGA_SEC_ERR_TIMEOUT]	    = "timeout",
+	[FPGA_SEC_ERR_CANCELED]	    = "user-abort",
+	[FPGA_SEC_ERR_BUSY]	    = "device-busy",
+	[FPGA_SEC_ERR_INVALID_SIZE] = "invalid-file-size",
+	[FPGA_SEC_ERR_RW_ERROR]	    = "read-write-error",
+	[FPGA_SEC_ERR_WEAROUT]	    = "flash-wearout",
+	[FPGA_SEC_ERR_FILE_READ]    = "file-read-error"
 };
 
 static const char *sec_progress(struct device *dev, enum fpga_sec_prog prog)
