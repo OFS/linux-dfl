@@ -30,13 +30,13 @@ static void update_progress(struct fpga_sec_mgr *smgr,
 	sysfs_notify(&smgr->dev.kobj, "update", "status");
 }
 
-static void set_error(struct fpga_sec_mgr *smgr, enum fpga_sec_err err_code)
+static void fpga_sec_set_error(struct fpga_sec_mgr *smgr, enum fpga_sec_err err_code)
 {
 	smgr->err_state = smgr->progress;
 	smgr->err_code = err_code;
 }
 
-static void set_hw_errinfo(struct fpga_sec_mgr *smgr)
+static void fpga_sec_set_hw_errinfo(struct fpga_sec_mgr *smgr)
 {
 	if (smgr->sops->get_hw_errinfo)
 		smgr->hw_errinfo = smgr->sops->get_hw_errinfo(smgr);
@@ -45,8 +45,8 @@ static void set_hw_errinfo(struct fpga_sec_mgr *smgr)
 static void fpga_sec_dev_error(struct fpga_sec_mgr *smgr,
 			       enum fpga_sec_err err_code)
 {
-	set_error(smgr, err_code);
-	set_hw_errinfo(smgr);
+	fpga_sec_set_error(smgr, err_code);
+	fpga_sec_set_hw_errinfo(smgr);
 	smgr->sops->cancel(smgr);
 }
 
@@ -57,7 +57,7 @@ static int progress_transition(struct fpga_sec_mgr *smgr,
 
 	mutex_lock(&smgr->lock);
 	if (smgr->request_cancel) {
-		set_error(smgr, FPGA_SEC_ERR_CANCELED);
+		fpga_sec_set_error(smgr, FPGA_SEC_ERR_CANCELED);
 		smgr->sops->cancel(smgr);
 		ret = -ECANCELED;
 	} else {
@@ -86,7 +86,7 @@ static void fpga_sec_mgr_update(struct work_struct *work)
 
 	get_device(&smgr->dev);
 	if (request_firmware(&fw, smgr->filename, &smgr->dev)) {
-		set_error(smgr, FPGA_SEC_ERR_FILE_READ);
+		fpga_sec_set_error(smgr, FPGA_SEC_ERR_FILE_READ);
 		goto idle_exit;
 	}
 
@@ -94,7 +94,7 @@ static void fpga_sec_mgr_update(struct work_struct *work)
 	smgr->remaining_size = fw->size;
 
 	if (!try_module_get(smgr->dev.parent->driver->owner)) {
-		set_error(smgr, FPGA_SEC_ERR_BUSY);
+		fpga_sec_set_error(smgr, FPGA_SEC_ERR_BUSY);
 		goto release_fw_exit;
 	}
 
