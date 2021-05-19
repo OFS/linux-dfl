@@ -260,7 +260,7 @@ static ssize_t filename_store(struct device *dev, struct device_attribute *attr,
 	struct fpga_sec_mgr *smgr = to_sec_mgr(dev);
 	int ret = count;
 
-	if (count == 0 || count >= PATH_MAX)
+	if (!count || count >= PATH_MAX)
 		return -EINVAL;
 
 	mutex_lock(&smgr->lock);
@@ -431,7 +431,7 @@ fpga_sec_mgr_create(struct device *dev, const char *name,
 
 	if (!sops || !sops->cancel || !sops->prepare ||
 	    !sops->write_blk || !sops->poll_complete) {
-		dev_err(dev, "Attempt to register without required ops\n");
+		dev_err(dev, "Attempt to register without all required ops\n");
 		return NULL;
 	}
 
@@ -463,6 +463,8 @@ fpga_sec_mgr_create(struct device *dev, const char *name,
 	smgr->name = name;
 	smgr->priv = priv;
 	smgr->sops = sops;
+	smgr->err_code = FPGA_SEC_ERR_NONE;
+	smgr->progress = FPGA_SEC_PROG_IDLE;
 	init_completion(&smgr->update_done);
 	INIT_WORK(&smgr->work, fpga_sec_mgr_update);
 
@@ -586,7 +588,7 @@ EXPORT_SYMBOL_GPL(fpga_sec_mgr_register);
  * For some devices, once the secure update has begun authentication
  * the hardware cannot be signaled to stop, and the driver will not
  * exit until the hardware signals completion.  This could be 30+
- * minutes of waiting. The driver_unload flag enableds a force-unload
+ * minutes of waiting. The driver_unload flag enables a force-unload
  * of the driver (e.g. modprobe -r) by signaling the parent driver to
  * exit even if the hardware update is incomplete. The driver_unload
  * flag also prevents new updates from starting once the unregister
