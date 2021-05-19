@@ -395,12 +395,14 @@ fw_state_exit:
 	return ret;
 }
 
+#define WRITE_BLOCK_SIZE 0x4000 /* Update remaining_size every 0x4000 bytes */
+
 static enum fpga_sec_err
-m10bmc_sec_write_blk(struct fpga_sec_mgr *smgr, u32 offset, u32 size)
+m10bmc_sec_write_blk(struct fpga_sec_mgr *smgr, u32 offset)
 {
 	struct m10bmc_sec *sec = smgr->priv;
 	unsigned int stride = regmap_get_reg_stride(sec->m10bmc->regmap);
-	u32 doorbell;
+	u32 doorbell, blk_size;
 	int ret;
 
 	ret = m10bmc_sys_read(sec->m10bmc, M10BMC_DOORBELL, &doorbell);
@@ -411,12 +413,17 @@ m10bmc_sec_write_blk(struct fpga_sec_mgr *smgr, u32 offset, u32 size)
 		return FPGA_SEC_ERR_HW_ERROR;
 	}
 
+	blk_size = min_t(u32, smgr->remaining_size, WRITE_BLOCK_SIZE);
 	ret = regmap_bulk_write(sec->m10bmc->regmap,
 				M10BMC_STAGING_BASE + offset,
 				(void *)smgr->data + offset,
-				(size + stride - 1) / stride);
+				(blk_size + stride - 1) / stride);
 
-	return ret ? FPGA_SEC_ERR_RW_ERROR : FPGA_SEC_ERR_NONE;
+	if (ret)
+		return FPGA_SEC_ERR_RW_ERROR;
+
+	smgr->remaining_size -= blk_size;
+	return FPGA_SEC_ERR_NONE;
 }
 
 /*
