@@ -985,9 +985,12 @@ static int parse_feature_irqs(struct build_feature_devs_info *binfo,
 		fid, ibase, inr);
 
 	if (ibase + inr > binfo->nr_irqs) {
-		dev_err(binfo->dev,
-			"Invalid interrupt number in feature 0x%x\n", fid);
-		return -EINVAL;
+		dev_warn(binfo->dev,
+			 "Ignoring nvalid interrupt number in feature 0x%x %d > %d\n\n",
+			 fid, ibase + inr, binfo->nr_irqs);
+		*irq_base = 0;
+		*nr_irqs = 0;
+		return 0;
 	}
 
 	for (i = 0; i < inr; i++) {
