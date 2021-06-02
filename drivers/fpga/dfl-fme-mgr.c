@@ -170,6 +170,7 @@ static int fme_mgr_write(struct fpga_manager *mgr,
 	void __iomem *fme_pr = priv->ioaddr;
 	u64 pr_ctrl, pr_status, pr_data;
 	int delay = 0, pr_credit, i = 0;
+	size_t full_cnt = count;
 
 	dev_dbg(dev, "start request\n");
 
@@ -192,6 +193,8 @@ static int fme_mgr_write(struct fpga_manager *mgr,
 		while (pr_credit <= 1) {
 			if (delay++ > PR_WAIT_TIMEOUT) {
 				dev_err(dev, "PR_CREDIT timeout\n");
+				dev_err(dev, "wrote %zu bytes of %zu total\n",
+					full_cnt - count, full_cnt);
 				return -ETIMEDOUT;
 			}
 			udelay(1);
