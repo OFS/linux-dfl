@@ -38,8 +38,9 @@
  * of a memory channel, and the Control Register definitions are used for
  * managing the memory-clear functionality in revision 0.
  */
-#define EMIF_CAPABILITY_BASE            0x10
-#define EMIF_CAPABILITY_CHN_MSK         GENMASK_ULL(7, 0)
+#define EMIF_CAPABILITY_BASE		0x10
+#define EMIF_CAPABILITY_CHN_MSK_V0	GENMASK_ULL(3, 0)
+#define EMIF_CAPABILITY_CHN_MSK		GENMASK_ULL(7, 0)
 
 struct dfl_emif {
 	struct device *dev;
@@ -196,7 +197,12 @@ static umode_t dfl_emif_visible(struct kobject *kobj,
 	if (dfl_feature_revision(de->base) > 0 && strstr(attr->name, "_clear"))
 		return 0;
 
-	val = FIELD_GET(EMIF_CAPABILITY_CHN_MSK, readq(de->base + EMIF_CAPABILITY_BASE));
+	if (dfl_feature_revision(de->base) == 0)
+		val = FIELD_GET(EMIF_CAPABILITY_CHN_MSK_V0,
+				readq(de->base + EMIF_CAPABILITY_BASE));
+	else
+		val = FIELD_GET(EMIF_CAPABILITY_CHN_MSK,
+				readq(de->base + EMIF_CAPABILITY_BASE));
 
 	return (val & BIT_ULL(eattr->index)) ? attr->mode : 0;
 }
