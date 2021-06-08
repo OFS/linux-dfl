@@ -1883,15 +1883,22 @@ EXPORT_SYMBOL_GPL(dfl_fpga_cdev_config_ports_pf);
 int dfl_fpga_cdev_config_ports_vf(struct dfl_fpga_cdev *cdev, int num_vfs)
 {
 	struct dfl_feature_dev_data *fdata;
-	int ret = 0;
+	int ret = 0, port_count = 0;
 
 	mutex_lock(&cdev->lock);
+
+	list_for_each_entry(fdata, &cdev->port_dev_list, node) {
+		if (fdata->dev)
+			continue;
+		port_count++;
+	}
+
 	/*
 	 * can't turn multiple ports into 1 VF device, only 1 port for 1 VF
 	 * device, so if released port number doesn't match VF device number,
 	 * then reject the request with -EINVAL error code.
 	 */
-	if (cdev->released_port_num != num_vfs) {
+	if (port_count && (cdev->released_port_num != num_vfs)) {
 		ret = -EINVAL;
 		goto done;
 	}
