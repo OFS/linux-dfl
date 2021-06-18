@@ -180,6 +180,7 @@ static int fme_mgr_write(struct fpga_manager *mgr,
 	void __iomem *fme_pr = priv->ioaddr;
 	u64 pr_ctrl, pr_status, pr_data;
 	int delay = 0, pr_credit;
+	size_t chunk_size;
 
 	dev_dbg(dev, "start request\n");
 
@@ -210,17 +211,14 @@ static int fme_mgr_write(struct fpga_manager *mgr,
 			pr_credit = FIELD_GET(FME_PR_STS_PR_CREDIT, pr_status);
 		}
 
-		if (count < 4) {
-			dev_err(dev, "Invalid PR bitstream size\n");
-			return -EINVAL;
-		}
+		chunk_size = min_t(size_t, count, 4);
 
 		pr_data = 0;
-		memcpy(&pr_data, buf, 4);
+		memcpy(&pr_data, buf, chunk_size);
 		pr_data_write(pr_data, fme_pr + FME_PR_DATA);
 
-		buf += 4;
-		count -= 4;
+		buf += chunk_size;
+		count -= chunk_size;
 		pr_credit--;
 	}
 
