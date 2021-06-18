@@ -74,7 +74,6 @@ static int fme_pr(struct platform_device *pdev, unsigned long arg)
 	struct dfl_fme *fme;
 	unsigned long minsz;
 	void *buf = NULL;
-	size_t length;
 	int ret = 0;
 	u64 v;
 
@@ -97,13 +96,7 @@ static int fme_pr(struct platform_device *pdev, unsigned long arg)
 		return -EINVAL;
 	}
 
-	/*
-	 * align PR buffer per PR bandwidth, as HW ignores the extra padding
-	 * data automatically.
-	 */
-	length = ALIGN(port_pr.buffer_size, 4);
-
-	buf = vmalloc(length);
+	buf = vmalloc(port_pr.buffer_size);
 	if (!buf)
 		return -ENOMEM;
 
@@ -140,7 +133,7 @@ static int fme_pr(struct platform_device *pdev, unsigned long arg)
 	fpga_image_info_free(region->info);
 
 	info->buf = buf;
-	info->count = length;
+	info->count = port_pr.buffer_size;
 	info->region_id = port_pr.port_id;
 	region->info = info;
 
