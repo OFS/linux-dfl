@@ -144,8 +144,6 @@
 #define PORT_UINT_CAP_INT_NUM	GENMASK_ULL(11, 0)	/* Interrupts num */
 #define PORT_UINT_CAP_FST_VECT	GENMASK_ULL(23, 12)	/* First Vector */
 
-struct dfl_feature_dev_data;
-
 /**
  * struct dfl_fpga_port_ops - port ops
  *
@@ -159,16 +157,15 @@ struct dfl_fpga_port_ops {
 	const char *name;
 	struct module *owner;
 	struct list_head node;
-	int (*get_id)(struct dfl_feature_dev_data *fdata);
-	int (*enable_set)(struct dfl_feature_dev_data *fdata, bool enable);
+	int (*get_id)(struct platform_device *pdev);
+	int (*enable_set)(struct platform_device *pdev, bool enable);
 };
 
 void dfl_fpga_port_ops_add(struct dfl_fpga_port_ops *ops);
 void dfl_fpga_port_ops_del(struct dfl_fpga_port_ops *ops);
-struct dfl_fpga_port_ops *
-	dfl_fpga_port_ops_get(struct dfl_feature_dev_data *fdata);
+struct dfl_fpga_port_ops *dfl_fpga_port_ops_get(struct platform_device *pdev);
 void dfl_fpga_port_ops_put(struct dfl_fpga_port_ops *ops);
-int dfl_fpga_check_port_id(struct dfl_feature_dev_data *fdata, void *pport_id);
+int dfl_fpga_check_port_id(struct platform_device *pdev, void *pport_id);
 
 /**
  * struct dfl_feature_id - dfl private feature id
@@ -233,32 +230,26 @@ struct dfl_feature {
 #define FEATURE_DEV_ID_UNUSED	(-1)
 
 /**
- * struct dfl_feature_dev_data - dfl enumeration data for dfl feature dev.
+ * struct dfl_feature_platform_data - platform data for feature devices
  *
- * @node: node to link the data structure to container device's port_dev_list.
- * @lock: mutex to protect feature dev data.
- * @dev: ptr to the feature's platform device linked with this structure.
- * @type: type of DFL FIU for the feature dev. See enum dfl_id_type.
- * @pdev_id: platform device id for the feature dev.
- * @pdev_name: platform device name for the feature dev.
+ * @node: node to link feature devs to container device's port_dev_list.
+ * @lock: mutex to protect platform data.
+ * @cdev: cdev of feature dev.
+ * @dev: ptr to platform device linked with this platform data.
  * @dfl_cdev: ptr to container device.
- * @id: id used for the feature device.
+ * @id: id used for this feature device.
  * @disable_count: count for port disable.
  * @excl_open: set on feature device exclusive open.
  * @open_count: count for feature device open.
  * @num: number for sub features.
  * @private: ptr to feature dev private data.
- * @features: sub features for the feature dev.
- * @resource_num: number of resources for the feature dev.
- * @resources: resources for the feature dev.
+ * @features: sub features of this feature dev.
  */
-struct dfl_feature_dev_data {
+struct dfl_feature_platform_data {
 	struct list_head node;
 	struct mutex lock;
+	struct cdev cdev;
 	struct platform_device *dev;
-	enum dfl_id_type type;
-	int pdev_id;
-	const char *pdev_name;
 	struct dfl_fpga_cdev *dfl_cdev;
 	int id;
 	unsigned int disable_count;
@@ -266,68 +257,55 @@ struct dfl_feature_dev_data {
 	int open_count;
 	void *private;
 	int num;
-	struct dfl_feature *features;
-	int resource_num;
-	struct resource *resources;
-};
-
-/**
- * struct dfl_feature_platform_data - platform data for feature devices
- *
- * @fdata: dfl enumeration data for the dfl feature device.
- * @cdev: cdev of feature dev.
- */
-struct dfl_feature_platform_data {
-	struct dfl_feature_dev_data *fdata;
-	struct cdev cdev;
+	struct dfl_feature features[];
 };
 
 static inline
-int dfl_feature_dev_use_begin(struct dfl_feature_dev_data *fdata,
+int dfl_feature_dev_use_begin(struct dfl_feature_platform_data *pdata,
 			      bool excl)
 {
-	if (fdata->excl_open)
+	if (pdata->excl_open)
 		return -EBUSY;
 
 	if (excl) {
-		if (fdata->open_count)
+		if (pdata->open_count)
 			return -EBUSY;
 
-		fdata->excl_open = true;
+		pdata->excl_open = true;
 	}
-	fdata->open_count++;
+	pdata->open_count++;
 
 	return 0;
 }
 
 static inline
-void dfl_feature_dev_use_end(struct dfl_feature_dev_data *fdata)
+void dfl_feature_dev_use_end(struct dfl_feature_platform_data *pdata)
 {
-	fdata->excl_open = false;
+	pdata->excl_open = false;
 
-	if (WARN_ON(fdata->open_count <= 0))
+	if (WARN_ON(pdata->open_count <= 0))
 		return;
 
-	fdata->open_count--;
+	pdata->open_count--;
 }
 
 static inline
-int dfl_feature_dev_use_count(struct dfl_feature_dev_data *fdata)
+int dfl_feature_dev_use_count(struct dfl_feature_platform_data *pdata)
 {
-	return fdata->open_count;
+	return pdata->open_count;
 }
 
 static inline
-void dfl_fpga_fdata_set_private(struct dfl_feature_dev_data *fdata,
+void dfl_fpga_pdata_set_private(struct dfl_feature_platform_data *pdata,
 				void *private)
 {
-	fdata->private = private;
+	pdata->private = private;
 }
 
 static inline
-void *dfl_fpga_fdata_get_private(struct dfl_feature_dev_data *fdata)
+void *dfl_fpga_pdata_get_private(struct dfl_feature_platform_data *pdata)
 {
-	return fdata->private;
+	return pdata->private;
 }
 
 struct dfl_feature_ops {
@@ -357,29 +335,30 @@ struct platform_device *dfl_fpga_inode_to_feature_dev(struct inode *inode)
 
 	pdata = container_of(inode->i_cdev, struct dfl_feature_platform_data,
 			     cdev);
-	return pdata->fdata->dev;
+	return pdata->dev;
 }
 
-#define dfl_fpga_dev_for_each_feature(fdata, feature)			    \
-	for ((feature) = (fdata)->features;				    \
-	   (feature) < (fdata)->features + (fdata)->num; (feature)++)
+#define dfl_fpga_dev_for_each_feature(pdata, feature)			    \
+	for ((feature) = (pdata)->features;				    \
+	   (feature) < (pdata)->features + (pdata)->num; (feature)++)
 
-static inline struct dfl_feature *
-dfl_get_feature_by_id(struct dfl_feature_dev_data *fdata, u16 id)
+static inline
+struct dfl_feature *dfl_get_feature_by_id(struct device *dev, u16 id)
 {
+	struct dfl_feature_platform_data *pdata = dev_get_platdata(dev);
 	struct dfl_feature *feature;
 
-	dfl_fpga_dev_for_each_feature(fdata, feature)
+	dfl_fpga_dev_for_each_feature(pdata, feature)
 		if (feature->id == id)
 			return feature;
 
 	return NULL;
 }
 
-static inline void __iomem *
-dfl_get_feature_ioaddr_by_id(struct dfl_feature_dev_data *fdata, u16 id)
+static inline
+void __iomem *dfl_get_feature_ioaddr_by_id(struct device *dev, u16 id)
 {
-	struct dfl_feature *feature = dfl_get_feature_by_id(fdata, id);
+	struct dfl_feature *feature = dfl_get_feature_by_id(dev, id);
 
 	if (feature && feature->ioaddr)
 		return feature->ioaddr;
@@ -388,18 +367,15 @@ dfl_get_feature_ioaddr_by_id(struct dfl_feature_dev_data *fdata, u16 id)
 	return NULL;
 }
 
-static inline struct dfl_feature_dev_data *
-to_dfl_feature_dev_data(struct device *dev)
+static inline bool is_dfl_feature_present(struct device *dev, u16 id)
 {
-	struct dfl_feature_platform_data *pdata = dev_get_platdata(dev);
-
-	return pdata->fdata;
+	return !!dfl_get_feature_ioaddr_by_id(dev, id);
 }
 
 static inline
-struct device *dfl_fpga_fdata_to_parent(struct dfl_feature_dev_data *fdata)
+struct device *dfl_fpga_pdata_to_parent(struct dfl_feature_platform_data *pdata)
 {
-	return fdata->dev->dev.parent->parent;
+	return pdata->dev->dev.parent->parent;
 }
 
 /**
@@ -460,23 +436,26 @@ struct dfl_fpga_cdev *
 dfl_fpga_feature_devs_enumerate(struct dfl_fpga_enum_info *info);
 void dfl_fpga_feature_devs_remove(struct dfl_fpga_cdev *cdev);
 
-struct dfl_feature_dev_data *
-__dfl_fpga_cdev_find_port_data(struct dfl_fpga_cdev *cdev, void *data,
-			       int (*match)(struct dfl_feature_dev_data *,
-					    void *));
+/*
+ * need to drop the device reference with put_device() after use port platform
+ * device returned by __dfl_fpga_cdev_find_port and dfl_fpga_cdev_find_port
+ * functions.
+ */
+struct platform_device *
+__dfl_fpga_cdev_find_port(struct dfl_fpga_cdev *cdev, void *data,
+			  int (*match)(struct platform_device *, void *));
 
-static inline struct dfl_feature_dev_data *
-dfl_fpga_cdev_find_port_data(struct dfl_fpga_cdev *cdev, void *data,
-			     int (*match)(struct dfl_feature_dev_data *,
-					  void *))
+static inline struct platform_device *
+dfl_fpga_cdev_find_port(struct dfl_fpga_cdev *cdev, void *data,
+			int (*match)(struct platform_device *, void *))
 {
-	struct dfl_feature_dev_data *fdata;
+	struct platform_device *pdev;
 
 	mutex_lock(&cdev->lock);
-	fdata = __dfl_fpga_cdev_find_port_data(cdev, data, match);
+	pdev = __dfl_fpga_cdev_find_port(cdev, data, match);
 	mutex_unlock(&cdev->lock);
 
-	return fdata;
+	return pdev;
 }
 
 int dfl_fpga_cdev_release_port(struct dfl_fpga_cdev *cdev, int port_id);
