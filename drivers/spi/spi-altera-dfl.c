@@ -137,8 +137,8 @@ static void config_spi_master(void __iomem *base, struct spi_master *master)
 
 static int dfl_spi_altera_probe(struct dfl_device *dfl_dev)
 {
+	struct spi_board_info *board_info = &m10_bmc_info;
 	struct device *dev = &dfl_dev->dev;
-	struct spi_board_info *spi_info;
 	struct spi_master *master;
 	struct altera_spi *hw;
 	void __iomem *base;
@@ -156,10 +156,8 @@ static int dfl_spi_altera_probe(struct dfl_device *dfl_dev)
 
 	base = devm_ioremap_resource(dev, &dfl_dev->mmio_res);
 
-	if (IS_ERR(base)) {
-		dev_err(dev, "%s get mem resource fail!\n", __func__);
+	if (IS_ERR(base))
 		return PTR_ERR(base);
-	}
 
 	config_spi_master(base, master);
 	dev_dbg(dev, "%s cs %u bpm 0x%x mode 0x%x\n", __func__,
@@ -180,14 +178,13 @@ static int dfl_spi_altera_probe(struct dfl_device *dfl_dev)
 		goto exit;
 	}
 
-	if (dfl_feature_revision(base) == FME_FEATURE_REV_MAX10_SPI_N5010)
-		spi_info = &m10_n5010_bmc_info;
-	else
-		spi_info = &m10_bmc_info;
+	if (dfl_dev->revision == FME_FEATURE_REV_MAX10_SPI_N5010)
+		board_info = &m10_n5010_bmc_info;
 
-	if (!spi_new_device(master,  spi_info))
+	if (!spi_new_device(master, board_info)) {
 		dev_err(dev, "%s failed to create SPI device: %s\n",
-			__func__, spi_info->modalias);
+			__func__, board_info->modalias);
+	}
 
 	return 0;
 exit:

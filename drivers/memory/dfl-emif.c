@@ -186,6 +186,7 @@ static umode_t dfl_emif_visible(struct kobject *kobj,
 	struct dfl_emif *de = dev_get_drvdata(kobj_to_dev(kobj));
 	struct emif_attr *eattr = container_of(attr, struct emif_attr,
 					       attr.attr);
+	struct dfl_device *ddev = to_dfl_dev(de->dev);
 	u64 val;
 
 	/*
@@ -194,10 +195,10 @@ static umode_t dfl_emif_visible(struct kobject *kobj,
 	 * CAPABILITY_CHN_MSK field (which is a bitmap) indicates which
 	 * interfaces are available.
 	 */
-	if (dfl_feature_revision(de->base) > 0 && strstr(attr->name, "_clear"))
+	if (ddev->revision > 0 && strstr(attr->name, "_clear"))
 		return 0;
 
-	if (dfl_feature_revision(de->base) == 0)
+	if (ddev->revision == 0)
 		val = FIELD_GET(EMIF_CAPABILITY_CHN_MSK_V0,
 				readq(de->base + EMIF_CAPABILITY_BASE));
 	else
