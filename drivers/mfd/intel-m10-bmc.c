@@ -32,7 +32,7 @@ static const struct regmap_range n3000_fw_handshake_regs[] = {
 	regmap_reg_range(M10BMC_N3000_TELEM_START, M10BMC_N3000_TELEM_END),
 };
 
-static struct mfd_cell m10bmc_n5010_bmc_subdevs[] = {
+static struct mfd_cell m10bmc_n5010_subdevs[] = {
 	{ .name = "n5010bmc-hwmon" },
 	{ .name = "n5010bmc-secure" },
 	{ .name = "n5010bmc-phy" },
@@ -296,8 +296,8 @@ static int intel_m10_bmc_spi_probe(struct spi_device *spi)
 			ARRAY_SIZE(d5005_fw_handshake_regs);
 		break;
 	case M10_N5010:
-		cells = m10bmc_n5010_bmc_subdevs;
-		n_cell = ARRAY_SIZE(m10bmc_n5010_bmc_subdevs);
+		cells = m10bmc_n5010_subdevs;
+		n_cell = ARRAY_SIZE(m10bmc_n5010_subdevs);
 		ddata->handshake_sys_reg_ranges = n5010_fw_handshake_regs;
 		ddata->handshake_sys_reg_nranges =
 			ARRAY_SIZE(n5010_fw_handshake_regs);
