@@ -96,6 +96,9 @@ static int fme_pr(struct platform_device *pdev, unsigned long arg)
 		return -EINVAL;
 	}
 
+	if (port_pr.buffer_size == 0)
+		return -EINVAL;
+
 	buf = vmalloc(port_pr.buffer_size);
 	if (!buf)
 		return -ENOMEM;
