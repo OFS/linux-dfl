@@ -97,6 +97,8 @@ static int fme_pr(struct platform_device *pdev, unsigned long arg)
 		return -EINVAL;
 	}
 
+	if (port_pr.buffer_size == 0)
+		return -EINVAL;
 	/*
 	 * align PR buffer per PR bandwidth, as HW ignores the extra padding
 	 * data automatically.
