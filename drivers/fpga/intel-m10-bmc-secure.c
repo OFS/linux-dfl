@@ -43,7 +43,13 @@ show_root_entry_hash(struct device *dev, u32 exp_magic,
 	u8 hash[REH_SHA384_SIZE];
 	u32 magic;
 
-	ret = m10bmc_raw_read(sec->m10bmc, prog_addr, &magic);
+	if (sec->m10bmc->type == M10_N6010) {
+		ret = sec->m10bmc->ops.flash_read(sec->m10bmc, &magic,
+						  prog_addr, sizeof(u32));
+	} else {
+		ret = m10bmc_raw_read(sec->m10bmc, prog_addr, &magic);
+	}
+
 	if (ret)
 		return ret;
 
@@ -75,16 +81,21 @@ show_root_entry_hash(struct device *dev, u32 exp_magic,
 	return cnt;
 }
 
-#define DEVICE_ATTR_SEC_REH_RO(_name, _magic, _prog_addr, _reh_addr) \
+#define DEVICE_ATTR_SEC_REH_RO(_name) \
 static ssize_t _name##_root_entry_hash_show(struct device *dev, \
 					    struct device_attribute *attr, \
 					    char *buf) \
-{ return show_root_entry_hash(dev, _magic, _prog_addr, _reh_addr, buf); } \
+{							\
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);   \
+	struct intel_m10bmc *m10bmc = sec->m10bmc;  \
+	return show_root_entry_hash(dev, _name##_magic(m10bmc),\
+			_name##_prog_addr(m10bmc), _name##_reh_addr(m10bmc),\
+			buf); } \
 static DEVICE_ATTR_RO(_name##_root_entry_hash)
 
-DEVICE_ATTR_SEC_REH_RO(bmc, BMC_PROG_MAGIC, BMC_PROG_ADDR, BMC_REH_ADDR);
-DEVICE_ATTR_SEC_REH_RO(sr, SR_PROG_MAGIC, SR_PROG_ADDR, SR_REH_ADDR);
-DEVICE_ATTR_SEC_REH_RO(pr, PR_PROG_MAGIC, PR_PROG_ADDR, PR_REH_ADDR);
+DEVICE_ATTR_SEC_REH_RO(bmc);
+DEVICE_ATTR_SEC_REH_RO(sr);
+DEVICE_ATTR_SEC_REH_RO(pr);
 
 #define CSK_BIT_LEN		128U
 #define CSK_32ARRAY_SIZE	DIV_ROUND_UP(CSK_BIT_LEN, 32)
@@ -113,18 +124,22 @@ show_canceled_csk(struct device *dev, u32 addr, char *buf)
 	return bitmap_print_to_pagebuf(1, buf, csk_map, CSK_BIT_LEN);
 }
 
-#define DEVICE_ATTR_SEC_CSK_RO(_name, _addr) \
+#define DEVICE_ATTR_SEC_CSK_RO(_name) \
 static ssize_t _name##_canceled_csks_show(struct device *dev, \
 					  struct device_attribute *attr, \
 					  char *buf) \
-{ return show_canceled_csk(dev, _addr, buf); } \
+{                                                    \
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);   \
+	struct intel_m10bmc *m10bmc = sec->m10bmc;  \
+	return show_canceled_csk(dev, _name##_prog_addr(m10bmc) + CSK_VEC_OFFSET,\
+			buf); } \
 static DEVICE_ATTR_RO(_name##_canceled_csks)
 
 #define CSK_VEC_OFFSET 0x34
 
-DEVICE_ATTR_SEC_CSK_RO(bmc, BMC_PROG_ADDR + CSK_VEC_OFFSET);
-DEVICE_ATTR_SEC_CSK_RO(sr, SR_PROG_ADDR + CSK_VEC_OFFSET);
-DEVICE_ATTR_SEC_CSK_RO(pr, PR_PROG_ADDR + CSK_VEC_OFFSET);
+DEVICE_ATTR_SEC_CSK_RO(bmc);
+DEVICE_ATTR_SEC_CSK_RO(sr);
+DEVICE_ATTR_SEC_CSK_RO(pr);
 
 #define FLASH_COUNT_SIZE 4096	/* count stored as inverted bit vector */
 
