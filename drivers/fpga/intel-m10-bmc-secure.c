@@ -312,6 +312,31 @@ free_exit:
 }
 static DEVICE_ATTR_WO(power_on_image);
 
+static ssize_t
+fpga_boot_image_show(struct device *dev,
+		     struct device_attribute *attr, char *buf)
+{
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);
+	int ret;
+	u32 status;
+	int boot_page;
+
+	ret = m10bmc_sys_read(sec->m10bmc, m10bmc_base(sec->m10bmc) +
+			      M10BMC_PMCI_FPGA_CONF_STS, &status);
+	if (ret)
+		return ret;
+
+	if (!FIELD_GET(PMCI_FPGA_CONFIGED, status))
+		return -EINVAL;
+
+	boot_page = FIELD_GET(PMCI_FPGA_BOOT_PAGE, status);
+	if (boot_page >= FPGA_MAX)
+		return -EINVAL;
+
+	return sysfs_emit(buf, "%s\n", fpga_image_names[boot_page]);
+}
+static DEVICE_ATTR_RO(fpga_boot_image);
+
 static umode_t
 m10bmc_is_visible(struct kobject *kobj,
 		  struct attribute *attr, int n)
@@ -332,6 +357,7 @@ static const struct fpga_power_on pmci_power_on_image = {
 static struct attribute *m10bmc_image_attrs[] = {
 	&dev_attr_power_on_image.attr,
 	&dev_attr_available_fpga_images.attr,
+	&dev_attr_fpga_boot_image.attr,
 	NULL,
 };
 
