@@ -220,6 +220,10 @@ enum m10bmc_type {
 #define PMCI_FPGA_RECONF_PAGE  GENMASK(22, 20)
 #define PMCI_FPGA_RP_LOAD      BIT(23)
 
+#define M10BMC_PMCI_FPGA_CONF_STS 0xa0
+#define PMCI_FPGA_BOOT_PAGE  GENMASK(2, 0)
+#define PMCI_FPGA_CONFIGED   BIT(3)
+
 /* Addresses for security related data in FLASH */
 #define PMCI_BMC_REH_ADDR 0x7ffc004
 #define PMCI_BMC_PROG_ADDR 0x7ffc000
