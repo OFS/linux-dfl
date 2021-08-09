@@ -84,3 +84,11 @@ Description:	Write-only. A key word from the available_fpga_images file
 		error code will be returned if you attempt to select an
 		unsupported image or fall-back sequence. Consult your product
 		documentation for supported configurations.
+
+What:           /sys/bus/platform/drivers/intel-m10bmc-secure/.../fpga_boot_image
+Date:		Oct 2021
+KernelVersion:  5.15
+Contact:	Tianfei zhang <tianfei.zhang@intel.com>
+Description:	Read-only. Reading this file will return the name of image booted
+		from FPGA. The EINVAL error code will be returned if no image booted
+		from FPGA.
