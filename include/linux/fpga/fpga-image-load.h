@@ -9,6 +9,7 @@
 
 #include <linux/cdev.h>
 #include <linux/device.h>
+#include <linux/eventfd.h>
 #include <linux/mutex.h>
 #include <linux/types.h>
 #include <uapi/linux/fpga-image-load.h>
@@ -50,6 +51,7 @@ struct fpga_image_load {
 	u32 progress;
 	u32 err_code;			/* image load error code */
 	bool driver_unload;
+	struct eventfd_ctx *finished;
 	void *priv;
 };
 
