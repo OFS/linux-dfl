@@ -28,6 +28,8 @@ FPGA_IMAGE_LOAD_WRITE:
 
 Start an image upload with the provided image buffer. This IOCTL returns
 immediately after starting a kernel worker thread to process the image
-upload which could take as long as 40 minutes depending on the actual
-device being updated. This is an exclusive operation; an attempt to start
-concurrent image uploads for the same device will fail with EBUSY.
+upload which could take as long as 40 minutes depending on the actual device
+being updated. This is an exclusive operation; an attempt to start
+concurrent image uploads for the same device will fail with EBUSY. An
+eventfd file descriptor parameter is provided to this IOCTL. It will be
+signalled at the completion of the image upload.
