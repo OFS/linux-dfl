@@ -26,6 +26,9 @@ struct fpga_image_load;
  *			    written.
  * @poll_complete:	    Required: Check for the completion of the
  *			    HW authentication/programming process.
+ * @cancel:		    Required: Request cancellation of update. This op
+ *			    is called from the context of a different kernel
+ *			    thread, so race conditions need to be considered.
  * @cleanup:		    Optional: Complements the prepare()
  *			    function and is called at the completion
  *			    of the update, whether success or failure,
@@ -36,6 +39,7 @@ struct fpga_image_load_ops {
 	s32 (*write)(struct fpga_image_load *imgld, const u8 *data,
 		     u32 offset, u32 size);
 	u32 (*poll_complete)(struct fpga_image_load *imgld);
+	void (*cancel)(struct fpga_image_load *imgld);
 	void (*cleanup)(struct fpga_image_load *imgld);
 };
 
