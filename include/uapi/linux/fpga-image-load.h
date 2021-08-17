@@ -69,4 +69,6 @@ struct fpga_image_status {
 
 #define FPGA_IMAGE_LOAD_STATUS	_IOR(FPGA_IMAGE_LOAD_MAGIC, 1, struct fpga_image_status)
 
+#define FPGA_IMAGE_LOAD_CANCEL	_IO(FPGA_IMAGE_LOAD_MAGIC, 2)
+
 #endif /* _UAPI_LINUX_FPGA_IMAGE_LOAD_H */
