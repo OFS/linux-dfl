@@ -1,3 +1,11 @@
+What:		/sys/bus/dfl/devices/dfl-port.X.X/feature_rev
+Date:		Oct 2021
+KernelVersion:	5.16
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read only. Displays the DFL feature revision for the user
+		clock.
+		Format: %u
+
 What:		/sys/bus/dfl/devices/dfl-port.X.X/userclk/frequency
 Date:		Aug 2020
 KernelVersion:	5.9
@@ -20,10 +28,9 @@ Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Displays the user clock reference frequency in KHZ.
 		Format: %llu
 
-What:		/sys/bus/dfl/devices/dfl-port.0.6/userclk/revision
+What:		/sys/bus/dfl/devices/dfl-port.X.X/userclk/revision
 Date:		June 2020
 KernelVersion:	5.9
 Contact:	Russ Weight <russell.h.weight@intel.com>
-Description:	Read only. Displays the revision number for the user clock
-		implementation.
+Description:	Read only. Displays the revision number for the IOPLL IP.
 		Format: %llu
