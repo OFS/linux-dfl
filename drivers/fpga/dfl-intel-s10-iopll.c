@@ -480,19 +480,39 @@ static ssize_t ref_frequency_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(ref_frequency);
 
-static  struct attribute *iopll_attrs[] = {
+#define to_dfl_dev(d) container_of(d, struct dfl_device, dev)
+static ssize_t feature_rev_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct dfl_device *dfl_dev = to_dfl_dev(dev);
+
+	return sprintf(buf, "%u\n", dfl_dev->revision);
+}
+static DEVICE_ATTR_RO(feature_rev);
+
+static  struct attribute *iopll_ip_attrs[] = {
 	&dev_attr_frequency.attr,
 	&dev_attr_revision.attr,
 	&dev_attr_ref_frequency.attr,
 	NULL,
 };
 
-static const struct attribute_group iopll_attr_group = {
+static const struct attribute_group iopll_ip_attr_group = {
 	.name	= "userclk",
+	.attrs	= iopll_ip_attrs,
+};
+
+static  struct attribute *iopll_attrs[] = {
+	&dev_attr_feature_rev.attr,
+	NULL,
+};
+
+static const struct attribute_group iopll_attr_group = {
 	.attrs	= iopll_attrs,
 };
 
 static const struct attribute_group *iopll_attr_groups[] = {
+	&iopll_ip_attr_group,
 	&iopll_attr_group,
 	NULL
 };
