@@ -28,6 +28,7 @@ static const struct m10bmc_csr m10bmc_pmci_csr = {
 	.pr_prog_addr = PMCI_PR_PROG_ADDR,
 	.pr_reh_addr = PMCI_PR_REH_ADDR,
 	.pr_magic = PMCI_PR_PROG_MAGIC,
+	.rsu_update_counter = PMCI_STAGING_FLASH_COUNT,
 };
 
 static const struct m10bmc_csr m10bmc_spi_csr = {
@@ -47,6 +48,7 @@ static const struct m10bmc_csr m10bmc_spi_csr = {
 	.pr_prog_addr = PR_PROG_ADDR,
 	.pr_reh_addr = PR_REH_ADDR,
 	.pr_magic = PR_PROG_MAGIC,
+	.rsu_update_counter = STAGING_FLASH_COUNT,
 };
 
 static struct mfd_cell m10bmc_n6010_bmc_subdevs[] = {

@@ -237,6 +237,8 @@ enum m10bmc_type {
 #define PMCI_PR_PROG_ADDR 0x7ffe000
 #define PMCI_PR_PROG_MAGIC 0x5250
 
+#define PMCI_STAGING_FLASH_COUNT 0x7ff5000
+
 #define m10bmc_base(m10bmc) ((m10bmc)->csr->base)
 #define doorbell_reg(m10bmc) ((m10bmc)->csr->doorbell)
 #define auth_result_reg(m10bmc) ((m10bmc)->csr->auth_result)
@@ -250,6 +252,7 @@ enum m10bmc_type {
 #define pr_prog_addr(m10bmc) ((m10bmc)->csr->pr_prog_addr)
 #define pr_reh_addr(m10bmc) ((m10bmc)->csr->pr_reh_addr)
 #define pr_magic(m10bmc) ((m10bmc)->csr->pr_magic)
+#define rsu_update_counter(m10bmc) ((m10bmc)->csr->rsu_update_counter)
 
 enum m10bmc_fw_state {
 	M10BMC_FW_STATE_NORMAL,
@@ -276,6 +279,7 @@ struct m10bmc_csr {
 	unsigned int pr_prog_addr;
 	unsigned int pr_reh_addr;
 	unsigned int pr_magic;
+	unsigned int rsu_update_counter;
 };
 
 /**

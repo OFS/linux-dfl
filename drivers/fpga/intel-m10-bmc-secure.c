@@ -181,8 +181,8 @@ static ssize_t flash_count_show(struct device *dev,
 		return -ENOMEM;
 
 	ret = sec->m10bmc->ops.flash_read(sec->m10bmc, flash_buf,
-					   STAGING_FLASH_COUNT,
-					   FLASH_COUNT_SIZE);
+					  rsu_update_counter(sec->m10bmc),
+					  FLASH_COUNT_SIZE);
 	if (ret) {
 		dev_err(sec->dev, "failed to read flash count\n");
 		goto exit_free;
