@@ -130,9 +130,9 @@ pmci_flash_bulk_read(struct intel_m10bmc *m10bmc, void *buf,
 
 		size -= blk_size;
 		offset += blk_size;
-	}
 
-	writel(0, pmci->base + PMCI_FLASH_CTRL);
+		writel(0, pmci->base + PMCI_FLASH_CTRL);
+	}
 
 	return 0;
 }
