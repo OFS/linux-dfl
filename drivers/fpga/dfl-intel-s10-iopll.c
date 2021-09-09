@@ -490,7 +490,7 @@ static ssize_t feature_rev_show(struct device *dev,
 {
 	struct dfl_device *dfl_dev = to_dfl_dev(dev);
 
-	return sprintf(buf, "%d\n", dfl_dev->revision);
+	return sprintf(buf, "%u\n", dfl_dev->revision);
 }
 static DEVICE_ATTR_RO(feature_rev);
 
