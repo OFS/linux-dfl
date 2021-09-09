@@ -427,10 +427,6 @@ static ssize_t frequency_store(struct device *dev,
 	if (count != sizeof(struct pll_config))
 		return -EINVAL;
 
-	if ((iopll_config->pll_freq_khz > IOPLL_MAX_FREQ * 1000) ||
-	    (iopll_config->pll_freq_khz < IOPLL_MIN_FREQ * 1000))
-		return -EINVAL;
-
 	mutex_lock(&iopll->iopll_mutex);
 
 	ret = iopll_set_freq(iopll, iopll_config, &seq);

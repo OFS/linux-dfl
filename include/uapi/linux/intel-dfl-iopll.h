@@ -11,9 +11,6 @@
 /*
  * IOPLL Configuration support.
  */
-#define  IOPLL_MAX_FREQ         600
-#define  IOPLL_MIN_FREQ         1
-
 struct pll_config {
 	unsigned int pll_freq_khz;
 	unsigned int pll_m;
