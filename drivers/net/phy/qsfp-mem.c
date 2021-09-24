@@ -58,6 +58,7 @@ struct qsfp {
 };
 
 static const struct regmap_range qsfp_mem_regmap_range[] = {
+	regmap_reg_range(CONF_OFF, STAT_OFF),
 	regmap_reg_range(QSFP_SHADOW_CSRS_BASE_OFF, QSFP_SHADOW_CSRS_BASE_END),
 };
 
@@ -107,7 +108,7 @@ static int qsfp_probe(struct dfl_device *dfl_dev)
 
 	qsfp_init_i2c(dev, qsfp);
 
-	writeq(CONF_POLL_EN | CONF_MOD_SEL, qsfp->base + CONF_OFF);
+	writeq(CONF_POLL_EN | CONF_MOD_SEL | CONF_LOW_POW, qsfp->base + CONF_OFF);
 	udelay(DELAY_US);
 
 	qsfp->regmap = devm_regmap_init_mmio(dev, qsfp->base, &mmio_cfg);
