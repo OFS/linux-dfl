@@ -429,7 +429,7 @@ static const struct m10bmc_sdata n6010bmc_curr_tbl[] = {
 };
 
 static const struct m10bmc_sdata n6010bmc_power_tbl[] = {
-	{ 0x724, 0x0, 0x0, 0x0, 0x0, 1000, "Board Power" },
+	{ 0x724, 0x0, 0x0, 0x0, 0x0, 1, "Board Power" },
 };
 
 static const struct hwmon_channel_info *n6010bmc_hinfo[] = {
