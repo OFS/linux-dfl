@@ -16,8 +16,14 @@
 
 struct m10bmc_sec;
 
+struct image_load {
+	const char *name;
+	int (*load_image)(struct m10bmc_sec *sec);
+};
+
 struct m10bmc_sec_ops {
 	int (*rsu_status)(struct m10bmc_sec *sec);
+	struct image_load *image_load;		/* terminated with { } member */
 };
 
 struct m10bmc_sec {
@@ -28,6 +34,162 @@ struct m10bmc_sec {
 	u32 fw_name_id;
 	bool cancel_request;
 	const struct m10bmc_sec_ops *ops;
+};
+
+static int m10bmc_sec_bmc_image_load(struct m10bmc_sec *sec, unsigned int val)
+{
+	const struct m10bmc_csr_map *csr_map = sec->m10bmc->info->csr_map;
+	u32 doorbell;
+	int ret;
+
+	if (val > 1) {
+		dev_err(sec->dev, "secure update image load invalid reload val = %u\n", val);
+		return -EINVAL;
+	}
+
+	ret = m10bmc_sys_read(sec->m10bmc, csr_map->doorbell, &doorbell);
+	if (ret)
+		return ret;
+
+	if (doorbell & DRBL_REBOOT_DISABLED)
+		return -EBUSY;
+
+	return m10bmc_sys_update_bits(sec->m10bmc, csr_map->doorbell,
+				      DRBL_CONFIG_SEL | DRBL_REBOOT_REQ,
+				      FIELD_PREP(DRBL_CONFIG_SEL, val) |
+				      DRBL_REBOOT_REQ);
+}
+
+static int m10bmc_n6000_sec_bmc_image_load(struct m10bmc_sec *sec, unsigned int val)
+{
+	const struct m10bmc_csr_map *csr_map = sec->m10bmc->info->csr_map;
+	u32 doorbell;
+	int ret;
+
+	if (val > 1) {
+		dev_err(sec->dev, "secure update image load invalid reload val = %u\n", val);
+		return -EINVAL;
+	}
+
+	ret = m10bmc_sys_read(sec->m10bmc, csr_map->doorbell, &doorbell);
+	if (ret)
+		return ret;
+
+	if (doorbell & PMCI_DRBL_REBOOT_DISABLED)
+		return -EBUSY;
+
+	return regmap_update_bits(sec->m10bmc->regmap,
+				  csr_map->base + M10BMC_PMCI_MAX10_RECONF,
+				  PMCI_MAX10_REBOOT_REQ | PMCI_MAX10_REBOOT_PAGE,
+				  FIELD_PREP(PMCI_MAX10_REBOOT_PAGE, val) |
+				  PMCI_MAX10_REBOOT_REQ);
+}
+
+static int pmci_sec_fpga_image_load(struct m10bmc_sec *sec, unsigned int val)
+{
+	const struct m10bmc_csr_map *csr_map = sec->m10bmc->info->csr_map;
+	int ret;
+
+	if (val > 2) {
+		dev_err(sec->dev, "secure update image load invalid reload val = %u\n", val);
+		return -EINVAL;
+	}
+
+	ret = regmap_update_bits(sec->m10bmc->regmap,
+				 csr_map->base + M10BMC_PMCI_FPGA_RECONF,
+				 PMCI_FPGA_RP_LOAD, 0);
+	if (ret)
+		return ret;
+
+	return regmap_update_bits(sec->m10bmc->regmap,
+				  csr_map->base + M10BMC_PMCI_FPGA_RECONF,
+				  PMCI_FPGA_RECONF_PAGE | PMCI_FPGA_RP_LOAD,
+				  FIELD_PREP(PMCI_FPGA_RECONF_PAGE, val) |
+				  PMCI_FPGA_RP_LOAD);
+}
+
+static int m10bmc_sec_bmc_image_load_0(struct m10bmc_sec *sec)
+{
+	return m10bmc_sec_bmc_image_load(sec, 0);
+}
+
+static int m10bmc_sec_bmc_image_load_1(struct m10bmc_sec *sec)
+{
+	return m10bmc_sec_bmc_image_load(sec, 1);
+}
+
+static int pmci_sec_bmc_image_load_0(struct m10bmc_sec *sec)
+{
+	return m10bmc_n6000_sec_bmc_image_load(sec, 0);
+}
+
+static int pmci_sec_bmc_image_load_1(struct m10bmc_sec *sec)
+{
+	return m10bmc_n6000_sec_bmc_image_load(sec, 1);
+}
+
+static int pmci_sec_fpga_image_load_0(struct m10bmc_sec *sec)
+{
+	return pmci_sec_fpga_image_load(sec, 0);
+}
+
+static int pmci_sec_fpga_image_load_1(struct m10bmc_sec *sec)
+{
+	return pmci_sec_fpga_image_load(sec, 1);
+}
+
+static int pmci_sec_fpga_image_load_2(struct m10bmc_sec *sec)
+{
+	return pmci_sec_fpga_image_load(sec, 2);
+}
+
+
+static struct image_load n3000_image_load_hndlrs[] = {
+	{
+		.name = "bmc_factory",
+		.load_image = m10bmc_sec_bmc_image_load_1,
+	},
+	{
+		.name = "bmc_user",
+		.load_image = m10bmc_sec_bmc_image_load_0,
+	},
+	{}
+};
+
+static struct image_load d5005_image_load_hndlrs[] = {
+	{
+		.name = "bmc_factory",
+		.load_image = m10bmc_sec_bmc_image_load_0,
+	},
+	{
+		.name = "bmc_user",
+		.load_image = m10bmc_sec_bmc_image_load_1,
+	},
+	{}
+};
+
+static struct image_load n6000_image_load_hndlrs[] = {
+	{
+		.name = "bmc_factory",
+		.load_image = pmci_sec_bmc_image_load_0,
+	},
+	{
+		.name = "bmc_user",
+		.load_image = pmci_sec_bmc_image_load_1,
+	},
+	{
+		.name = "fpga_factory",
+		.load_image = pmci_sec_fpga_image_load_0,
+	},
+	{
+		.name = "fpga_user1",
+		.load_image = pmci_sec_fpga_image_load_1,
+	},
+	{
+		.name = "fpga_user2",
+		.load_image = pmci_sec_fpga_image_load_2,
+	},
+	{}
 };
 
 static DEFINE_XARRAY_ALLOC(fw_upload_xa);
@@ -254,8 +416,55 @@ static struct attribute_group m10bmc_security_attr_group = {
 	.attrs = m10bmc_security_attrs,
 };
 
+static ssize_t available_images_show(struct device *dev,
+				     struct device_attribute *attr, char *buf)
+{
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);
+	const struct image_load *hndlr;
+	ssize_t count = 0;
+
+	for (hndlr = sec->ops->image_load; hndlr->name; hndlr++)
+		count += scnprintf(buf + count, PAGE_SIZE - count, "%s ", hndlr->name);
+
+	buf[count - 1] = '\n';
+
+	return count;
+}
+static DEVICE_ATTR_RO(available_images);
+
+static ssize_t image_load_store(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);
+	const struct image_load *hndlr;
+	int ret = -EINVAL;
+
+	for (hndlr = sec->ops->image_load; hndlr->name; hndlr++) {
+		if (sysfs_streq(buf, hndlr->name)) {
+			ret = hndlr->load_image(sec);
+			break;
+		}
+	}
+
+	return ret ? : count;
+}
+static DEVICE_ATTR_WO(image_load);
+
+static struct attribute *m10bmc_control_attrs[] = {
+	&dev_attr_available_images.attr,
+	&dev_attr_image_load.attr,
+	NULL,
+};
+
+static struct attribute_group m10bmc_control_attr_group = {
+	.name = "control",
+	.attrs = m10bmc_control_attrs,
+};
+
 static const struct attribute_group *m10bmc_sec_attr_groups[] = {
 	&m10bmc_security_attr_group,
+	&m10bmc_control_attr_group,
 	NULL,
 };
 
@@ -676,10 +885,17 @@ static const struct fw_upload_ops m10bmc_ops = {
 
 static const struct m10bmc_sec_ops m10sec_n3000_ops = {
 	.rsu_status = m10bmc_sec_n3000_rsu_status,
+	.image_load = n3000_image_load_hndlrs,
+};
+
+static const struct m10bmc_sec_ops m10sec_d5005_ops = {
+	.rsu_status = m10bmc_sec_n3000_rsu_status,
+	.image_load = d5005_image_load_hndlrs,
 };
 
 static const struct m10bmc_sec_ops m10sec_n6000_ops = {
 	.rsu_status = m10bmc_sec_n6000_rsu_status,
+	.image_load = n6000_image_load_hndlrs,
 };
 
 #define SEC_UPDATE_LEN_MAX 32
@@ -749,7 +965,7 @@ static const struct platform_device_id intel_m10bmc_sec_ids[] = {
 	},
 	{
 		.name = "d5005bmc-sec-update",
-		.driver_data = (kernel_ulong_t)&m10sec_n3000_ops,
+		.driver_data = (kernel_ulong_t)&m10sec_d5005_ops,
 	},
 	{
 		.name = "n6000bmc-sec-update",
