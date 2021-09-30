@@ -59,3 +59,24 @@ Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Returns number of times the secure update
 		staging area has been flashed.
 		Format: "%u".
+
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../control/available_images
+Date:		Nov 2021
+KernelVersion:  5.16
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read-only. This file returns a space separated list of
+		key words that may be written into the image_load file
+		described below. These keywords decribe an FPGA, BMC,
+		or firmware image in FLASH or EEPROM storage that may
+		be loaded.
+
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../control/image_load
+Date:		Nov 2021
+KernelVersion:  5.16
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Write-only. A key word may be written to this file to
+		trigger a reload of an FPGA, BMC, or firmware image from
+		FLASH or EEPROM. Refer to the available_images file for a
+		list of supported key words for the underlying device.
+		Writing an unsupported string to this file will result in
+		EINVAL being returned.
