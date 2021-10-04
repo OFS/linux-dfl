@@ -536,6 +536,36 @@ exit_free:
 }
 static DEVICE_ATTR_RO(flash_count);
 
+static ssize_t
+sdm_provision_status_show(struct device *dev,
+		     struct device_attribute *attr, char *buf)
+{
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);
+	u32 status;
+	int ret;
+
+	ret = m10bmc_sys_read(sec->m10bmc, m10bmc_base(sec->m10bmc) +
+			      M10BMC_PMCI_SDM_CTRL_STS, &status);
+	if (ret)
+		return ret;
+
+	return sysfs_emit(buf, "0x%x\n",
+			  (unsigned int)FIELD_GET(PMCI_SDM_PGM_ERROR, status));
+}
+static DEVICE_ATTR_RO(sdm_provision_status);
+
+static umode_t
+m10bmc_security_is_visible(struct kobject *kobj, struct attribute *attr, int n)
+{
+	struct m10bmc_sec *sec = dev_get_drvdata(kobj_to_dev(kobj));
+
+	if (sec->type != N6000BMC_SEC &&
+	    attr == &dev_attr_sdm_provision_status.attr)
+		return 0;
+
+	return attr->mode;
+}
+
 static struct attribute *m10bmc_security_attrs[] = {
 	&dev_attr_flash_count.attr,
 	&dev_attr_bmc_root_entry_hash.attr,
@@ -544,12 +574,14 @@ static struct attribute *m10bmc_security_attrs[] = {
 	&dev_attr_sr_canceled_csks.attr,
 	&dev_attr_pr_canceled_csks.attr,
 	&dev_attr_bmc_canceled_csks.attr,
+	&dev_attr_sdm_provision_status.attr,
 	NULL,
 };
 
 static struct attribute_group m10bmc_security_attr_group = {
 	.name = "security",
 	.attrs = m10bmc_security_attrs,
+	.is_visible = m10bmc_security_is_visible,
 };
 
 static enum fpga_image
@@ -737,8 +769,7 @@ static ssize_t image_load_store(struct device *dev,
 static DEVICE_ATTR_WO(image_load);
 
 static umode_t
-m10bmc_is_visible(struct kobject *kobj,
-		  struct attribute *attr, int n)
+m10bmc_image_is_visible(struct kobject *kobj, struct attribute *attr, int n)
 {
 	struct m10bmc_sec *sec = dev_get_drvdata(kobj_to_dev(kobj));
 
@@ -763,7 +794,7 @@ static struct attribute *m10bmc_control_attrs[] = {
 static struct attribute_group m10bmc_control_attr_group = {
 	.name = "control",
 	.attrs = m10bmc_control_attrs,
-	.is_visible = m10bmc_is_visible,
+	.is_visible = m10bmc_image_is_visible,
 };
 
 static const struct attribute_group *m10bmc_sec_attr_groups[] = {
