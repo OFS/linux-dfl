@@ -127,13 +127,39 @@ enum m10bmc_type {
 #define RSU_STAT_NON_INC		0x6
 #define RSU_STAT_ERASE_FAIL		0x7
 #define RSU_STAT_WEAROUT		0x8
-#define RSU_STAT_NIOS_OK		0x80
-#define RSU_STAT_USER_OK		0x81
-#define RSU_STAT_FACTORY_OK		0x82
-#define RSU_STAT_USER_FAIL		0x83
-#define RSU_STAT_FACTORY_FAIL		0x84
-#define RSU_STAT_NIOS_FLASH_ERR		0x85
-#define RSU_STAT_FPGA_FLASH_ERR		0x86
+#define RSU_STAT_PMCI_SS_FAIL           0x9
+#define RSU_STAT_FLASH_CMD              0xa
+#define RSU_STAT_FACTORY_UNVERITY       0xb
+#define RSU_STAT_FACTORY_ACTIVE         0xc
+#define RSU_STAT_POWER_DOWN             0xd
+#define RSU_STAT_CANCELLATION           0xe
+#define RSU_STAT_HASH                   0xf
+#define RSU_STAT_FLASH_ACCESS           0x10
+#define RSU_STAT_SDM_PR_CERT	        0x20
+#define RSU_STAT_SDM_PR_NIOS_BUSY	0x21
+#define RSU_STAT_SDM_PR_TIMEOUT	        0x22
+#define RSU_STAT_SDM_PR_FAILED		0x23
+#define RSU_STAT_SDM_PR_MISMATCH	0x24
+#define RSU_STAT_SDM_PR_FLUSH   	0x25
+#define RSU_STAT_SDM_SR_CERT	        0x30
+#define RSU_STAT_SDM_SR_NIOS_BUSY	0x31
+#define RSU_STAT_SDM_SR_TIMEOUT	        0x32
+#define RSU_STAT_SDM_SR_SDM_FAILED	0x33
+#define RSU_STAT_SDM_SR_MISMATCH	0x34
+#define RSU_STAT_SDM_SR_FLUSH   	0x35
+#define RSU_STAT_SDM_KEY_CERT	        0x40
+#define RSU_STAT_SDM_KEY_NIOS_BUSY	0x41
+#define RSU_STAT_SDM_KEY_TIMEOUT	0x42
+#define RSU_STAT_SDM_KEY_FAILED		0x43
+#define RSU_STAT_SDM_KEY_MISMATCH	0x44
+#define RSU_STAT_SDM_KEY_FLUSH   	0x45
+#define RSU_STAT_NIOS_OK                0x80
+#define RSU_STAT_USER_OK                0x81
+#define RSU_STAT_FACTORY_OK             0x82
+#define RSU_STAT_USER_FAIL              0x83
+#define RSU_STAT_FACTORY_FAIL           0x84
+#define RSU_STAT_NIOS_FLASH_ERR         0x85
+#define RSU_STAT_FPGA_FLASH_ERR	        0x86
 
 #define HOST_STATUS_IDLE		0x0
 #define HOST_STATUS_WRITE_DONE		0x1
@@ -232,6 +258,11 @@ enum m10bmc_type {
 
 #define M10BMC_PMCI_SDM_CTRL_STS 0x230
 #define PMCI_SDM_IMG_REQ	BIT(0)
+#define PMCI_SDM_PGM_ERROR	GENMASK(23, 16)
+
+#define M10BMC_PMCI_SDM_PR_STS		0x820
+#define M10BMC_PMCI_CERT_PROG_STS	0x824
+#define M10BMC_PMCI_CERT_SPEC_STS	0x828
 
 #define PMCI_ERROR_LOG_ADDR  0x7fb0000
 #define PMCI_ERROR_LOG_SIZE  0x40000
