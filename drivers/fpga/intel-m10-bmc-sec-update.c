@@ -45,6 +45,7 @@ struct m10bmc_sec_ops {
 	int (*rsu_status)(struct m10bmc_sec *sec);
 	struct image_load *image_load;		/* terminated with { } member */
 	const struct fpga_power_on *poc;	/* power on image configuration */
+	bool sec_visible;
 };
 
 struct m10bmc_sec {
@@ -61,11 +62,27 @@ static void log_error_regs(struct m10bmc_sec *sec, u32 doorbell)
 {
 	const struct m10bmc_csr_map *csr_map = sec->m10bmc->info->csr_map;
 	u32 auth_result;
+	int status;
 
 	dev_err(sec->dev, "Doorbell: 0x%08x\n", doorbell);
 
 	if (!m10bmc_sys_read(sec->m10bmc, csr_map->auth_result, &auth_result))
 		dev_err(sec->dev, "RSU auth result: 0x%08x\n", auth_result);
+
+	status = sec->ops->rsu_status(sec);
+	if (status < 0)
+		return;
+
+	if (status == RSU_STAT_SDM_PR_FAILED) {
+		if (!m10bmc_sys_read(sec->m10bmc, M10BMC_PMCI_SDM_PR_STS, &status))
+			dev_err(sec->dev, "SDM Key Program Status: 0x%08x\n", status);
+	} else if (status == RSU_STAT_SDM_SR_SDM_FAILED ||
+		   status == RSU_STAT_SDM_KEY_FAILED) {
+		if (!m10bmc_sys_read(sec->m10bmc, M10BMC_PMCI_CERT_PROG_STS, &status))
+			dev_err(sec->dev, "Certificate Program Status: 0x%08x\n", status);
+		if (!m10bmc_sys_read(sec->m10bmc, M10BMC_PMCI_CERT_SPEC_STS, &status))
+			dev_err(sec->dev, "Certificate Specific Status: 0x%08x\n", status);
+	}
 }
 
 static int m10bmc_sec_progress_status(struct m10bmc_sec *sec, u32 *doorbell_reg,
@@ -160,7 +177,7 @@ static int pmci_sec_fpga_image_load(struct m10bmc_sec *sec, unsigned int val)
 				  PMCI_FPGA_RP_LOAD);
 }
 
-static int pmci_sec_sdm_image_load(struct m10bmc_sec *sec)
+static int pmci_sec_sdm_sr_image_load(struct m10bmc_sec *sec)
 {
 	const struct m10bmc_csr_map *csr_map = sec->m10bmc->info->csr_map;
 
@@ -400,8 +417,8 @@ static struct image_load n6000_image_load_hndlrs[] = {
 		.load_image = pmci_sec_fpga_image_load_2,
 	},
 	{
-		.name = "sdm",
-		.load_image = pmci_sec_sdm_image_load,
+		.name = "sdm_sr",
+		.load_image = pmci_sec_sdm_sr_image_load,
 	},
 	{}
 };
@@ -614,6 +631,33 @@ exit_free:
 }
 static DEVICE_ATTR_RO(flash_count);
 
+static ssize_t sdm_sr_provision_status_show(struct device *dev,
+					    struct device_attribute *attr, char *buf)
+{
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);
+	const struct m10bmc_csr_map *csr_map = sec->m10bmc->info->csr_map;
+	u32 status;
+	int ret;
+
+	ret = m10bmc_sys_read(sec->m10bmc, csr_map->base + M10BMC_PMCI_SDM_SR_CTRL_STS, &status);
+	if (ret)
+		return ret;
+
+	return sysfs_emit(buf, "0x%x\n", (unsigned int)FIELD_GET(PMCI_SDM_SR_PGM_ERROR, status));
+}
+static DEVICE_ATTR_RO(sdm_sr_provision_status);
+
+static umode_t m10bmc_security_is_visible(struct kobject *kobj, struct attribute *attr, int n)
+{
+	struct m10bmc_sec *sec = dev_get_drvdata(kobj_to_dev(kobj));
+
+	if (!sec->ops->sec_visible &&
+	    attr == &dev_attr_sdm_sr_provision_status.attr)
+		return 0;
+
+	return attr->mode;
+}
+
 static struct attribute *m10bmc_security_attrs[] = {
 	&dev_attr_flash_count.attr,
 	&dev_attr_bmc_root_entry_hash.attr,
@@ -622,12 +666,14 @@ static struct attribute *m10bmc_security_attrs[] = {
 	&dev_attr_sr_canceled_csks.attr,
 	&dev_attr_pr_canceled_csks.attr,
 	&dev_attr_bmc_canceled_csks.attr,
+	&dev_attr_sdm_sr_provision_status.attr,
 	NULL,
 };
 
 static struct attribute_group m10bmc_security_attr_group = {
 	.name = "security",
 	.attrs = m10bmc_security_attrs,
+	.is_visible = m10bmc_security_is_visible,
 };
 
 static enum fpga_image
@@ -866,7 +912,7 @@ static ssize_t image_load_store(struct device *dev,
 static DEVICE_ATTR_WO(image_load);
 
 static umode_t
-m10bmc_is_visible(struct kobject *kobj, struct attribute *attr, int n)
+m10bmc_image_is_visible(struct kobject *kobj, struct attribute *attr, int n)
 {
 	struct m10bmc_sec *sec = dev_get_drvdata(kobj_to_dev(kobj));
 
@@ -891,7 +937,7 @@ static struct attribute *m10bmc_control_attrs[] = {
 static struct attribute_group m10bmc_control_attr_group = {
 	.name = "control",
 	.attrs = m10bmc_control_attrs,
-	.is_visible = m10bmc_is_visible,
+	.is_visible = m10bmc_image_is_visible,
 };
 
 static const struct attribute_group *m10bmc_sec_attr_groups[] = {
@@ -1298,6 +1344,7 @@ static const struct m10bmc_sec_ops m10sec_n6000_ops = {
 	.rsu_status = m10bmc_sec_n6000_rsu_status,
 	.image_load = n6000_image_load_hndlrs,
 	.poc = &pmci_power_on_image,
+	.sec_visible = true,
 };
 
 #define SEC_UPDATE_LEN_MAX 32
