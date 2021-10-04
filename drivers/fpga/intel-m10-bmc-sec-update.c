@@ -141,6 +141,14 @@ static int pmci_sec_fpga_image_load(struct m10bmc_sec *sec,
 				  PMCI_FPGA_RP_LOAD);
 }
 
+static int pmci_sec_sdm_image_load(struct m10bmc_sec *sec)
+{
+	return regmap_update_bits(sec->m10bmc->regmap,
+				  m10bmc_base(sec->m10bmc) +
+				  M10BMC_PMCI_SDM_CTRL_STS,
+				  PMCI_SDM_IMG_REQ, PMCI_SDM_IMG_REQ);
+}
+
 static int m10bmc_sec_bmc_image_load_0(struct m10bmc_sec *sec)
 {
 	return m10bmc_sec_bmc_image_load(sec, 0);
@@ -378,6 +386,10 @@ static struct image_load pmci_image_load_hndlrs[] = {
 	{
 		.name = "fpga_user2",
 		.load_image = pmci_sec_fpga_image_load_2,
+	},
+	{
+		.name = "sdm",
+		.load_image = pmci_sec_sdm_image_load,
 	},
 	{}
 };
