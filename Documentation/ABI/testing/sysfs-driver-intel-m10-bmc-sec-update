@@ -60,6 +60,14 @@ Description:	Read only. Returns number of times the secure update
 		staging area has been flashed.
 		Format: "%u".
 
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../security/sdm_sr_provision_status
+Date:		November 2021
+KernelVersion:  5.16
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read-only. Read this file to determine the status of SDM
+		static region key provisioning.
+		Format: "0x%x".
+
 What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../control/available_images
 Date:		Nov 2021
 KernelVersion:  5.16
