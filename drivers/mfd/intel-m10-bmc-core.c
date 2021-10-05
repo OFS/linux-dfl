@@ -51,13 +51,13 @@ static const struct m10bmc_csr m10bmc_spi_csr = {
 	.rsu_update_counter = STAGING_FLASH_COUNT,
 };
 
-static struct mfd_cell m10bmc_n6010_bmc_subdevs[] = {
-	{ .name = "n6010bmc-hwmon" },
-	{ .name = "n6010bmc-secure" },
-	{ .name = "n6010bmc-log" }
+static struct mfd_cell m10bmc_n6000_bmc_subdevs[] = {
+	{ .name = "n6000bmc-hwmon" },
+	{ .name = "n6000bmc-secure" },
+	{ .name = "n6000bmc-log" }
 };
 
-static const struct regmap_range n6010_fw_handshake_regs[] = {
+static const struct regmap_range n6000_fw_handshake_regs[] = {
 	regmap_reg_range(M10BMC_PMCI_TELEM_START, M10BMC_PMCI_TELEM_END),
 };
 
@@ -367,7 +367,7 @@ int m10bmc_dev_init(struct intel_m10bmc *m10bmc)
 	init_rwsem(&m10bmc->bmcfw_lock);
 	dev_set_drvdata(m10bmc->dev, m10bmc);
 
-	if (m10bmc->type == M10_N6010) {
+	if (m10bmc->type == M10_N6000) {
 		if (!m10bmc->flash_ops) {
 			dev_err(m10bmc->dev,
 				"No flash-ops provided\n");
@@ -408,12 +408,12 @@ int m10bmc_dev_init(struct intel_m10bmc *m10bmc)
 			ARRAY_SIZE(n5010_fw_handshake_regs);
 		m10bmc->csr = &m10bmc_spi_csr;
 		break;
-	case M10_N6010:
-		cells = m10bmc_n6010_bmc_subdevs;
-		n_cell = ARRAY_SIZE(m10bmc_n6010_bmc_subdevs);
-		m10bmc->handshake_sys_reg_ranges = n6010_fw_handshake_regs;
+	case M10_N6000:
+		cells = m10bmc_n6000_bmc_subdevs;
+		n_cell = ARRAY_SIZE(m10bmc_n6000_bmc_subdevs);
+		m10bmc->handshake_sys_reg_ranges = n6000_fw_handshake_regs;
 		m10bmc->handshake_sys_reg_nranges =
-			ARRAY_SIZE(n6010_fw_handshake_regs);
+			ARRAY_SIZE(n6000_fw_handshake_regs);
 		m10bmc->csr = &m10bmc_pmci_csr;
 		break;
 	default:
