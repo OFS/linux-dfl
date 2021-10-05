@@ -340,7 +340,7 @@ static const struct m10bmc_hwmon_board_data n5010bmc_hwmon_bdata = {
 	.hinfo = n5010bmc_hinfo,
 };
 
-static const struct m10bmc_sdata n6010bmc_temp_tbl[] = {
+static const struct m10bmc_sdata n6000bmc_temp_tbl[] = {
 	{ 0x444, 0x448, 0x44c, 0x0, 0x0, 500, "FPGA E-TILE Temperature #1" },
 	{ 0x450, 0x454, 0x458, 0x0, 0x0, 500, "FPGA E-TILE Temperature #2" },
 	{ 0x45c, 0x460, 0x464, 0x0, 0x0, 500, "FPGA E-TILE Temperature #3" },
@@ -378,7 +378,7 @@ static const struct m10bmc_sdata n6010bmc_temp_tbl[] = {
 	{ 0x5e8, 0x5ec, 0x5f0, 0x5c0, 0x0, 500, "FPGA Corner Temperature [Remote]" },
 };
 
-static const struct m10bmc_sdata n6010bmc_in_tbl[] = {
+static const struct m10bmc_sdata n6000bmc_in_tbl[] = {
 	{ 0x5f4, 0x0, 0x0, 0x0, 0x0, 1, "Inlet 12V PCIe Rail Voltage" },
 	{ 0x60c, 0x0, 0x0, 0x0, 0x0, 1, "Inlet 12V Aux Rail Voltage" },
 	{ 0x624, 0x0, 0x0, 0x0, 0x0, 1, "Inlet 3V3 PCIe Rail Voltage" },
@@ -412,7 +412,7 @@ static const struct m10bmc_sdata n6010bmc_in_tbl[] = {
 	{ 0x720, 0x0, 0x0, 0x0, 0x0, 1, "AVDD_PCIE_0V9_CVL Voltage" },
 };
 
-static const struct m10bmc_sdata n6010bmc_curr_tbl[] = {
+static const struct m10bmc_sdata n6000bmc_curr_tbl[] = {
 	{ 0x600, 0x604, 0x608, 0x0, 0x0, 1, "Inlet 12V PCIe Rail Current" },
 	{ 0x618, 0x61c, 0x620, 0x0, 0x0, 1, "Inlet 12V Aux Rail Current" },
 	{ 0x630, 0x634, 0x638, 0x0, 0x0, 1, "Inlet 3V3 PCIe Rail Current" },
@@ -428,11 +428,11 @@ static const struct m10bmc_sdata n6010bmc_curr_tbl[] = {
 	{ 0x6b8, 0x6bc, 0x670, 0x0, 0x0, 1, "QSFP 3V3 Rail Current" },
 };
 
-static const struct m10bmc_sdata n6010bmc_power_tbl[] = {
+static const struct m10bmc_sdata n6000bmc_power_tbl[] = {
 	{ 0x724, 0x0, 0x0, 0x0, 0x0, 1, "Board Power" },
 };
 
-static const struct hwmon_channel_info *n6010bmc_hinfo[] = {
+static const struct hwmon_channel_info *n6000bmc_hinfo[] = {
 	HWMON_CHANNEL_INFO(temp,
 			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
 			   HWMON_T_LABEL,
@@ -555,15 +555,15 @@ static const struct hwmon_channel_info *n6010bmc_hinfo[] = {
 	NULL
 };
 
-static const struct m10bmc_hwmon_board_data n6010bmc_hwmon_bdata = {
+static const struct m10bmc_hwmon_board_data n6000bmc_hwmon_bdata = {
 	.tables = {
-		[hwmon_temp] = n6010bmc_temp_tbl,
-		[hwmon_in] = n6010bmc_in_tbl,
-		[hwmon_curr] = n6010bmc_curr_tbl,
-		[hwmon_power] = n6010bmc_power_tbl,
+		[hwmon_temp] = n6000bmc_temp_tbl,
+		[hwmon_in] = n6000bmc_in_tbl,
+		[hwmon_curr] = n6000bmc_curr_tbl,
+		[hwmon_power] = n6000bmc_power_tbl,
 	},
 
-	.hinfo = n6010bmc_hinfo,
+	.hinfo = n6000bmc_hinfo,
 };
 
 static umode_t
@@ -781,8 +781,8 @@ static const struct platform_device_id intel_m10bmc_hwmon_ids[] = {
 		.driver_data = (unsigned long)&n5010bmc_hwmon_bdata,
 	},
 	{
-		.name = "n6010bmc-hwmon",
-		.driver_data = (unsigned long)&n6010bmc_hwmon_bdata,
+		.name = "n6000bmc-hwmon",
+		.driver_data = (unsigned long)&n6000bmc_hwmon_bdata,
 	},
 	{ }
 };
