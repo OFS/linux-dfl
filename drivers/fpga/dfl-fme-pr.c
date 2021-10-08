@@ -82,7 +82,7 @@ static int fme_pr(struct platform_device *pdev, unsigned long arg)
 	if (copy_from_user(&port_pr, argp, minsz))
 		return -EFAULT;
 
-	if (port_pr.argsz < minsz || port_pr.flags)
+	if (port_pr.argsz < minsz || port_pr.flags || !port_pr.buffer_size)
 		return -EINVAL;
 
 	/* get fme header region */
