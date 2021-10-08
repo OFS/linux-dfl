@@ -1,6 +1,6 @@
-What:		/sys/bus/platform/devices/n3000bmc-secure.*.auto/security/sr_root_entry_hash
-Date:		January 2021
-KernelVersion:  5.12
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../security/sr_root_entry_hash
+Date:		Nov 2021
+KernelVersion:	5.16
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Returns the root entry hash for the static
 		region if one is programmed, else it returns the
@@ -8,9 +8,9 @@ Description:	Read only. Returns the root entry hash for the static
 		visible if the underlying device supports it.
 		Format: "0x%x".
 
-What:		/sys/bus/platform/devices/n3000bmc-secure.*.auto/security/pr_root_entry_hash
-Date:		January 2021
-KernelVersion:  5.12
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../security/pr_root_entry_hash
+Date:		Nov 2021
+KernelVersion:	5.16
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Returns the root entry hash for the partial
 		reconfiguration region if one is programmed, else it
@@ -18,9 +18,9 @@ Description:	Read only. Returns the root entry hash for the partial
 		is only visible if the underlying device supports it.
 		Format: "0x%x".
 
-What:		/sys/bus/platform/devices/n3000bmc-secure.*.auto/security/bmc_root_entry_hash
-Date:		January 2021
-KernelVersion:  5.12
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../security/bmc_root_entry_hash
+Date:		Nov 2021
+KernelVersion:	5.16
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Returns the root entry hash for the BMC image
 		if one is programmed, else it returns the string:
@@ -28,41 +28,62 @@ Description:	Read only. Returns the root entry hash for the BMC image
 		underlying device supports it.
 		Format: "0x%x".
 
-What:		/sys/bus/platform/devices/n3000bmc-secure.*.auto/security/sr_canceled_csks
-Date:		January 2021
-KernelVersion:  5.12
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../security/sr_canceled_csks
+Date:		Nov 2021
+KernelVersion:	5.16
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Returns a list of indices for canceled code
 		signing keys for the static region. The standard bitmap
 		list format is used (e.g. "1,2-6,9").
 
-What:		/sys/bus/platform/devices/n3000bmc-secure.*.auto/security/pr_canceled_csks
-Date:		January 2021
-KernelVersion:  5.12
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../security/pr_canceled_csks
+Date:		Nov 2021
+KernelVersion:	5.16
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Returns a list of indices for canceled code
 		signing keys for the partial reconfiguration region. The
 		standard bitmap list format is used (e.g. "1,2-6,9").
 
-What:		/sys/bus/platform/devices/n3000bmc-secure.*.auto/security/bmc_canceled_csks
-Date:		January 2021
-KernelVersion:  5.12
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../security/bmc_canceled_csks
+Date:		Nov 2021
+KernelVersion:	5.16
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Returns a list of indices for canceled code
 		signing keys for the BMC.  The standard bitmap list format
 		is used (e.g. "1,2-6,9").
 
-What:		/sys/bus/platform/devices/n3000bmc-secure.*.auto/security/flash_count
-Date:		January 2021
-KernelVersion:  5.12
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../security/flash_count
+Date:		Nov 2021
+KernelVersion:	5.16
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Read only. Returns number of times the secure update
 		staging area has been flashed.
 		Format: "%u".
 
-What:		/sys/bus/platform/drivers/intel-m10bmc-secure/.../available_fpga_images
-Date:		April 2021
-KernelVersion:  5.13
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../control/available_images
+Date:		Nov 2021
+KernelVersion:  5.16
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read-only. This file returns a space separated list of
+		key words that may be written into the image_load file
+		described below. These keywords decribe an FPGA, BMC,
+		or firmware image in FLASH or EEPROM storage that may
+		be loaded.
+
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../control/image_load
+Date:		Nov 2021
+KernelVersion:  5.16
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Write-only. A key word may be written to this file to
+		trigger a reload of an FPGA, BMC, or firmware image from
+		FLASH or EEPROM. Refer to the available_images file for a
+		list of supported key words for the underlying device.
+		Writing an unsupported string to this file will result in
+		EINVAL being returned.
+
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../control/available_power_on_images
+Date:		Nov 2021
+KernelVersion:  5.16
 Contact:	Tianfei zhang <tianfei.zhang@intel.com>
 Description:	Read-only. This file returns a space separated list of
 		key words that may be written into the power_on_image file
@@ -70,9 +91,9 @@ Description:	Read-only. This file returns a space separated list of
 		images that may be used as a default on the next boot of
 		the FPGA card.
 
-What:           /sys/bus/platform/drivers/intel-m10bmc-secure/.../power_on_image
-Date:		April 2021
-KernelVersion:  5.13
+What:           /sys/bus/platform/drivers/intel-m10bmc-sec-update/.../control/power_on_image
+Date:		Nov 2021
+KernelVersion:  5.16
 Contact:	Tianfei zhang <tianfei.zhang@intel.com>
 Description:	Write-only. A key word from the available_fpga_images file
 		may be written to this file to select the FPGA image to be
@@ -85,9 +106,9 @@ Description:	Write-only. A key word from the available_fpga_images file
 		unsupported image or fall-back sequence. Consult your product
 		documentation for supported configurations.
 
-What:           /sys/bus/platform/drivers/intel-m10bmc-secure/.../fpga_boot_image
-Date:		August 2021
-KernelVersion:  5.13
+What:           /sys/bus/platform/drivers/intel-m10bmc-sec-update/.../control/fpga_boot_image
+Date:		Nov 2021
+KernelVersion:  5.16
 Contact:	Tianfei zhang <tianfei.zhang@intel.com>
 Description:	Read-only. Reading this file will return the name of image booted
 		from FPGA. The EINVAL error code will be returned if no image booted

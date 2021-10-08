@@ -253,9 +253,9 @@ config FPGA_IMAGE_LOAD
 	  device driver and/or the device itself to authenticate and
 	  disposition the image data.
 
-config IFPGA_M10_BMC_SECURE
+config FPGA_M10_BMC_SEC_UPDATE
 	tristate "Intel MAX10 BMC Secure Update driver"
-	depends on MFD_INTEL_M10_BMC_CORE && FPGA_SEC_MGR
+	depends on MFD_INTEL_M10_BMC_CORE && FPGA_IMAGE_LOAD
 	help
 	  Secure update support for the Intel MAX10 board management
 	  controller.
