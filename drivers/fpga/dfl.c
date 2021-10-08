@@ -727,7 +727,7 @@ struct build_feature_devs_info {
  */
 struct dfl_feature_info {
 	u16 fid;
-	u8 rev;
+	u8 revision;
 	struct resource mmio_res;
 	void __iomem *ioaddr;
 	struct list_head node;
@@ -807,7 +807,7 @@ static int build_info_commit_dev(struct build_feature_devs_info *binfo)
 		/* save resource information for each feature */
 		feature->dev = fdev;
 		feature->id = finfo->fid;
-		feature->revision = finfo->rev;
+		feature->revision = finfo->revision;
 
 		/*
 		 * the FIU header feature has some fundamental functions (sriov
@@ -1035,13 +1035,13 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 {
 	unsigned int irq_base, nr_irqs;
 	struct dfl_feature_info *finfo;
-	u8 rev = 0;
+	u8 revision = 0;
 	int ret;
 	u64 v;
 
 	if (fid != FEATURE_ID_AFU) {
 		v = readq(binfo->ioaddr + ofst);
-		rev = FIELD_GET(DFH_REVISION, v);
+		revision = FIELD_GET(DFH_REVISION, v);
 
 		/* read feature size and id if inputs are invalid */
 		size = size ? size : feature_size(v);
@@ -1060,7 +1060,7 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 		return -ENOMEM;
 
 	finfo->fid = fid;
-	finfo->rev = rev;
+	finfo->revision = revision;
 	finfo->mmio_res.start = binfo->start + ofst;
 	finfo->mmio_res.end = finfo->mmio_res.start + size - 1;
 	finfo->mmio_res.flags = IORESOURCE_MEM;
