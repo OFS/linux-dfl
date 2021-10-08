@@ -53,7 +53,7 @@ static const struct m10bmc_csr m10bmc_spi_csr = {
 
 static struct mfd_cell m10bmc_n6000_bmc_subdevs[] = {
 	{ .name = "n6000bmc-hwmon" },
-	{ .name = "n6000bmc-secure" },
+	{ .name = "n6000bmc-sec_update" },
 	{ .name = "n6000bmc-log" }
 };
 
@@ -63,7 +63,7 @@ static const struct regmap_range n6000_fw_handshake_regs[] = {
 
 static struct mfd_cell m10bmc_d5005_subdevs[] = {
 	{ .name = "d5005bmc-hwmon" },
-	{ .name = "d5005bmc-secure" }
+	{ .name = "d5005bmc-sec-update" }
 };
 
 static const struct regmap_range d5005_fw_handshake_regs[] = {
@@ -73,7 +73,7 @@ static const struct regmap_range d5005_fw_handshake_regs[] = {
 static struct mfd_cell m10bmc_pacn3000_subdevs[] = {
 	{ .name = "n3000bmc-hwmon" },
 	{ .name = "n3000bmc-retimer" },
-	{ .name = "n3000bmc-secure" },
+	{ .name = "n3000bmc-sec-update" },
 };
 
 static const struct regmap_range n3000_fw_handshake_regs[] = {
@@ -82,7 +82,7 @@ static const struct regmap_range n3000_fw_handshake_regs[] = {
 
 static struct mfd_cell m10bmc_n5010_subdevs[] = {
 	{ .name = "n5010bmc-hwmon" },
-	{ .name = "n5010bmc-secure" },
+	{ .name = "n5010bmc-sec-update" },
 	{ .name = "n5010bmc-phy" },
 };
 
