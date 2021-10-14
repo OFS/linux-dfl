@@ -186,4 +186,12 @@ config PTP_1588_CLOCK_OCP
 
 	  More information is available at http://www.timingcard.com/
 
+config PTP_DFL_TOD
+	tristate "FPGA DFL ToD Driver"
+	help
+	  The FPGA DFL driver for the Intel ToD slave device. The Intel
+	  FPGA ToD IP is exposed as PTP Hardware Clock (PHC) device to
+	  the Linux PTP stack to synchronize the system clock to its
+	  ToD information using phc2sys utility of the Linux PTP stack.
+
 endmenu
