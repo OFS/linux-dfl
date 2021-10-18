@@ -53,7 +53,7 @@ static const struct m10bmc_csr m10bmc_spi_csr = {
 
 static struct mfd_cell m10bmc_n6000_bmc_subdevs[] = {
 	{ .name = "n6000bmc-hwmon" },
-	{ .name = "n6000bmc-sec_update" },
+	{ .name = "n6000bmc-sec-update" },
 	{ .name = "n6000bmc-log" }
 };
 
