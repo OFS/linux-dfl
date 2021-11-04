@@ -31,15 +31,15 @@ static void m10bmc_log_time_sync(struct work_struct *work)
 	struct delayed_work *dwork;
 	u32 time_high, time_low;
 	struct m10bmc_log *log;
-	s64 time_ns;
+	s64 time_ms;
 	int ret;
 
 	dwork = to_delayed_work(work);
 	log = container_of(dwork, struct m10bmc_log, dwork);
 
-	time_ns = ktime_to_ns(ktime_get_real());
-	time_low = (u32)FIELD_GET(TIME_LOW, time_ns);
-	time_high = (u32)FIELD_GET(TIME_LOW, time_ns);
+	time_ms = ktime_to_ms(ktime_get_real());
+	time_low = (u32)FIELD_GET(TIME_LOW, time_ms);
+	time_high = (u32)FIELD_GET(TIME_HIGH, time_ms);
 	ret = regmap_write(log->m10bmc->regmap, m10bmc_base(log->m10bmc) +
 			   M10BMC_PMCI_TIME_HIGH, time_high);
 	if (!ret)
