@@ -108,7 +108,7 @@ static int qsfp_probe(struct dfl_device *dfl_dev)
 
 	qsfp_init_i2c(dev, qsfp);
 
-	writeq(CONF_POLL_EN | CONF_MOD_SEL | CONF_LOW_POW, qsfp->base + CONF_OFF);
+	writeq(CONF_POLL_EN | CONF_MOD_SEL, qsfp->base + CONF_OFF);
 	udelay(DELAY_US);
 
 	qsfp->regmap = devm_regmap_init_mmio(dev, qsfp->base, &mmio_cfg);
