@@ -94,9 +94,13 @@ static void log_error_regs(struct m10bmc_sec *sec, u32 doorbell)
 		if (!m10bmc_sys_read(sec->m10bmc, M10BMC_PMCI_SDM_PR_STS, &status))
 			dev_err(sec->dev, "SDM Key Program Status: 0x%08x\n",
 				status);
-	} else if (status == RSU_STAT_SDM_SR_SDM_FAILED) {
-		if (!m10bmc_sys_read(sec->m10bmc, M10BMC_PMCI_CERT_STS, &status))
+	} else if (status == RSU_STAT_SDM_SR_SDM_FAILED ||
+		   status == RSU_STAT_SDM_KEY_FAILED) {
+		if (!m10bmc_sys_read(sec->m10bmc, M10BMC_PMCI_CERT_PROG_STS, &status))
 			dev_err(sec->dev, "Certificate Program Status: 0x%08x\n",
+				status);
+		if (!m10bmc_sys_read(sec->m10bmc, M10BMC_PMCI_CERT_SPEC_STS, &status))
+			dev_err(sec->dev, "Certificate Specific Status: 0x%08x\n",
 				status);
 	}
 }
