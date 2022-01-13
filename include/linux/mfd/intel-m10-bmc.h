@@ -244,6 +244,11 @@
 #define M10BMC_PMCI_CERT_PROG_STS		0x824
 #define M10BMC_PMCI_CERT_SPEC_STS		0x828
 
+#define M10BMC_PMCI_SR_RH0			0x848
+#define M10BMC_PMCI_SR_CSK			0x878
+#define M10BMC_PMCI_PR_RH0			0x87c
+#define M10BMC_PMCI_PR_CSK			0x8ac
+
 #define M10BMC_N6000_BUILD_VER			0x0
 #define NIOS2_N6000_FW_VERSION			0x4
 #define M10BMC_N6000_MAC_LOW			0x20
@@ -324,6 +329,10 @@ struct m10bmc_csr_map {
 	unsigned int pr_reh_addr;
 	unsigned int pr_magic;
 	unsigned int rsu_update_counter;
+	unsigned int pr_sdm_reh_reg;
+	unsigned int pr_sdm_csk_reg;
+	unsigned int sr_sdm_reh_reg;
+	unsigned int sr_sdm_csk_reg;
 	unsigned int staging_size;
 };
 
