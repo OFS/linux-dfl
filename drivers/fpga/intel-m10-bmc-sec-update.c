@@ -496,6 +496,44 @@ DEVICE_ATTR_SEC_REH_RO(bmc);
 DEVICE_ATTR_SEC_REH_RO(sr);
 DEVICE_ATTR_SEC_REH_RO(pr);
 
+#define SDM_ROOT_HASH_REG_NUM 12
+
+static ssize_t
+show_sdm_root_entry_hash(struct device *dev, u32 start, char *buf)
+{
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);
+	int i, cnt, ret;
+	u32 key;
+
+	cnt = sprintf(buf, "0x");
+	for (i = 0; i < SDM_ROOT_HASH_REG_NUM; i++) {
+		ret = m10bmc_sys_read(sec->m10bmc,
+				      m10bmc_base(sec->m10bmc) +
+				      start + i * 4, &key);
+		if (ret)
+			return ret;
+
+		cnt += sprintf(buf + cnt, "%08x", key);
+	}
+	cnt += sprintf(buf + cnt, "\n");
+
+	return cnt;
+}
+
+#define DEVICE_ATTR_SDM_SEC_REH_RO(_name) \
+static ssize_t _name##_sdm_root_entry_hash_show(struct device *dev, \
+					    struct device_attribute *attr, \
+					    char *buf) \
+{							\
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);   \
+	struct intel_m10bmc *m10bmc = sec->m10bmc;  \
+	return show_sdm_root_entry_hash(dev, _name##_sdm_reh_reg(m10bmc),\
+			buf); } \
+static DEVICE_ATTR_RO(_name##_sdm_root_entry_hash)
+
+DEVICE_ATTR_SDM_SEC_REH_RO(pr);
+DEVICE_ATTR_SDM_SEC_REH_RO(sr);
+
 #define CSK_BIT_LEN		128U
 #define CSK_32ARRAY_SIZE	DIV_ROUND_UP(CSK_BIT_LEN, 32)
 
@@ -539,6 +577,34 @@ static DEVICE_ATTR_RO(_name##_canceled_csks)
 DEVICE_ATTR_SEC_CSK_RO(bmc);
 DEVICE_ATTR_SEC_CSK_RO(sr);
 DEVICE_ATTR_SEC_CSK_RO(pr);
+
+static ssize_t
+show_sdm_canceled_csk(struct device *dev, u32 addr, char *buf)
+{
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);
+	int ret;
+	u32 val;
+
+	ret = m10bmc_sys_read(sec->m10bmc,
+			      m10bmc_base(sec->m10bmc) + addr, &val);
+	if (ret)
+		return ret;
+
+	return sysfs_emit(buf, "%08x\n", val);
+}
+
+#define DEVICE_ATTR_SDM_SEC_CSK_RO(_name) \
+static ssize_t _name##_sdm_canceled_csks_show(struct device *dev, \
+					  struct device_attribute *attr, \
+					  char *buf) \
+{                                                    \
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);   \
+	struct intel_m10bmc *m10bmc = sec->m10bmc;  \
+	return show_sdm_canceled_csk(dev, _name##_sdm_csk_reg(m10bmc),\
+			buf); } \
+static DEVICE_ATTR_RO(_name##_sdm_canceled_csks)
+DEVICE_ATTR_SDM_SEC_CSK_RO(pr);
+DEVICE_ATTR_SDM_SEC_CSK_RO(sr);
 
 #define FLASH_COUNT_SIZE 4096	/* count stored as inverted bit vector */
 
@@ -596,7 +662,11 @@ m10bmc_security_is_visible(struct kobject *kobj, struct attribute *attr, int n)
 	struct m10bmc_sec *sec = dev_get_drvdata(kobj_to_dev(kobj));
 
 	if (sec->type != N6000BMC_SEC &&
-	    attr == &dev_attr_sdm_sr_provision_status.attr)
+	    (attr == &dev_attr_sdm_sr_provision_status.attr ||
+	     attr == &dev_attr_pr_sdm_root_entry_hash.attr ||
+	     attr == &dev_attr_pr_sdm_canceled_csks.attr ||
+	     attr == &dev_attr_sr_sdm_root_entry_hash.attr ||
+	     attr == &dev_attr_sr_sdm_canceled_csks.attr))
 		return 0;
 
 	return attr->mode;
@@ -611,6 +681,10 @@ static struct attribute *m10bmc_security_attrs[] = {
 	&dev_attr_pr_canceled_csks.attr,
 	&dev_attr_bmc_canceled_csks.attr,
 	&dev_attr_sdm_sr_provision_status.attr,
+	&dev_attr_pr_sdm_root_entry_hash.attr,
+	&dev_attr_pr_sdm_canceled_csks.attr,
+	&dev_attr_sr_sdm_root_entry_hash.attr,
+	&dev_attr_sr_sdm_canceled_csks.attr,
 	NULL,
 };
 
