@@ -276,6 +276,11 @@ enum m10bmc_type {
 #define M10BMC_PMCI_CERT_PROG_STS	0x824
 #define M10BMC_PMCI_CERT_SPEC_STS	0x828
 
+#define M10BMC_PMCI_SR_RH0 0x848
+#define M10BMC_PMCI_SR_CSK 0x878
+#define M10BMC_PMCI_PR_RH0 0x87c
+#define M10BMC_PMCI_PR_CSK 0x8ac
+
 #define PMCI_ERROR_LOG_ADDR  0x7fb0000
 #define PMCI_ERROR_LOG_SIZE  0x40000
 
@@ -314,6 +319,10 @@ enum m10bmc_type {
 #define pr_reh_addr(m10bmc) ((m10bmc)->csr->pr_reh_addr)
 #define pr_magic(m10bmc) ((m10bmc)->csr->pr_magic)
 #define rsu_update_counter(m10bmc) ((m10bmc)->csr->rsu_update_counter)
+#define pr_sdm_reh_reg(m10bmc) ((m10bmc)->csr->pr_sdm_reh_reg)
+#define pr_sdm_csk_reg(m9bmc) ((m10bmc)->csr->pr_sdm_csk_reg)
+#define sr_sdm_reh_reg(m10bmc) ((m10bmc)->csr->sr_sdm_reh_reg)
+#define sr_sdm_csk_reg(m10bmc) ((m10bmc)->csr->sr_sdm_csk_reg)
 
 enum m10bmc_fw_state {
 	M10BMC_FW_STATE_NORMAL,
@@ -341,6 +350,10 @@ struct m10bmc_csr {
 	unsigned int pr_reh_addr;
 	unsigned int pr_magic;
 	unsigned int rsu_update_counter;
+	unsigned int pr_sdm_reh_reg;
+	unsigned int pr_sdm_csk_reg;
+	unsigned int sr_sdm_reh_reg;
+	unsigned int sr_sdm_csk_reg;
 };
 
 /**
