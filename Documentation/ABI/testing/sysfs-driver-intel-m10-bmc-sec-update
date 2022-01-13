@@ -148,3 +148,40 @@ Contact:	Tianfei zhang <tianfei.zhang@intel.com>
 Description:	Read-only. Reading this file will return the name of image booted
 		from FPGA. The EINVAL error code will be returned if no image booted
 		from FPGA.
+
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../security/sr_sdm_root_entry_hash
+Date:		Jan 2022
+KernelVersion:	5.16
+Contact:	Tianfei Zhang <tianfei.zhang@intel.com>
+Description:	Read only. Returns the root entry hash of SDM (Secure Device
+		Manager) for the static region if one is programmed, else it
+		returns the string: "hash not programmed".  This file is only
+		visible if the underlying device supports it.
+		Format: "0x%x".
+
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../security/pr_sdm_root_entry_hash
+Date:		Jan 2022
+KernelVersion:	5.16
+Contact:	Tianfei Zhang <tianfei.zhang@intel.com>
+Description:	Read only. Returns the root entry hash of SDM (Secure Device
+		Manager) for the partial reconfiguration region if one is programmed,
+		else it returns the string: "hash not programmed".  This file
+		is only visible if the underlying device supports it.
+		Format: "0x%x".
+
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../security/pr_sdm_canceled_csks
+Date:		Jan 2022
+KernelVersion:	5.16
+Contact:	Tianfei Zhang <tianfei.zhang@intel.com>
+Description:	Read only. Returns a list of indices for canceled code
+		signing keys of SDM (Secure Device Manager) for the partial
+		reconfiguration region. The standard bitmap list format is
+		used (e.g. "1,2-6,9").
+
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../security/sr_sdm_canceled_csks
+Date:		Jan 2022
+KernelVersion:	5.16
+Contact:	Tianfei Zhang <tianfei.zhang@intel.com>
+Description:	Read only. Returns a list of indices for canceled code
+		signing keys of SDM (Secure Device Manager) for the static
+		region. The standard bitmap list format is used (e.g. "1,2-6,9").
