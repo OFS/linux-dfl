@@ -373,6 +373,10 @@ static const struct m10bmc_csr_map m10bmc_n6000_csr_map = {
 	.pr_reh_addr = M10BMC_N6000_PR_REH_ADDR,
 	.pr_magic = M10BMC_N6000_PR_PROG_MAGIC,
 	.rsu_update_counter = M10BMC_N6000_STAGING_FLASH_COUNT,
+	.pr_sdm_reh_reg = M10BMC_PMCI_PR_RH0,
+	.pr_sdm_csk_reg = M10BMC_PMCI_PR_CSK,
+	.sr_sdm_reh_reg = M10BMC_PMCI_SR_RH0,
+	.sr_sdm_csk_reg = M10BMC_PMCI_SR_CSK,
 	.staging_size = M10BMC_STAGING_SIZE,
 };
 
