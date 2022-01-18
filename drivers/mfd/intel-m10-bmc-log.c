@@ -137,6 +137,7 @@ static struct nvmem_config bmc_event_log_nvmem_config = {
 	.word_size = 1,
 	.size = PMCI_ERROR_LOG_SIZE,
 	.reg_read = bmc_event_log_nvmem_read,
+	.id = NVMEM_DEVID_AUTO,
 };
 
 static struct nvmem_config fpga_image_dir_nvmem_config = {
@@ -145,6 +146,7 @@ static struct nvmem_config fpga_image_dir_nvmem_config = {
 	.word_size = 1,
 	.size = PMCI_FPGA_IMAGE_DIR_SIZE,
 	.reg_read = fpga_image_dir_nvmem_read,
+	.id = NVMEM_DEVID_AUTO,
 };
 
 static struct nvmem_config bom_info_nvmem_config = {
@@ -153,6 +155,7 @@ static struct nvmem_config bom_info_nvmem_config = {
 	.word_size = 1,
 	.size = PMCI_BOM_INFO_SIZE,
 	.reg_read = bom_info_nvmem_read,
+	.id = NVMEM_DEVID_AUTO,
 };
 
 static int m10bmc_log_probe(struct platform_device *pdev)
