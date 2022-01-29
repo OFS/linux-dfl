@@ -25,27 +25,21 @@
 
 #define STAT_OFF	0x28
 
-#define I2C_BASE_OFF	0x40
-#define I2C_TFR_CMD	0x44
-#define I2C_RX_DATA	0x48
-#define I2C_RX_DATA_VAL	0xf
-#define I2C_CTRL        0x4c
+#define I2C_CTRL        0x48
 #define I2C_CTRL_EN	BIT(0)
 #define I2C_CTRL_BSP	BIT(1)
+#define I2C_CTRL_FIFO  GENMASK(3, 2)
+#define I2C_CTRL_FIFO_NOT_FULL 3
 
-#define I2C_ISER	0x50
+#define I2C_ISER	0x4c
 #define I2C_ISER_TXRDY	BIT(0)
 #define I2C_ISER_RXRDY	BIT(1)
-#define I2C_ISR		0x54
-#define I2C_STAT	0x58
-#define I2C_TC_FIFO_LVL	0x5c
-#define I2C_RX_FIFO_LVL	0x60
-#define I2C_RX_FIFO_DEPTH 0x82
-#define I2C_SCL_LOW	0x64
-#define COUNT_PERIOD_LOW 0x3c
-#define I2C_SCL_HIGH	0x68
-#define COUNT_PERIOD_HIGH 0x28
-#define I2C_SDA_HOLD	0x70
+#define I2C_SCL_LOW	0x60
+#define COUNT_PERIOD_LOW 0x82
+#define I2C_SCL_HIGH	0x64
+#define COUNT_PERIOD_HIGH 0x3c
+#define I2C_SDA_HOLD	0x68
+#define COUNT_PERIOD_HOLD 0x28
 
 #define QSFP_SHADOW_CSRS_BASE_OFF	0x100
 #define QSFP_SHADOW_CSRS_BASE_END	0x3f8
@@ -69,11 +63,13 @@ static const struct regmap_access_table qsfp_mem_access_table = {
 
 static void qsfp_init_i2c(struct device *dev, struct qsfp *qsfp)
 {
-	writel(I2C_CTRL_EN | I2C_CTRL_BSP, qsfp->base + I2C_CTRL);
-	writel(I2C_RX_FIFO_DEPTH, qsfp->base + I2C_RX_FIFO_LVL);
+	writel(I2C_ISER_TXRDY | I2C_ISER_RXRDY, qsfp->base + I2C_ISER);
 	writel(COUNT_PERIOD_LOW, qsfp->base + I2C_SCL_LOW);
 	writel(COUNT_PERIOD_HIGH, qsfp->base + I2C_SCL_HIGH);
-	writel(I2C_RX_DATA_VAL, qsfp->base + I2C_RX_DATA);
+	writel(COUNT_PERIOD_HOLD, qsfp->base + I2C_SDA_HOLD);
+
+	writel(FIELD_PREP(I2C_CTRL_FIFO, I2C_CTRL_FIFO_NOT_FULL) |
+	       I2C_CTRL_EN | I2C_CTRL_BSP, qsfp->base + I2C_CTRL);
 }
 
 static const struct regmap_config mmio_cfg = {
