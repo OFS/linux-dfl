@@ -951,8 +951,13 @@ static int parse_feature_irqs(struct build_feature_devs_info *binfo,
 {
 	void __iomem *base = binfo->ioaddr + ofst;
 	unsigned int i, ibase, inr = 0;
+	enum dfl_id_type type;
 	int virq;
 	u64 v;
+
+	type = feature_dev_id_type(binfo->feature_dev);
+	if (type >= DFL_ID_MAX)
+		return -EINVAL;
 
 	/*
 	 * Ideally DFL framework should only read info from DFL header, but
@@ -970,16 +975,22 @@ static int parse_feature_irqs(struct build_feature_devs_info *binfo,
 	 */
 	switch (fid) {
 	case PORT_FEATURE_ID_UINT:
+		if (type != PORT_ID)
+			break;
 		v = readq(base + PORT_UINT_CAP);
 		ibase = FIELD_GET(PORT_UINT_CAP_FST_VECT, v);
 		inr = FIELD_GET(PORT_UINT_CAP_INT_NUM, v);
 		break;
 	case PORT_FEATURE_ID_ERROR:
+		if (type != PORT_ID)
+			break;
 		v = readq(base + PORT_ERROR_CAP);
 		ibase = FIELD_GET(PORT_ERROR_CAP_INT_VECT, v);
 		inr = FIELD_GET(PORT_ERROR_CAP_SUPP_INT, v);
 		break;
 	case FME_FEATURE_ID_GLOBAL_ERR:
+		if (type != FME_ID)
+			break;
 		v = readq(base + FME_ERROR_CAP);
 		ibase = FIELD_GET(FME_ERROR_CAP_INT_VECT, v);
 		inr = FIELD_GET(FME_ERROR_CAP_SUPP_INT, v);
@@ -996,12 +1007,10 @@ static int parse_feature_irqs(struct build_feature_devs_info *binfo,
 		fid, ibase, inr);
 
 	if (ibase + inr > binfo->nr_irqs) {
-		dev_warn(binfo->dev,
-			 "Ignoring nvalid interrupt number in feature 0x%x %d > %d\n\n",
-			 fid, ibase + inr, binfo->nr_irqs);
-		*irq_base = 0;
-		*nr_irqs = 0;
-		return 0;
+		dev_err(binfo->dev,
+			"Invalid interrupt number in feature 0x%x type %d\n\n",
+			 fid, type);
+		return -EINVAL;
 	}
 
 	for (i = 0; i < inr; i++) {
