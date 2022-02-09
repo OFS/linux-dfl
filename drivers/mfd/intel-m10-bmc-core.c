@@ -35,6 +35,26 @@ static const struct m10bmc_csr m10bmc_pmci_csr = {
 	.sr_sdm_csk_reg = M10BMC_PMCI_SR_CSK,
 };
 
+static const struct m10bmc_csr m10bmc_pmci2_csr = {
+	.base = M10BMC_PMCI_SYS_BASE,
+	.build_version = M10BMC_PMCI_BUILD_VER,
+	.fw_version = NIOS2_PMCI_FW_VERSION,
+	.mac_low = M10BMC_PMCI_MAC_LOW,
+	.mac_high = M10BMC_PMCI_MAC_HIGH,
+	.doorbell = M10BMC_PMCI_DOORBELL,
+	.auth_result = M10BMC_PMCI_AUTH_RESULT,
+	.bmc_prog_addr = 0x00830000,
+	.bmc_reh_addr = 0x00830004,
+	.bmc_magic = PMCI_BMC_PROG_MAGIC,
+	.sr_prog_addr = 0x00820000,
+	.sr_reh_addr = 0x00820004,
+	.sr_magic = PMCI_SR_PROG_MAGIC,
+	.pr_prog_addr = 0x00810000,
+	.pr_reh_addr = 0x00810004,
+	.pr_magic = PMCI_PR_PROG_MAGIC,
+	.rsu_update_counter = 0x00860000,
+};
+
 static const struct m10bmc_csr m10bmc_spi_csr = {
 	.base = M10BMC_SYS_BASE,
 	.build_version = M10BMC_BUILD_VER,
@@ -63,6 +83,15 @@ static struct mfd_cell m10bmc_n6000_bmc_subdevs[] = {
 
 static const struct regmap_range n6000_fw_handshake_regs[] = {
 	regmap_reg_range(M10BMC_PMCI_TELEM_START, M10BMC_PMCI_TELEM_END),
+};
+
+static struct mfd_cell m10bmc_c6100_bmc_subdevs[] = {
+	{ .name = "c6100bmc-hwmon" },
+	{ .name = "n6000bmc-sec-update" },
+};
+
+static const struct regmap_range c6100_fw_handshake_regs[] = {
+	regmap_reg_range(M10BMC_PMCI_TELEM_START, M10BMC_PMCI2_TELEM_END),
 };
 
 static struct mfd_cell m10bmc_d5005_subdevs[] = {
@@ -371,7 +400,7 @@ int m10bmc_dev_init(struct intel_m10bmc *m10bmc)
 	init_rwsem(&m10bmc->bmcfw_lock);
 	dev_set_drvdata(m10bmc->dev, m10bmc);
 
-	if (m10bmc->type == M10_N6000) {
+	if ((m10bmc->type == M10_N6000) || (m10bmc->type == M10_C6100)) {
 		if (!m10bmc->flash_ops) {
 			dev_err(m10bmc->dev,
 				"No flash-ops provided\n");
@@ -419,6 +448,14 @@ int m10bmc_dev_init(struct intel_m10bmc *m10bmc)
 		m10bmc->handshake_sys_reg_nranges =
 			ARRAY_SIZE(n6000_fw_handshake_regs);
 		m10bmc->csr = &m10bmc_pmci_csr;
+		break;
+	case M10_C6100:
+		cells = m10bmc_c6100_bmc_subdevs;
+		n_cell = ARRAY_SIZE(m10bmc_c6100_bmc_subdevs);
+		m10bmc->handshake_sys_reg_ranges = c6100_fw_handshake_regs;
+		m10bmc->handshake_sys_reg_nranges =
+			ARRAY_SIZE(c6100_fw_handshake_regs);
+		m10bmc->csr = &m10bmc_pmci2_csr;
 		break;
 	default:
 		return -ENODEV;
