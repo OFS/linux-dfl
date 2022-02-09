@@ -578,6 +578,218 @@ static const struct m10bmc_hwmon_board_data n6000bmc_hwmon_bdata = {
 	.hinfo = n6000bmc_hinfo,
 };
 
+static const struct m10bmc_sdata c6100bmc_temp_tbl[] = {
+	PMCI_BASE_TEMP_SENSORS
+	{ 0x758, 0x750, 0x754, 0x0, 0x0, 15, "ICXD_LCC Package Temperature" },
+	{ 0x75c, 0x0, 0x0, 0x0, 0x0, 15, "ICXD_LCC Core 0 Temperature" },
+	{ 0x760, 0x0, 0x0, 0x0, 0x0, 15, "ICXD_LCC Core 1 Temperature" },
+	{ 0x764, 0x0, 0x0, 0x0, 0x0, 15, "ICXD_LCC Core 2 Temperature" },
+	{ 0x768, 0x0, 0x0, 0x0, 0x0, 15, "ICXD_LCC Core 3 Temperature" },
+	{ 0x76c, 0x0, 0x0, 0x0, 0x0, 15, "ICXD_LCC Core 4 Temperature" },
+	{ 0x770, 0x0, 0x0, 0x0, 0x0, 15, "ICXD_LCC Core 5 Temperature" },
+	{ 0x774, 0x0, 0x0, 0x0, 0x0, 15, "ICXD_LCC Core 6 Temperature" },
+	{ 0x778, 0x0, 0x0, 0x0, 0x0, 15, "ICXD_LCC Core 7 Temperature" },
+	{ 0x77c, 0x0, 0x0, 0x0, 0x0, 15, "ICXD_LCC_FD Temperature" },
+	{ 0x780, 0x0, 0x0, 0x0, 0x0, 15, "ICXD_LCC_FE Temperature" },
+	{ 0x784, 0x0, 0x0, 0x0, 0x0, 15, "ICXD_LCC_FF Temperature" },
+	{ 0x794, 0x0, 0x0, 0x0, 0x0, 1, "ICXD_LCC_IR38163_P1V05_T" },
+	{ 0x7a0, 0x0, 0x0, 0x0, 0x0, 1, "ICXD_LCC_IR38363_PVNN_T" },
+	{ 0x7ac, 0x0, 0x0, 0x0, 0x0, 1, "PXE1410_ICXD_LCC_PVCCIN_CPU_T" },
+	{ 0x7b8, 0x0, 0x0, 0x0, 0x0, 1, "PXE1410_ICXD_LCC_P1V8_CPU_AUX_T" },
+	{ 0x7c4, 0x0, 0x0, 0x0, 0x0, 1, "PXM1310_ICXD_LCC_PVDDR_ABC_CPU_T" },
+	{ 0x7d0, 0x0, 0x0, 0x0, 0x0, 1, "PXM1310_ICXD_LCC_PVCCANA_CPU_T" },
+};
+
+static const struct m10bmc_sdata c6100bmc_in_tbl[] = {
+	PMCI_BASE_IN_SENSORS
+	{ 0x78c, 0x0, 0x0, 0x0, 0x0, 1, "ICXD_LCC_IR38163_P1V05_V" },
+	{ 0x798, 0x0, 0x0, 0x0, 0x0, 1, "ICXD_LCC_IR38363_PVNN_V" },
+	{ 0x7a4, 0x0, 0x0, 0x0, 0x0, 1, "PXE1410_ICXD_LCC_PVCCIN_CPU_V" },
+	{ 0x7b0, 0x0, 0x0, 0x0, 0x0, 1, "PXE1410_ICXD_LCC_P1V8_CPU_AUX_V" },
+	{ 0x7bc, 0x0, 0x0, 0x0, 0x0, 1, "PXM1310_ICXD_LCC_PVDDR_ABC_CPU_V" },
+	{ 0x7c8, 0x0, 0x0, 0x0, 0x0, 1, "PXM1310_ICXD_LCC_PVCCANA_CPU_V" },
+};
+
+static const struct m10bmc_sdata c6100bmc_curr_tbl[] = {
+	PMCI_BASE_CURR_SENSORS
+	{ 0x790, 0x0, 0x0, 0x0, 0x0, 1, "ICXD_LCC_IR38163_P1V05_I" },
+	{ 0x79c, 0x0, 0x0, 0x0, 0x0, 1, "ICXD_LCC_IR38363_PVNN_I" },
+	{ 0x7a8, 0x0, 0x0, 0x0, 0x0, 1, "PXE1410_ICXD_LCC_PVCCIN_CPU_I" },
+	{ 0x7b4, 0x0, 0x0, 0x0, 0x0, 1, "PXE1410_ICXD_LCC_P1V8_CPU_AUX_I" },
+	{ 0x7c0, 0x0, 0x0, 0x0, 0x0, 1, "PXM1310_ICXD_LCC_PVDDR_ABC_CPU_I" },
+	{ 0x7cc, 0x0, 0x0, 0x0, 0x0, 1, "PXM1310_ICXD_LCC_PVCCANA_CPU_I" },
+};
+
+static const struct m10bmc_sdata c6100bmc_power_tbl[] = {
+	PMCI_BASE_PWR_SENSORS
+	{ 0x788, 0x0, 0x0, 0x0, 0x0, 1, "ICXD Package Power" },
+};
+
+static const struct hwmon_channel_info *c6100bmc_hinfo[] = {
+	HWMON_CHANNEL_INFO(temp,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
+			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
+			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
+			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
+			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
+			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
+			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
+			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
+			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
+			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL),
+	HWMON_CHANNEL_INFO(in,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL),
+	HWMON_CHANNEL_INFO(curr,
+			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
+			   HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
+			   HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
+			   HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
+			   HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
+			   HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
+			   HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
+			   HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
+			   HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL),
+	HWMON_CHANNEL_INFO(power,
+			   HWMON_P_INPUT | HWMON_P_LABEL,
+			   HWMON_P_INPUT | HWMON_P_LABEL),
+	NULL
+};
+
+static const struct m10bmc_hwmon_board_data c6100bmc_hwmon_bdata = {
+	.tables = {
+		[hwmon_temp] = c6100bmc_temp_tbl,
+		[hwmon_in] = c6100bmc_in_tbl,
+		[hwmon_curr] = c6100bmc_curr_tbl,
+		[hwmon_power] = c6100bmc_power_tbl,
+	},
+
+	.hinfo = c6100bmc_hinfo,
+};
+
 static umode_t
 m10bmc_hwmon_is_visible(const void *data, enum hwmon_sensor_types type,
 			u32 attr, int channel)
@@ -795,6 +1007,10 @@ static const struct platform_device_id intel_m10bmc_hwmon_ids[] = {
 	{
 		.name = "n6000bmc-hwmon",
 		.driver_data = (unsigned long)&n6000bmc_hwmon_bdata,
+	},
+	{
+		.name = "c6100bmc-hwmon",
+		.driver_data = (unsigned long)&c6100bmc_hwmon_bdata,
 	},
 	{ }
 };
