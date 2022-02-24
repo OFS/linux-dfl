@@ -19,6 +19,7 @@ enum m10bmc_type {
 	M10_D5005,
 	M10_N5010,
 	M10_N6000,
+	M10_C6100,
 	M10_N5014,
 };
 
@@ -202,6 +203,7 @@ enum m10bmc_type {
 /* Telemetry registers */
 #define M10BMC_PMCI_TELEM_START		0x400
 #define M10BMC_PMCI_TELEM_END		0x78c
+#define M10BMC_PMCI2_TELEM_END		0x7d0
 
 #define M10BMC_PMCI_BUILD_VER   0x0
 #define NIOS2_PMCI_FW_VERSION   0x4
