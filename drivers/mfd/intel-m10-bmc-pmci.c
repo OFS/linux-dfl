@@ -175,7 +175,10 @@ static int pmci_probe(struct dfl_device *ddev)
 
 	pmci->m10bmc.dev = dev;
 	pmci->dev = dev;
-	pmci->m10bmc.type = M10_N6000;
+	if (ddev->revision == 2)
+		pmci->m10bmc.type = M10_C6100;
+	else
+		pmci->m10bmc.type = M10_N6000;
 	pmci->m10bmc.flash_ops = pmci_flash_ops;
 
 	pmci->base = devm_ioremap_resource(dev, &ddev->mmio_res);
