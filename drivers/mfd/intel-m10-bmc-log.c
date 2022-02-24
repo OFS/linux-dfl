@@ -241,10 +241,22 @@ static const struct m10bmc_log_cfg n6000_cfg = {
 	.bi_off = PMCI_BOM_INFO_ADDR,
 };
 
+static const struct m10bmc_log_cfg c6100_cfg = {
+	.el_size = PMCI_ERROR_LOG_SIZE,
+	.el_off = 0x00a80000,
+
+	.id_size = 0x00030000,
+	.id_off = 0x00910000,
+};
+
 static const struct platform_device_id intel_m10bmc_log_ids[] = {
 	{
 		.name = "n6000bmc-log",
 		.driver_data = (unsigned long)&n6000_cfg,
+	},
+	{
+		.name = "c6100bmc-log",
+		.driver_data = (unsigned long)&c6100_cfg,
 	},
 	{ }
 };
