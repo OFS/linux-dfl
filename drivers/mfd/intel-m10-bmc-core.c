@@ -86,6 +86,7 @@ static const struct regmap_range null_fw_handshake_regs[0];
 static struct mfd_cell m10bmc_c6100_bmc_subdevs[] = {
 	{ .name = "c6100bmc-hwmon" },
 	{ .name = "n6000bmc-sec-update" },
+	{ .name = "c6100bmc-log" },
 };
 
 static struct mfd_cell m10bmc_d5005_subdevs[] = {
