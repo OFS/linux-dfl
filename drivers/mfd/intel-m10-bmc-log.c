@@ -273,4 +273,3 @@ MODULE_DEVICE_TABLE(platform, intel_m10bmc_log_ids);
 MODULE_AUTHOR("Intel Corporation");
 MODULE_DESCRIPTION("Intel MAX10 BMC Log");
 MODULE_LICENSE("GPL v2");
-MODULE_ALIAS("platform:intel-m10bmc-log");
