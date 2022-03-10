@@ -95,13 +95,16 @@ What:           /sys/bus/platform/drivers/intel-m10bmc-sec-update/.../control/po
 Date:		Nov 2021
 KernelVersion:  5.16
 Contact:	Tianfei zhang <tianfei.zhang@intel.com>
-Description:	Write-only. A key word from the available_fpga_images file
+Description:	Read/Write. A key word from the available_fpga_images file
 		may be written to this file to select the FPGA image to be
 		configured on the next boot of the FPGA card. One or more
 		additional keywords may be specified, separated by spaces,
 		to identify a sequence of fall-back images in the event that
-		the selected FPGA image fails to load. Your specific device
-		may not support all possible fall-back sequences. The EINVAL
-		error code will be returned if you attempt to select an
-		unsupported image or fall-back sequence. Consult your product
-		documentation for supported configurations.
+		the selected FPGA image fails to load. Reading this file
+		will return the space separated list of keywords identifying
+		the default power-on image and the current fall-back sequence.
+		Your specific device may not support all possible fall-back
+		sequences. The EINVAL error code will be returned if you
+		attempt to select an unsupported image or fall-back sequence.
+		Consult your product documentation for supported
+		configurations.
