@@ -40,6 +40,7 @@ static const char * const fpga_image_names[] = {
 
 struct fpga_power_on {
 	u32 avail_image_mask;
+	int (*get_sequence)(struct m10bmc_sec *sec, char *buf);
 	int (*set_sequence)(struct m10bmc_sec *sec, enum fpga_image images[]);
 };
 
@@ -614,6 +615,34 @@ pmci_set_power_on_image(struct m10bmc_sec *sec, enum fpga_image images[])
 	return 0;
 }
 
+static int pmci_get_power_on_image(struct m10bmc_sec *sec, char *buf)
+{
+	const char *image_names[FPGA_MAX] = { 0 };
+	int ret, i = 0;
+	u32 poc;
+
+	ret = m10bmc_sys_read(sec->m10bmc, M10BMC_PMCI_FPGA_POC_STS_BL, &poc);
+	if (ret)
+		return ret;
+
+	if (poc & PMCI_FACTORY_IMAGE_SEL)
+		image_names[i++] = fpga_image_names[FPGA_FACTORY];
+
+	if (FIELD_GET(PMCI_USER_IMAGE_PAGE, poc) == POC_USER_IMAGE_1) {
+		image_names[i++] = fpga_image_names[FPGA_USER1];
+		image_names[i++] = fpga_image_names[FPGA_USER2];
+	} else {
+		image_names[i++] = fpga_image_names[FPGA_USER2];
+		image_names[i++] = fpga_image_names[FPGA_USER1];
+	}
+
+	if (!(poc & PMCI_FACTORY_IMAGE_SEL))
+		image_names[i] = fpga_image_names[FPGA_FACTORY];
+
+	return sysfs_emit(buf, "%s %s %s\n", image_names[0],
+			  image_names[1], image_names[2]);
+}
+
 static ssize_t
 available_power_on_images_show(struct device *dev,
 			       struct device_attribute *attr, char *buf)
@@ -631,6 +660,15 @@ available_power_on_images_show(struct device *dev,
 	return count;
 }
 static DEVICE_ATTR_RO(available_power_on_images);
+
+static ssize_t
+power_on_image_show(struct device *dev,
+		    struct device_attribute *attr, char *buf)
+{
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);
+
+	return sec->poc->get_sequence(sec, buf);
+}
 
 static ssize_t
 power_on_image_store(struct device *dev,
@@ -655,11 +693,12 @@ free_exit:
 	kfree(tokens);
 	return ret ? : count;
 }
-static DEVICE_ATTR_WO(power_on_image);
+static DEVICE_ATTR_RW(power_on_image);
 
 static const struct fpga_power_on pmci_power_on_image = {
 	.avail_image_mask = BIT(FPGA_FACTORY) | BIT(FPGA_USER1) | BIT(FPGA_USER2),
 	.set_sequence = pmci_set_power_on_image,
+	.get_sequence = pmci_get_power_on_image,
 };
 
 static ssize_t available_images_show(struct device *dev,
