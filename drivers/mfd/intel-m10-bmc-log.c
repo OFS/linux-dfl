@@ -242,6 +242,9 @@ static const struct m10bmc_log_cfg n6000_cfg = {
 };
 
 static const struct m10bmc_log_cfg c6100_cfg = {
+	.el_size = PMCI_ERROR_LOG_SIZE,
+	.el_off = 0x00a80000,
+
 	.id_size = 0x00030000,
 	.id_off = 0x00910000,
 };
