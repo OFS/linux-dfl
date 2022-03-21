@@ -225,7 +225,7 @@ config FPGA_DFL_PCI
 
 	  To compile this as a module, choose M here.
 
-config FPGA_DFl_HSSI
+config FPGA_DFL_HSSI
 	tristate "FPGA DFL HSSI Driver"
 	depends on FPGA_DFL
 	help

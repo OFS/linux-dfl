@@ -55,5 +55,5 @@ obj-$(CONFIG_FPGA_DFL_NIOS_INTEL_PAC_N3000)	+= dfl-n3000-nios.o
 
 # Drivers for FPGAs which implement DFL
 obj-$(CONFIG_FPGA_DFL_PCI)		+= dfl-pci.o
-obj-$(CONFIG_FPGA_DFl_HSSI)		+= dfl-hssi.o
+obj-$(CONFIG_FPGA_DFL_HSSI)		+= dfl-hssi.o
 obj-$(CONFIG_FPGA_DFL_INTEL_S10_IOPLL)	+= dfl-intel-s10-iopll.o
