@@ -69,9 +69,16 @@
 #define DFHv1_PARAM_HDR_VERSION		GENMASK_ULL(31, 16) /* Version Param */
 #define DFHv1_PARAM_HDR_NEXT_OFFSET	GENMASK_ULL(63, 32) /* Offset of next Param */
 
-#define DFLv1_PARAM_ID_MSIX	0x1
-#define DFLv1_PARAM_MSIX_STARTV	0x8
-#define DFLv1_PARAM_MSIX_NUMV	0xc
+#define DFHv1_PARAM_ID_MSIX	0x1
+#define DFHv1_PARAM_MSIX_STARTV	0x8
+#define DFHv1_PARAM_MSIX_NUMV	0xc
+
+#define DFHv1_PARAM_ID_CLK_FRQ    0x2
+#define DFHv1_PARAM_ID_FIFO_LEN   0x3
+
+#define DFHv1_PARAM_ID_REG_LAYOUT 0x4
+#define DFHv1_PARAM_ID_REG_WIDTH  GENMASK_ULL(63, 32)
+#define DFHv1_PARAM_ID_REG_SHIFT  GENMASK_ULL(31, 0)
 
 /**
  * enum dfl_id_type - define the DFL FIU types
