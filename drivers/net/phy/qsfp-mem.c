@@ -24,6 +24,8 @@
 #define CONF_POLL_EN	BIT(4)
 
 #define STAT_OFF	0x28
+#define DELAY_REG       0x38
+#define DELAY_VALUE       0xffffff
 
 #define I2C_CTRL        0x48
 #define I2C_CTRL_EN	BIT(0)
@@ -103,6 +105,9 @@ static int qsfp_probe(struct dfl_device *dfl_dev)
 	udelay(DELAY_US);
 
 	qsfp_init_i2c(dev, qsfp);
+
+	udelay(DELAY_US);
+	writeq(DELAY_VALUE, qsfp->base + DELAY_REG);
 
 	writeq(CONF_POLL_EN | CONF_MOD_SEL, qsfp->base + CONF_OFF);
 	udelay(DELAY_US);
