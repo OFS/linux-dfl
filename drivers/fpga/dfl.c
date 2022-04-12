@@ -991,11 +991,30 @@ static void build_info_free(struct build_feature_devs_info *binfo)
 	devm_kfree(binfo->dev, binfo);
 }
 
-static inline u32 feature_size(u64 value)
+static inline u32 feature_size(void __iomem *dfh_ioaddr, void __iomem *end, u64 value)
 {
 	u32 ofst = FIELD_GET(DFH_NEXT_HDR_OFST, value);
 	/* workaround for private features with invalid size, use 4K instead */
-	return ofst ? ofst : 4096;
+	if (!ofst)
+		return 4096;
+
+	if (value & DFH_EOL)
+		return ofst;
+
+	do {
+		value = readq(dfh_ioaddr + ofst);
+
+		if (FIELD_GET(DFH_TYPE, value) != DFH_TYPE_INTERFACE)
+			return ofst;
+
+		ofst += FIELD_GET(DFH_NEXT_HDR_OFST, value);
+
+		if (value & DFH_EOL)
+			return ofst;
+
+	} while ((dfh_ioaddr + ofst) < end);
+
+	return 0;
 }
 
 static u16 feature_id(u64 value)
@@ -1202,7 +1221,12 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 		dfh_ver = FIELD_GET(DFH_VERSION, v);
 
 		/* read feature size and id if inputs are invalid */
-		size = size ? size : feature_size(v);
+		size = size ? size : feature_size(binfo->ioaddr + ofst,
+						  binfo->ioaddr + binfo->len, v);
+		if (!size) {
+			dev_err(binfo->dev, "illegal feature with size of 0\n");
+			return -EINVAL;
+		}
 		fid = fid ? fid : feature_id(v);
 		if (dfh_ver == 1) {
 			dfh_psize = dfh_get_param_size(binfo->ioaddr + ofst, size);
@@ -1428,6 +1452,8 @@ static int parse_feature(struct build_feature_devs_info *binfo,
 		return parse_feature_private(binfo, ofst);
 	case DFH_TYPE_FIU:
 		return parse_feature_fiu(binfo, ofst);
+	case DFH_TYPE_INTERFACE:
+		break;
 	default:
 		dev_info(binfo->dev,
 			 "Feature Type %x is not supported.\n", type);
