@@ -24,6 +24,7 @@
 #define CONF_POLL_EN	BIT(4)
 
 #define STAT_OFF	0x28
+#define MODPRSL         BIT(0)
 #define DELAY_REG       0x38
 #define DELAY_VALUE       0xffffff
 
@@ -48,9 +49,29 @@
 
 #define DELAY_US 1000
 
+#define QSFP_CHECK_TIME 500
+
+enum qsfp_init_status {
+	QSFP_INIT_RESET = 0,
+	QSFP_INIT_DONE,
+};
+
+/**
+ * struct qsfp - device private data structure
+ * @base: base address of the device.
+ * @regmap: regmap for device.
+ * @dwork: work struct for checking qsfp plugin status.
+ * @dev: point to dfl device.
+ * @init: qsfp init status.
+ * @lock: lock for qsfp initial function and status.
+ */
 struct qsfp {
 	void __iomem *base;
 	struct regmap *regmap;
+	struct delayed_work dwork;
+	struct device *dev;
+	enum qsfp_init_status init;
+	struct mutex lock;
 };
 
 static const struct regmap_range qsfp_mem_regmap_range[] = {
@@ -63,7 +84,7 @@ static const struct regmap_access_table qsfp_mem_access_table = {
 	.n_yes_ranges	= ARRAY_SIZE(qsfp_mem_regmap_range),
 };
 
-static void qsfp_init_i2c(struct device *dev, struct qsfp *qsfp)
+static void qsfp_init_i2c(struct qsfp *qsfp)
 {
 	writel(I2C_ISER_TXRDY | I2C_ISER_RXRDY, qsfp->base + I2C_ISER);
 	writel(COUNT_PERIOD_LOW, qsfp->base + I2C_SCL_LOW);
@@ -83,6 +104,82 @@ static const struct regmap_config mmio_cfg = {
 	.max_register = QSFP_SHADOW_CSRS_BASE_END,
 };
 
+static void qsfp_init(struct qsfp *qsfp)
+{
+	writeq(CONF_RST_MOD | CONF_RST_CON | CONF_MOD_SEL,
+	       qsfp->base + CONF_OFF);
+	udelay(DELAY_US);
+	writeq(CONF_MOD_SEL, qsfp->base + CONF_OFF);
+	udelay(DELAY_US);
+
+	qsfp_init_i2c(qsfp);
+
+	udelay(DELAY_US);
+	writeq(DELAY_VALUE, qsfp->base + DELAY_REG);
+
+	writeq(CONF_POLL_EN | CONF_MOD_SEL, qsfp->base + CONF_OFF);
+	udelay(DELAY_US);
+}
+
+static int check_qsfp_plugin(struct qsfp *qsfp)
+{
+	u64 status;
+
+	status = readq(qsfp->base + STAT_OFF);
+
+	return (!(status & MODPRSL));
+}
+
+static void qsfp_check_hotplug(struct work_struct *work)
+{
+	struct delayed_work *dwork;
+	struct qsfp *qsfp;
+	u64 status;
+
+	dwork = to_delayed_work(work);
+	qsfp = container_of(dwork, struct qsfp, dwork);
+
+	mutex_lock(&qsfp->lock);
+
+	status = readq(qsfp->base + STAT_OFF);
+	dev_dbg(qsfp->dev, "qsfp status 0x%llx\n", status);
+
+	if (check_qsfp_plugin(qsfp) &&
+	    qsfp->init == QSFP_INIT_RESET) {
+		dev_info(qsfp->dev, "detected QSFP plugin\n");
+		qsfp_init(qsfp);
+		WRITE_ONCE(qsfp->init, QSFP_INIT_DONE);
+	} else if (!check_qsfp_plugin(qsfp) &&
+		   qsfp->init == QSFP_INIT_DONE) {
+		dev_info(qsfp->dev, "detected QSFP unplugin\n");
+		WRITE_ONCE(qsfp->init, QSFP_INIT_RESET);
+	}
+	mutex_unlock(&qsfp->lock);
+
+	schedule_delayed_work(&qsfp->dwork, msecs_to_jiffies(QSFP_CHECK_TIME));
+}
+
+static ssize_t qsfp_connected_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct qsfp *qsfp = dev_get_drvdata(dev);
+	u32 plugin;
+
+	mutex_lock(&qsfp->lock);
+	plugin = check_qsfp_plugin(qsfp) && (qsfp->init == QSFP_INIT_DONE);
+	mutex_unlock(&qsfp->lock);
+
+	return sysfs_emit(buf, "%u\n", plugin);
+}
+
+static DEVICE_ATTR_RO(qsfp_connected);
+
+static struct attribute *qsfp_mem_attrs[] = {
+	&dev_attr_qsfp_connected.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(qsfp_mem);
+
 static int qsfp_probe(struct dfl_device *dfl_dev)
 {
 	struct device *dev = &dfl_dev->dev;
@@ -92,25 +189,17 @@ static int qsfp_probe(struct dfl_device *dfl_dev)
 	if (!qsfp)
 		return -ENOMEM;
 
-	dev_set_drvdata(dev, qsfp);
-
 	qsfp->base = devm_ioremap_resource(dev, &dfl_dev->mmio_res);
 	if (!qsfp->base)
 		return -ENOMEM;
 
-	writeq(CONF_RST_MOD | CONF_RST_CON | CONF_MOD_SEL,
-	       qsfp->base + CONF_OFF);
-	udelay(DELAY_US);
-	writeq(CONF_MOD_SEL, qsfp->base + CONF_OFF);
-	udelay(DELAY_US);
+	qsfp->dev = dev;
+	mutex_init(&qsfp->lock);
 
-	qsfp_init_i2c(dev, qsfp);
+	dev_set_drvdata(dev, qsfp);
 
-	udelay(DELAY_US);
-	writeq(DELAY_VALUE, qsfp->base + DELAY_REG);
-
-	writeq(CONF_POLL_EN | CONF_MOD_SEL, qsfp->base + CONF_OFF);
-	udelay(DELAY_US);
+	INIT_DELAYED_WORK(&qsfp->dwork, qsfp_check_hotplug);
+	qsfp_check_hotplug(&qsfp->dwork.work);
 
 	qsfp->regmap = devm_regmap_init_mmio(dev, qsfp->base, &mmio_cfg);
 	if (IS_ERR(qsfp->regmap))
@@ -125,6 +214,8 @@ static void qsfp_remove(struct dfl_device *dfl_dev)
 	struct qsfp *qsfp = dev_get_drvdata(dev);
 
 	writeq(CONF_MOD_SEL, qsfp->base + CONF_OFF);
+
+	cancel_delayed_work_sync(&qsfp->dwork);
 }
 
 #define FME_FEATURE_ID_QSFP 0x13
@@ -137,6 +228,7 @@ static const struct dfl_device_id qsfp_ids[] = {
 static struct dfl_driver qsfp_driver = {
 	.drv = {
 		.name = "qsfp-mem",
+		.dev_groups = qsfp_mem_groups,
 	},
 	.id_table = qsfp_ids,
 	.probe = qsfp_probe,
