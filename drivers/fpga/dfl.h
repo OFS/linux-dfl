@@ -80,6 +80,7 @@
 #define DFH_TYPE_AFU		1
 #define DFH_TYPE_PRIVATE	3
 #define DFH_TYPE_FIU		4
+#define DFH_TYPE_INTERFACE	5
 
 /*
  * DFHv1 Register Offset definitons
