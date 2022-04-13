@@ -28,30 +28,30 @@ as illustrated below::
     Header            Header            Header            Header
  +----------+  +-->+----------+  +-->+----------+  +-->+----------+
  |   Type   |  |   |  Type    |  |   |  Type    |  |   |  Type    |
- |   FIU    |  |   | Private  |  |   | Private  |  |   | Private  |
+ |   FIU    |  |   | Private  |  |   | Interface|  |   | Private  |
  +----------+  |   | Feature  |  |   | Feature  |  |   | Feature  |
  | Next_DFH |--+   +----------+  |   +----------+  |   +----------+
  +----------+      | Next_DFH |--+   | Next_DFH |--+   | Next_DFH |--> NULL
  |    ID    |      +----------+      +----------+      +----------+
  +----------+      |    ID    |      |    ID    |      |    ID    |
  | Next_AFU |--+   +----------+      +----------+      +----------+
- +----------+  |   | Feature  |      | Feature  |      | Feature  |
+ +----------+  |   | Feature  |      | Interface|      | Feature  |
  |  Header  |  |   | Register |      | Register |      | Register |
  | Register |  |   |   Set    |      |   Set    |      |   Set    |
  |   Set    |  |   +----------+      +----------+      +----------+
- +----------+  |      Header
-               +-->+----------+
-                   |   Type   |
-                   |   AFU    |
-                   +----------+
-                   | Next_DFH |--> NULL
-                   +----------+
-                   |   GUID   |
-                   +----------+
-                   |  Header  |
-                   | Register |
-                   |   Set    |
-                   +----------+
+ +----------+  |      Header            Header
+               +-->+----------+  +-->+----------+
+                   |   Type   |  |   |  Type    |
+                   |   AFU    |  |   | Interface|
+                   +----------+  |   +----------+
+                   | Next_DFH |--+   | Next_DFH |--> NULL
+                   +----------+      +----------+
+                   |   GUID   |      |   GUID   |
+                   +----------+      +----------+
+                   |  Header  |      | Interface|
+                   | Register |      | Register |
+                   |   Set    |      |   Set    |
+                   +----------+      +----------+
 
 FPGA Interface Unit (FIU) represents a standalone functional unit for the
 interface to FPGA, e.g. the FPGA Management Engine (FME) and Port (more
@@ -69,6 +69,14 @@ Each FIU, AFU and Private Feature could implement its own functional registers.
 The functional register set for FIU and AFU, is named as Header Register Set,
 e.g. FME Header Register Set, and the one for Private Feature, is named as
 Feature Register Set, e.g. FME Partial Reconfiguration Feature Register Set.
+
+Each FIU, AFU and Private Feature could have its own set of child DFH's of the
+type, interface.  These interface DFHs indicate IP blocks that could be
+reused in any FIU, AFU or Private Feature.  The intent is that the specific
+driver for any FIU, AFU or Private Feature could reuse shared code for
+accessing the IP associated with the interface DFH.  The DFL bus
+enumeration code ignores these DFH types except for the calculation of the size
+of a  FIU, AFU or Private Feature.
 
 This Device Feature List provides a way of linking features together, it's
 convenient for software to locate each feature by walking through this list,
