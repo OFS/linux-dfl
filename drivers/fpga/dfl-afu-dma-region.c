@@ -142,7 +142,7 @@ static bool dma_region_check_iova(struct dfl_afu_dma_region *region,
  *
  * Return 0 for success, -EEXIST if dma region has already been added.
  *
- * Needs to be called with pdata->lock heold.
+ * Needs to be called with fdata->lock held.
  */
 static int afu_dma_region_add(struct dfl_feature_dev_data *fdata,
 			      struct dfl_afu_dma_region *region)
@@ -185,7 +185,7 @@ static int afu_dma_region_add(struct dfl_feature_dev_data *fdata,
  * @fdata: feature dev data
  * @region: dma region to be removed
  *
- * Needs to be called with pdata->lock heold.
+ * Needs to be called with fdata->lock held.
  */
 static void afu_dma_region_remove(struct dfl_feature_dev_data *fdata,
 				  struct dfl_afu_dma_region *region)
@@ -204,7 +204,7 @@ static void afu_dma_region_remove(struct dfl_feature_dev_data *fdata,
  * afu_dma_region_destroy - destroy all regions in rbtree
  * @fdata: feature dev data
  *
- * Needs to be called with pdata->lock heold.
+ * Needs to be called with fdata->lock held.
  */
 void afu_dma_region_destroy(struct dfl_feature_dev_data *fdata)
 {
@@ -245,7 +245,7 @@ void afu_dma_region_destroy(struct dfl_feature_dev_data *fdata)
  *   [@iova, @iova+size)
  * If nothing is matched returns NULL.
  *
- * Needs to be called with pdata->lock held.
+ * Needs to be called with fdata->lock held.
  */
 struct dfl_afu_dma_region *
 afu_dma_region_find(struct dfl_feature_dev_data *fdata, u64 iova, u64 size)
@@ -285,7 +285,7 @@ afu_dma_region_find(struct dfl_feature_dev_data *fdata, u64 iova, u64 size)
  * @fdata: feature dev data
  * @iova: address of the dma region
  *
- * Needs to be called with pdata->lock held.
+ * Needs to be called with fdata->lock held.
  */
 static struct dfl_afu_dma_region *
 afu_dma_region_find_iova(struct dfl_feature_dev_data *fdata, u64 iova)
