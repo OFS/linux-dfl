@@ -7,7 +7,6 @@
 #ifndef __MFD_INTEL_M10_BMC_H
 #define __MFD_INTEL_M10_BMC_H
 
-#include <linux/dev_printk.h>
 #include <linux/regmap.h>
 #include <linux/rwsem.h>
 
