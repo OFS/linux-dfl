@@ -40,7 +40,7 @@ static int indirect_bus_clr_cmd(struct indirect_ctx *ctx)
 				 (!cmd), INDIRECT_INT_US, INDIRECT_TIMEOUT_US);
 
 	if (ret)
-		dev_err(ctx->dev, "%s timed out on clearing cmd 0x%xn", __func__, cmd);
+		dev_err(ctx->dev, "%s timed out on clearing cmd 0x%x\n", __func__, cmd);
 
 	return ret;
 }
