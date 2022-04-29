@@ -108,7 +108,6 @@ static int indirect_bus_reg_write(void *context, unsigned int reg,
 }
 
 static const struct regmap_bus indirect_bus = {
-	.fast_io = true,
 	.reg_write = indirect_bus_reg_write,
 	.reg_read =  indirect_bus_reg_read,
 };

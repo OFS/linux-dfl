@@ -150,7 +150,6 @@ static struct regmap_config m10bmc_pmci_regmap_config = {
 	.reg_bits = 32,
 	.reg_stride = 4,
 	.val_bits = 32,
-	.fast_io = true,
 	.wr_table = &m10_access_table,
 	.rd_table = &m10_access_table,
 	.max_register = M10BMC_PMCI_SYS_END,
