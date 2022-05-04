@@ -2,7 +2,7 @@
 /*
  * Header file for DFL driver and device API
  *
- * Copyright (C) 2020 Intel Corporation, Inc.
+ * Copyright (C) 2020-2022 Intel Corporation, Inc.
  */
 
 #ifndef __LINUX_DFL_H
@@ -10,6 +10,27 @@
 
 #include <linux/device.h>
 #include <linux/mod_devicetable.h>
+
+/*
+ * Device Feature Header Register Set
+ *
+ * For FIUs, they all have DFH + GUID + NEXT_AFU as common header registers.
+ * For AFUs, they have DFH + GUID as common header registers.
+ * For private features, they only have DFH register as common header.
+ */
+#define DFH			0x0
+#define GUID_L			0x8
+#define GUID_H			0x10
+#define NEXT_AFU		0x18
+
+#define DFH_SIZE		0x8
+
+/* Device Feature Header Register Bitfield */
+#define DFH_ID			GENMASK_ULL(11, 0)	/* Feature ID */
+#define DFH_REVISION		GENMASK_ULL(15, 12)	/* Feature revision */
+#define DFH_NEXT_HDR_OFST	GENMASK_ULL(39, 16)	/* Offset to next DFH */
+#define DFH_EOL			BIT_ULL(40)		/* End of list */
+#define DFH_TYPE		GENMASK_ULL(63, 60)	/* Feature type */
 
 /**
  * enum dfl_id_type - define the DFL FIU types
