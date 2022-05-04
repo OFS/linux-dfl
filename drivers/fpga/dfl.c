@@ -961,49 +961,51 @@ static int parse_feature_irqs(struct build_feature_devs_info *binfo,
 	void __iomem *base = binfo->ioaddr + ofst;
 	unsigned int i, ibase, inr = 0;
 	enum dfl_id_type type;
-	int virq;
+	int virq, off;
 	u64 v;
 
 	type = binfo->type;
 	if (type >= DFL_ID_MAX)
 		return -EINVAL;
 
-	/*
-	 * Ideally DFL framework should only read info from DFL header, but
-	 * current version DFL only provides mmio resources information for
-	 * each feature in DFL Header, no field for interrupt resources.
-	 * Interrupt resource information is provided by specific mmio
-	 * registers of each private feature which supports interrupt. So in
-	 * order to parse and assign irq resources, DFL framework has to look
-	 * into specific capability registers of these private features.
-	 *
-	 * Once future DFL version supports generic interrupt resource
-	 * information in common DFL headers, the generic interrupt parsing
-	 * code will be added. But in order to be compatible to old version
-	 * DFL, the driver may still fall back to these quirks.
-	 */
-	switch (fid) {
-	case PORT_FEATURE_ID_UINT:
-		if (type != PORT_ID)
+	v = readq(base);
+	v = FIELD_GET(DFH_VERSION, v);
+
+	if (v == 1) {
+		v =  readq(base + DFHv1_CSR_SIZE_GRP);
+		if (FIELD_GET(DFHv1_CSR_SIZE_GRP_HAS_PARAMS, v)) {
+			off = dfl_find_param(base + DFHv1_PARAM_HDR, ofst, DFHv1_PARAM_ID_MSIX);
+			if (off >= 0) {
+				ibase = readl(base + DFHv1_PARAM_HDR + off + DFHv1_PARAM_MSIX_STARTV);
+				inr = readl(base + DFHv1_PARAM_HDR + off + DFHv1_PARAM_MSIX_NUMV);
+				dev_dbg(binfo->dev, "%s start %d num %d fid 0x%x\n",
+					__func__, ibase, inr, fid);
+			}
+		}
+	} else {
+		switch (fid) {
+		case PORT_FEATURE_ID_UINT:
+			if (type != PORT_ID)
+				break;
+			v = readq(base + PORT_UINT_CAP);
+			ibase = FIELD_GET(PORT_UINT_CAP_FST_VECT, v);
+			inr = FIELD_GET(PORT_UINT_CAP_INT_NUM, v);
 			break;
-		v = readq(base + PORT_UINT_CAP);
-		ibase = FIELD_GET(PORT_UINT_CAP_FST_VECT, v);
-		inr = FIELD_GET(PORT_UINT_CAP_INT_NUM, v);
-		break;
-	case PORT_FEATURE_ID_ERROR:
-		if (type != PORT_ID)
+		case PORT_FEATURE_ID_ERROR:
+			if (type != PORT_ID)
+				break;
+			v = readq(base + PORT_ERROR_CAP);
+			ibase = FIELD_GET(PORT_ERROR_CAP_INT_VECT, v);
+			inr = FIELD_GET(PORT_ERROR_CAP_SUPP_INT, v);
 			break;
-		v = readq(base + PORT_ERROR_CAP);
-		ibase = FIELD_GET(PORT_ERROR_CAP_INT_VECT, v);
-		inr = FIELD_GET(PORT_ERROR_CAP_SUPP_INT, v);
-		break;
-	case FME_FEATURE_ID_GLOBAL_ERR:
-		if (type != FME_ID)
+		case FME_FEATURE_ID_GLOBAL_ERR:
+			if (type != FME_ID)
+				break;
+			v = readq(base + FME_ERROR_CAP);
+			ibase = FIELD_GET(FME_ERROR_CAP_INT_VECT, v);
+			inr = FIELD_GET(FME_ERROR_CAP_SUPP_INT, v);
 			break;
-		v = readq(base + FME_ERROR_CAP);
-		ibase = FIELD_GET(FME_ERROR_CAP_INT_VECT, v);
-		inr = FIELD_GET(FME_ERROR_CAP_SUPP_INT, v);
-		break;
+		}
 	}
 
 	if (!inr) {
@@ -1894,6 +1896,27 @@ long dfl_feature_ioctl_set_irq(struct platform_device *pdev,
 	return ret;
 }
 EXPORT_SYMBOL_GPL(dfl_feature_ioctl_set_irq);
+
+int dfl_find_param(void __iomem *base, resource_size_t max, int param)
+{
+	int off = 0;
+	u64 v, next;
+
+	while (off < max) {
+		v = readq(base + off);
+		if (param == FIELD_GET(DFHv1_PARAM_HDR_ID, v))
+			return off;
+
+		next = FIELD_GET(DFHv1_PARAM_HDR_NEXT_OFFSET, v);
+		if (!next)
+			break;
+
+		off += next;
+	}
+
+	return -ENOENT;
+}
+EXPORT_SYMBOL_GPL(dfl_find_param);
 
 static void __exit dfl_fpga_exit(void)
 {
