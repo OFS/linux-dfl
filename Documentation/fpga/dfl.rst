@@ -561,6 +561,30 @@ new DFL feature via UIO direct access, its feature id should be added to the
 driver's id_table.
 
 
+Extending the Device Feature Header - DFHv1
+===========================================
+The current 8 bytes of the Device Feature Header, hereafter referred to as
+to DFHv0, provide very little opportunity for the hardware to describe itself
+to software. Version 1 of the Device Feature Header (DFHv1) is being introduced
+to provide increased flexibility and extensibility to hardware designs using
+Device Feature Lists.  The list below describes some of the goals behind the
+changes in DFHv1:
+
+* Provide a standardized mechanism for features to describe
+  parameters/capabilities to software.
+* Standardized the use of a GUID for all DFHv1 types.
+* Decouple the location of the DFH from the register space of the feature itself.
+
+Modeled after PCI Capabilities, DFHv1 Parameters provide a mechanism to associate
+a list of parameter values to a particular feature.
+
+With DFHv0, not all features types contained a GUID.  DFHv1 makes the GUILD standard
+across all types.
+
+With DFHv0, the register map of a given feature is located immediately following
+the DFHv0 in the memory space.  With DFHv1, the location of the feature register
+map can be specified as an offset to the DFHv1 or as an absolute address.
+
 Open discussion
 ===============
 FME driver exports one ioctl (DFL_FPGA_FME_PORT_PR) for partial reconfiguration
