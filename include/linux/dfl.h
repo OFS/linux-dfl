@@ -69,6 +69,10 @@
 #define DFHv1_PARAM_HDR_VERSION		GENMASK_ULL(31, 16) /* Version Param */
 #define DFHv1_PARAM_HDR_NEXT_OFFSET	GENMASK_ULL(63, 32) /* Offset of next Param */
 
+#define DFLv1_PARAM_ID_MSIX	0x1
+#define DFLv1_PARAM_MSIX_STARTV	0x8
+#define DFLv1_PARAM_MSIX_NUMV	0xc
+
 /**
  * enum dfl_id_type - define the DFL FIU types
  */
@@ -144,4 +148,13 @@ void dfl_driver_unregister(struct dfl_driver *dfl_drv);
 	module_driver(__dfl_driver, dfl_driver_register, \
 		      dfl_driver_unregister)
 
+/*
+ * dfl_find_param() - find the offset of the given parameter
+ * @base: base pointer to start of dfl parameters in DFH
+ * @max: maximum offset to search
+ * @param: id of dfl parameter
+ *
+ * Return: positive offset on success, negative error code otherwise.
+ */
+int dfl_find_param(void __iomem *base, resource_size_t max, int param);
 #endif /* __LINUX_DFL_H */
