@@ -2,7 +2,7 @@
 /*
  * Driver Header File for FPGA Device Feature List (DFL) Support
  *
- * Copyright (C) 2017-2018 Intel Corporation, Inc.
+ * Copyright (C) 2017-2022 Intel Corporation, Inc.
  *
  * Authors:
  *   Kang Luwei <luwei.kang@intel.com>
@@ -54,28 +54,9 @@
 #define PORT_FEATURE_ID_UINT		0x12
 #define PORT_FEATURE_ID_STP		0x13
 
-/*
- * Device Feature Header Register Set
- *
- * For FIUs, they all have DFH + GUID + NEXT_AFU as common header registers.
- * For AFUs, they have DFH + GUID as common header registers.
- * For private features, they only have DFH register as common header.
- */
-#define DFH			0x0
-#define GUID_L			0x8
-#define GUID_H			0x10
-#define NEXT_AFU		0x18
-
-#define DFH_SIZE		0x8
-
 /* Device Feature Header Register Bitfield */
-#define DFH_ID			GENMASK_ULL(11, 0)	/* Feature ID */
 #define DFH_ID_FIU_FME		0
 #define DFH_ID_FIU_PORT		1
-#define DFH_REVISION		GENMASK_ULL(15, 12)	/* Feature revision */
-#define DFH_NEXT_HDR_OFST	GENMASK_ULL(39, 16)	/* Offset to next DFH */
-#define DFH_EOL			BIT_ULL(40)		/* End of list */
-#define DFH_TYPE		GENMASK_ULL(63, 60)	/* Feature type */
 #define DFH_TYPE_AFU		1
 #define DFH_TYPE_PRIVATE	3
 #define DFH_TYPE_FIU		4
