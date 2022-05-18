@@ -968,43 +968,49 @@ static int parse_feature_irqs(struct build_feature_devs_info *binfo,
 	if (type >= DFL_ID_MAX)
 		return -EINVAL;
 
-	v = readq(base);
-	v = FIELD_GET(DFH_VERSION, v);
+	switch (fid) {
+	case PORT_FEATURE_ID_UINT:
+		if (type != PORT_ID)
+			break;
+		v = readq(base + PORT_UINT_CAP);
+		ibase = FIELD_GET(PORT_UINT_CAP_FST_VECT, v);
+		inr = FIELD_GET(PORT_UINT_CAP_INT_NUM, v);
+		break;
+	case PORT_FEATURE_ID_ERROR:
+		if (type != PORT_ID)
+			break;
+		v = readq(base + PORT_ERROR_CAP);
+		ibase = FIELD_GET(PORT_ERROR_CAP_INT_VECT, v);
+		inr = FIELD_GET(PORT_ERROR_CAP_SUPP_INT, v);
+		break;
+	case FME_FEATURE_ID_GLOBAL_ERR:
+		if (type != FME_ID)
+			break;
+		v = readq(base + FME_ERROR_CAP);
+		ibase = FIELD_GET(FME_ERROR_CAP_INT_VECT, v);
+		inr = FIELD_GET(FME_ERROR_CAP_SUPP_INT, v);
+		break;
+	case FEATURE_ID_AFU:
+		break;
 
-	if (v == 1) {
-		v =  readq(base + DFHv1_CSR_SIZE_GRP);
-		if (FIELD_GET(DFHv1_CSR_SIZE_GRP_HAS_PARAMS, v)) {
-			off = dfl_find_param(base + DFHv1_PARAM_HDR, ofst, DFHv1_PARAM_ID_MSIX);
-			if (off >= 0) {
-				ibase = readl(base + DFHv1_PARAM_HDR + off + DFHv1_PARAM_MSIX_STARTV);
-				inr = readl(base + DFHv1_PARAM_HDR + off + DFHv1_PARAM_MSIX_NUMV);
-				dev_dbg(binfo->dev, "%s start %d num %d fid 0x%x\n",
-					__func__, ibase, inr, fid);
+	default:
+		v = readq(base);
+		v = FIELD_GET(DFH_VERSION, v);
+
+		if (v == 1) {
+			v =  readq(base + DFHv1_CSR_SIZE_GRP);
+			if (FIELD_GET(DFHv1_CSR_SIZE_GRP_HAS_PARAMS, v)) {
+				off = dfl_find_param(base + DFHv1_PARAM_HDR, ofst,
+						     DFHv1_PARAM_ID_MSIX);
+				if (off >= 0) {
+					ibase = readl(base + DFHv1_PARAM_HDR +
+						      off + DFHv1_PARAM_MSIX_STARTV);
+					inr = readl(base + DFHv1_PARAM_HDR +
+						    off + DFHv1_PARAM_MSIX_NUMV);
+					dev_dbg(binfo->dev, "%s start %d num %d fid 0x%x\n",
+						__func__, ibase, inr, fid);
+				}
 			}
-		}
-	} else {
-		switch (fid) {
-		case PORT_FEATURE_ID_UINT:
-			if (type != PORT_ID)
-				break;
-			v = readq(base + PORT_UINT_CAP);
-			ibase = FIELD_GET(PORT_UINT_CAP_FST_VECT, v);
-			inr = FIELD_GET(PORT_UINT_CAP_INT_NUM, v);
-			break;
-		case PORT_FEATURE_ID_ERROR:
-			if (type != PORT_ID)
-				break;
-			v = readq(base + PORT_ERROR_CAP);
-			ibase = FIELD_GET(PORT_ERROR_CAP_INT_VECT, v);
-			inr = FIELD_GET(PORT_ERROR_CAP_SUPP_INT, v);
-			break;
-		case FME_FEATURE_ID_GLOBAL_ERR:
-			if (type != FME_ID)
-				break;
-			v = readq(base + FME_ERROR_CAP);
-			ibase = FIELD_GET(FME_ERROR_CAP_INT_VECT, v);
-			inr = FIELD_GET(FME_ERROR_CAP_SUPP_INT, v);
-			break;
 		}
 	}
 
