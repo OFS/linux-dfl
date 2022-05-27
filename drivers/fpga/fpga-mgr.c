@@ -796,7 +796,7 @@ fpga_mgr_register_full(struct device *parent, const struct fpga_manager_info *in
 	if (!mgr)
 		return ERR_PTR(-ENOMEM);
 
-	id = ida_simple_get(&fpga_mgr_ida, 0, 0, GFP_KERNEL);
+	id = ida_alloc(&fpga_mgr_ida, GFP_KERNEL);
 	if (id < 0) {
 		ret = id;
 		goto error_kfree;
@@ -835,7 +835,7 @@ fpga_mgr_register_full(struct device *parent, const struct fpga_manager_info *in
 	return mgr;
 
 error_device:
-	ida_simple_remove(&fpga_mgr_ida, id);
+	ida_free(&fpga_mgr_ida, id);
 error_kfree:
 	kfree(mgr);
 
@@ -963,7 +963,7 @@ static void fpga_mgr_dev_release(struct device *dev)
 {
 	struct fpga_manager *mgr = to_fpga_manager(dev);
 
-	ida_simple_remove(&fpga_mgr_ida, mgr->dev.id);
+	ida_free(&fpga_mgr_ida, mgr->dev.id);
 	kfree(mgr);
 }
 
