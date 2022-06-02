@@ -183,7 +183,7 @@ m10bmc_pmci_flash_read(struct intel_m10bmc *m10bmc, void *buffer,
 
 	ret = m10bmc_pmci_get_mux(m10bmc);
 	if (ret)
-		return ret;
+		goto read_fail;
 
 	ret = m10bmc->flash_ops->read_blk(m10bmc, buffer, addr, size);
 	if (ret)
