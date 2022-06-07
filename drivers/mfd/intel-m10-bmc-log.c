@@ -112,8 +112,8 @@ static int bmc_nvmem_read(struct m10bmc_log *ddata, unsigned int addr,
 	ret = ddata->m10bmc->ops.flash_read(ddata->m10bmc, val,
 					    addr + off, count);
 	if (ret) {
-		dev_err(ddata->dev, "failed to read flash %x\n", addr);
-		return -EIO;
+		dev_err(ddata->dev, "failed to read flash %x (%d)\n", addr, ret);
+		return ret;
 	}
 
 	return 0;
