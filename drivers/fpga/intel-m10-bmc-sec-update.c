@@ -729,9 +729,9 @@ fpga_images(struct m10bmc_sec *sec, char *names, enum fpga_image images[])
 static int
 pmci_set_power_on_image(struct m10bmc_sec *sec, enum fpga_image images[])
 {
-	u32 poc_mask = PMCI_FACTORY_IMAGE_SEL;
+	u32 poc_mask = PMCI_FACTORY_IMAGE_SEL|PMCI_USER_IMAGE_PAGE;
 	int ret, first_user = 0;
-	u32 poc = 0;
+	u32 val, poc = 0;
 
 	if (images[1] == FPGA_FACTORY)
 		return -EINVAL;
@@ -742,18 +742,31 @@ pmci_set_power_on_image(struct m10bmc_sec *sec, enum fpga_image images[])
 	}
 
 	if (images[first_user] == FPGA_USER1 || images[first_user] == FPGA_USER2) {
-		poc_mask |= PMCI_USER_IMAGE_PAGE;
 		if (images[first_user] == FPGA_USER1)
+			poc |= FIELD_PREP(PMCI_USER_IMAGE_PAGE, POC_USER_IMAGE_1);
+		else
+			poc |= FIELD_PREP(PMCI_USER_IMAGE_PAGE, POC_USER_IMAGE_2);
+	} else {
+		dev_dbg(sec->dev, "%s first_user = %d not USER1 or USER2\n", __func__, first_user);
+		ret = m10bmc_sys_read(sec->m10bmc, M10BMC_PMCI_FPGA_POC_STS_BL, &val);
+		if (ret)
+			return ret;
+
+		if  (FIELD_GET(PMCI_USER_IMAGE_PAGE, val) == POC_USER_IMAGE_1)
 			poc |= FIELD_PREP(PMCI_USER_IMAGE_PAGE, POC_USER_IMAGE_1);
 		else
 			poc |= FIELD_PREP(PMCI_USER_IMAGE_PAGE, POC_USER_IMAGE_2);
 	}
 
+	dev_dbg(sec->dev, "%s poc = 0x%x pock_mask = 0x%x\n", __func__, poc, poc_mask);
+
 	ret = m10bmc_sys_update_bits(sec->m10bmc,
 				     m10bmc_base(sec->m10bmc) + M10BMC_PMCI_FPGA_POC,
 				     poc_mask | PMCI_FPGA_POC, poc | PMCI_FPGA_POC);
-	if (ret)
+	if (ret) {
+		dev_err(sec->dev, "%s m10bmc_sys_update_bits failed %d\n", __func__, ret);
 		return ret;
+	}
 
 	ret = regmap_read_poll_timeout(sec->m10bmc->regmap,
 				       m10bmc_base(sec->m10bmc) + M10BMC_PMCI_FPGA_POC,
@@ -762,8 +775,10 @@ pmci_set_power_on_image(struct m10bmc_sec *sec, enum fpga_image images[])
 				       NIOS_HANDSHAKE_INTERVAL_US,
 				       NIOS_HANDSHAKE_TIMEOUT_US);
 
-	if (ret || (FIELD_GET(PMCI_NIOS_STATUS, poc) != NIOS_STATUS_SUCCESS))
+	if (ret || (FIELD_GET(PMCI_NIOS_STATUS, poc) != NIOS_STATUS_SUCCESS)) {
+		dev_err(sec->dev, "%s readback poc = 0x%x\n", __func__, poc);
 		return -EIO;
+	}
 
 	return 0;
 }
