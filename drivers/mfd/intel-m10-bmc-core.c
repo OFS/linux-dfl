@@ -239,7 +239,16 @@ int m10bmc_sys_read(struct intel_m10bmc *m10bmc, unsigned int offset,
 {
 	int ret;
 
-	if (!is_handshake_sys_reg(m10bmc, offset))
+	/*
+	 * For N6000 and C6100, read the mailbox and read/write flash are two
+	 * separate channels.
+	 *
+	 * For N3000, there is only one channel for read/write mailbox and
+	 * flash. For some hardware limitation reasons, it prohibit read the
+	 * sensor registers while writing the flash.
+	 */
+	if ((m10bmc->type == M10_N6000) || (m10bmc->type == M10_C6100) ||
+			!is_handshake_sys_reg(m10bmc, offset))
 		return m10bmc_raw_read(m10bmc, m10bmc->csr->base + (offset), val);
 
 	down_read(&m10bmc->bmcfw_lock);
@@ -260,7 +269,8 @@ int m10bmc_sys_update_bits(struct intel_m10bmc *m10bmc, unsigned int offset,
 {
 	int ret;
 
-	if (!is_handshake_sys_reg(m10bmc, offset))
+	if ((m10bmc->type == M10_N6000) || (m10bmc->type == M10_C6100) ||
+			!is_handshake_sys_reg(m10bmc, offset))
 		return regmap_update_bits(m10bmc->regmap,
 					  m10bmc->csr->base + (offset), msk, val);
 
