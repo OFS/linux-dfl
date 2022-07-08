@@ -272,6 +272,18 @@ enum m10bmc_type {
 #define PMCI_SDM_PR_CNCL_REQ		 BIT(0)
 #define PMCI_SDM_PR_CNCL_ERROR		 GENMASK(18, 8)
 
+#define M10BMC_PMCI_SDM_CTRL 0x234
+#define SDM_CMD_TRIGGER        BIT(0)
+#define SDM_CMD_DONE           BIT(2)
+#define SDM_CMD_SELECT         GENMASK(11, 4)
+#define SDM_CMD_PROV_DATA      0x3
+#define SDM_CMD_STATUS         GENMASK(15, 12)
+#define sdm_status(cmd)	FIELD_GET(SDM_CMD_STATUS, cmd)
+#define SDM_CMD_STATUS_IDLE    0x0
+#define SDM_CMD_ERROR          GENMASK(23, 16)
+#define sdm_error(cmd)	FIELD_GET(SDM_CMD_ERROR, cmd)
+#define SDM_CMD_SUCC           0x0
+
 #define M10BMC_PMCI_SDM_PR_STS		0x820
 #define M10BMC_PMCI_CERT_PROG_STS	0x824
 #define M10BMC_PMCI_CERT_SPEC_STS	0x828

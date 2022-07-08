@@ -56,6 +56,7 @@ struct m10bmc_sec {
 	struct image_load *image_load;		/* terminated with { } member */
 	enum fpga_sec_type type;
 	const struct fpga_power_on *poc;	/* power on image configuration */
+	struct work_struct work;
 };
 
 struct image_load {
@@ -535,12 +536,82 @@ DEVICE_ATTR_SEC_REH_RO(pr);
 
 #define SDM_ROOT_HASH_REG_NUM 12
 
+static int sdm_check_config_status(struct m10bmc_sec *sec)
+{
+	struct intel_m10bmc *m10bmc = sec->m10bmc;
+	u32 val;
+	int ret;
+
+	ret = m10bmc_sys_read(m10bmc, M10BMC_PMCI_SDM_CTRL, &val);
+	if (ret)
+		return -EIO;
+
+	return FIELD_GET(SDM_CMD_DONE, val);
+}
+
+static int sdm_trigger_prov_data(struct m10bmc_sec *sec)
+{
+	struct intel_m10bmc *m10bmc = sec->m10bmc;
+	u32 cmd = 0;
+	int ret;
+
+	ret = m10bmc_sys_update_bits(m10bmc,
+				     M10BMC_PMCI_SDM_CTRL,
+				     SDM_CMD_SELECT,
+				     FIELD_PREP(SDM_CMD_SELECT, SDM_CMD_PROV_DATA));
+	if (ret)
+		return ret;
+
+	ret = m10bmc_sys_update_bits(m10bmc,
+				     M10BMC_PMCI_SDM_CTRL,
+				     SDM_CMD_TRIGGER, SDM_CMD_TRIGGER);
+	if (ret)
+		return ret;
+
+	ret = regmap_read_poll_timeout(m10bmc->regmap,
+				       m10bmc_base(sec->m10bmc) + M10BMC_PMCI_SDM_CTRL,
+				       cmd, sdm_status(cmd) == SDM_CMD_STATUS_IDLE,
+				       NIOS_HANDSHAKE_INTERVAL_US,
+				       NIOS_HANDSHAKE_TIMEOUT_US);
+	if (ret) {
+		dev_err(sec->dev, "Error polling SDM CTRL register: %d\n", ret);
+		return ret;
+	} else if (sdm_error(cmd) != SDM_CMD_SUCC) {
+		dev_err(sec->dev, "SDM trigger failure: %ld\n", sdm_error(cmd));
+		return -EIO;
+	}
+
+	ret = regmap_read_poll_timeout(m10bmc->regmap,
+				       m10bmc_base(sec->m10bmc) + M10BMC_PMCI_SDM_CTRL,
+				       cmd, (cmd & SDM_CMD_DONE),
+				       NIOS_HANDSHAKE_INTERVAL_US,
+				       2 * NIOS_HANDSHAKE_TIMEOUT_US);
+	if (ret) {
+		dev_err(sec->dev, "Error polling for SDM operation done: %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static void sdm_work(struct work_struct *work)
+{
+	struct m10bmc_sec *sec = container_of(work, struct m10bmc_sec,
+						work);
+	sdm_trigger_prov_data(sec);
+}
+
 static ssize_t
 show_sdm_root_entry_hash(struct device *dev, u32 start, char *buf)
 {
 	struct m10bmc_sec *sec = dev_get_drvdata(dev);
 	int i, cnt, ret;
 	u32 key;
+
+	flush_work(&sec->work);
+
+	if (sdm_check_config_status(sec) <= 0)
+		return -EIO;
 
 	cnt = sprintf(buf, "0x");
 	for (i = 0; i < SDM_ROOT_HASH_REG_NUM; i++) {
@@ -1540,8 +1611,11 @@ static int m10bmc_sec_probe(struct platform_device *pdev)
 	else if (type == N6000BMC_SEC)
 		sec->image_load = pmci_image_load_hndlrs;
 
-	if (type == N6000BMC_SEC)
+	if (type == N6000BMC_SEC) {
 		sec->poc = &pmci_power_on_image;
+		INIT_WORK(&sec->work, sdm_work);
+		queue_work(system_long_wq, &sec->work);
+	}
 
 	if (type == N6000BMC_SEC && !sec->m10bmc->flash_ops) {
 		dev_err(sec->dev, "No flash-ops provided for security manager\n");
@@ -1577,6 +1651,9 @@ static int m10bmc_sec_probe(struct platform_device *pdev)
 static int m10bmc_sec_remove(struct platform_device *pdev)
 {
 	struct m10bmc_sec *sec = dev_get_drvdata(&pdev->dev);
+
+	if (sec->type == N6000BMC_SEC)
+		flush_work(&sec->work);
 
 	firmware_upload_unregister(sec->fwl);
 	kfree(sec->fw_name);
