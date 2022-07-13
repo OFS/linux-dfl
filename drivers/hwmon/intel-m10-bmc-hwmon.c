@@ -567,12 +567,14 @@ static const struct m10bmc_hwmon_board_data n6000bmc_hwmon_bdata = {
 };
 
 static const struct m10bmc_sdata c6100bmc_temp_tbl[] = {
-	{ 0x440, 0x0, 0x0, 0x0, 0x0, 500, "FPGA FABRIC Max Temperature" },
+	{ 0x440, 0x0, 0x0, 0x0, 0x0, 500, "FPGA E-TILE Max Temperature" },
 	{ 0x444, 0x448, 0x44c, 0x0, 0x0, 500, "FPGA E-TILE Temperature #1" },
 	{ 0x450, 0x454, 0x458, 0x0, 0x0, 500, "FPGA E-TILE Temperature #2" },
 	{ 0x45c, 0x460, 0x464, 0x0, 0x0, 500, "FPGA E-TILE Temperature #3" },
 	{ 0x468, 0x46c, 0x470, 0x0, 0x0, 500, "FPGA E-TILE Temperature #4" },
 	{ 0x474, 0x478, 0x47c, 0x0, 0x0, 500, "FPGA P-TILE Temperature" },
+	{ 0x5b4, 0x5b8, 0x5bc, 0x0, 0x0, 500, "FPGA P-TILE2 DTS Temperature" },
+	{ 0x480, 0x0, 0x0, 0x0, 0x0, 500, "FPGA FABRIC Max Temperature" },
 	{ 0x484, 0x488, 0x48c, 0x0, 0x0, 500, "FPGA FABRIC Digital Temperature#1" },
 	{ 0x490, 0x494, 0x498, 0x0, 0x0, 500, "FPGA FABRIC Digital Temperature#2" },
 	{ 0x49c, 0x4a0, 0x4a4, 0x0, 0x0, 500, "FPGA FABRIC Digital Temperature#3" },
@@ -580,88 +582,42 @@ static const struct m10bmc_sdata c6100bmc_temp_tbl[] = {
 	{ 0x4b4, 0x4b8, 0x4bc, 0x0, 0x0, 500, "FPGA FABRIC Digital Temperature#5" },
 	{ 0x4d8, 0x4dc, 0x4e0, 0x0, 0x0, 500, "FPGA FABRIC Remote Digital Temperature#3" },
 	{ 0x4e4, 0x4e8, 0x4ec, 0x0, 0x0, 500, "FPGA FABRIC Remote Digital Temperature#4" },
-	{ 0x4f0, 0x4f4, 0x4f8, 0x52c, 0x0, 500, "Board Top Near ICXD SOC Temperature" },
 	{ 0x4fc, 0x500, 0x504, 0x5c0, 0x0, 500, "Board Bottom Temperature" },
-	{ 0x508, 0x50c, 0x510, 0x52c, 0x0, 500, "FPGA Ambient Temperature" },
-	{ 0x514, 0x518, 0x51c, 0x52c, 0x0, 500, "FPGA PTILE2 External Temperature" },
-	{ 0x520, 0x524, 0x528, 0x52c, 0x0, 500, "Board Rear Side Temperature" },
-	{ 0x530, 0x534, 0x538, 0x52c, 0x0, 500, "Board Front Side Temperature" },
-	{ 0x53c, 0x540, 0x544, 0x0, 0x0, 500, "QSFP1 Temperature" },
-	{ 0x548, 0x54c, 0x550, 0x0, 0x0, 500, "QSFP2 Temperature" },
-	{ 0x554, 0x0, 0x0, 0x0, 0x0, 500, "FPGA Core Voltage Phase 0 VR Temperature" },
-	{ 0x560, 0x0, 0x0, 0x0, 0x0, 500, "FPGA Core Voltage Phase 1 VR Temperature" },
-	{ 0x56c, 0x0, 0x0, 0x0, 0x0, 500, "FPGA Core Voltage Phase 2 VR Temperature" },
-	{ 0x578, 0x0, 0x0, 0x0, 0x0, 500, "FPGA Core Voltage VR Controller Temperature" },
-	{ 0x584, 0x0, 0x0, 0x0, 0x0, 500, "FPGA VCCH VR Temperature" },
-	{ 0x590, 0x0, 0x0, 0x0, 0x0, 500, "FPGA VCC_1V2 VR Temperature" },
-	{ 0x59c, 0x0, 0x0, 0x0, 0x0, 500, "FPGA VCCH, VCC_1V2 VR Controller Temperature" },
-	{ 0x5a8, 0x0, 0x0, 0x0, 0x0, 500, "3V3 VR Temperature" },
-	{ 0x5b4, 0x5b8, 0x5bc, 0x0, 0x0, 500, "FPGA PTILE2 DTS Temperature" },
+	{ 0x5e8, 0x5ec, 0x5f0, 0x5c0, 0x0, 500, "FPGA Corner (SDM) Temperature [Remote]" },
+	{ 0x5dc, 0x5e0, 0x5e4, 0x5c0, 0x0, 500, "FPGA Core Fabric Temperature [Remote]" },
 	{ 0x5c4, 0x5c8, 0x5cc, 0x5c0, 0x0, 500, "FPGA P-Tile Temperature [Remote]" },
 	{ 0x5d0, 0x5d4, 0x5d8, 0x5c0, 0x0, 500, "FPGA E-Tile Temperature [Remote]" },
-	{ 0x5dc, 0x5e0, 0x5e4, 0x5c0, 0x0, 500, "FPGA SDM Temperature [Remote]" },
-	{ 0x5e8, 0x5ec, 0x5f0, 0x5c0, 0x0, 500, "FPGA Corner Temperature [Remote]" },
+	{ 0x4f0, 0x4f4, 0x4f8, 0x52c, 0x0, 500, "Board Top Temperature" },
+	{ 0x520, 0x524, 0x528, 0x52c, 0x0, 500, "Board Rear Side Temperature" },
+	{ 0x530, 0x534, 0x538, 0x52c, 0x0, 500, "Board Front Side Temperature" },
+	{ 0x508, 0x50c, 0x510, 0x52c, 0x0, 500, "FPGA Ambient Temperature" },
+	{ 0x514, 0x518, 0x51c, 0x52c, 0x0, 500, "FPGA PTILE2 External Temperature" },
+	{ 0x53c, 0x540, 0x544, 0x0, 0x0, 500, "QSFP1 Temperature" },
+	{ 0x548, 0x54c, 0x550, 0x0, 0x0, 500, "QSFP2 Temperature" },
+	{ 0x728, 0x72c, 0x730, 0x0, 0x0, 500, "Virt FPGA Temperature" },
+	{ 0x758, 0x750, 0x754, 0x0, 0x0, 500, "SOC Package Temperature" },
 };
 
 static const struct m10bmc_sdata c6100bmc_in_tbl[] = {
 	{ 0x5f4, 0x0, 0x0, 0x0, 0x0, 1, "Inlet 12V PCIe Rail Voltage" },
 	{ 0x60c, 0x0, 0x0, 0x0, 0x0, 1, "Inlet 12V Aux Rail Voltage" },
 	{ 0x624, 0x0, 0x0, 0x0, 0x0, 1, "Inlet 3V3 PCIe Rail Voltage" },
-	{ 0x63c, 0x0, 0x0, 0x0, 0x0, 1, "FPGA Core Voltage Rail Voltage" },
-	{ 0x644, 0x0, 0x0, 0x0, 0x0, 1, "FPGA VCCH Rail Voltage" },
-	{ 0x64c, 0x0, 0x0, 0x0, 0x0, 1, "FPGA VCC_1V2 Rail Voltage" },
-	{ 0x654, 0x0, 0x0, 0x0, 0x0, 1, "FPGA VCCH_GXER_1V1, VCCA_1V8 Voltage" },
-	{ 0x664, 0x0, 0x0, 0x0, 0x0, 1, "FPGA VCCIO_1V2 Voltage" },
-	{ 0x694, 0x0, 0x0, 0x0, 0x0, 1, "CVL Core Voltage Rail Voltage" },
-	{ 0x6ac, 0x0, 0x0, 0x0, 0x0, 1, "Board 3V3 VR Voltage" },
 	{ 0x6b4, 0x0, 0x0, 0x0, 0x0, 1, "QSFP 3V3 Rail Voltage" },
 	{ 0x6c4, 0x0, 0x0, 0x0, 0x0, 1, "QSFP (Primary) Supply Rail Voltage" },
 	{ 0x6c8, 0x0, 0x0, 0x0, 0x0, 1, "QSFP (Secondary) Supply Rail Voltage" },
-	{ 0x674, 0x0, 0x0, 0x0, 0x0, 1, "ICXD SOC 3V3 Rails Inlet Voltage" },
-	{ 0x684, 0x0, 0x0, 0x0, 0x0, 1, "C10LP & Board CLK PWR 3V3 Inlet Voltage" },
-	{ 0x6cc, 0x0, 0x0, 0x0, 0x0, 1, "VCCH_GXER_1V1 Voltage" },
-	{ 0x6d0, 0x0, 0x0, 0x0, 0x0, 1, "VCCA_1V8  Voltage" },
-	{ 0x6d4, 0x0, 0x0, 0x0, 0x0, 1, "VCCIO_1V8 Voltage" },
-	{ 0x6d8, 0x0, 0x0, 0x0, 0x0, 1, "VPP_2V5  Voltage" },
-	{ 0x6e0, 0x0, 0x0, 0x0, 0x0, 1, "VCC_3V3_QSFPA  Voltage" },
-	{ 0x6e8, 0x0, 0x0, 0x0, 0x0, 1, "VCC_3V3_QSFPB Voltage" },
-	{ 0x6f0, 0x0, 0x0, 0x0, 0x0, 1, "VCC_3V3_AUX_PCIE Voltage" },
-	{ 0x6f4, 0x0, 0x0, 0x0, 0x0, 1, "VCC_2V5_C10 Voltage" },
-	{ 0x6fc, 0x0, 0x0, 0x0, 0x0, 1, "VTT_0V6_FPGA_DDR4_CH01 Voltage" },
-	{ 0x700, 0x0, 0x0, 0x0, 0x0, 1, "VTT_0V6_FPGA_DDR4_CH23 Voltage" },
-	{ 0x704, 0x0, 0x0, 0x0, 0x0, 1, "VTT_0V6_SoC_DDR4_CH01 Voltage" },
-	{ 0x70c, 0x0, 0x0, 0x0, 0x0, 1, "VCC_0V9_NVMe Voltage" },
-	{ 0x714, 0x0, 0x0, 0x0, 0x0, 1, "VCCL_SDM_0V8  Voltage" },
-	{ 0x718, 0x0, 0x0, 0x0, 0x0, 1, "VCCFUSEWR_SDM_1V8 Voltage" },
-	{ 0x71c, 0x0, 0x0, 0x0, 0x0, 1, "VCCCLK_GXER_2V5  Voltage" },
-	{ 0x720, 0x0, 0x0, 0x0, 0x0, 1, "ADC_VCC_12V_AUX_L2 Voltage" },
-	{ 0x734, 0x0, 0x0, 0x0, 0x0, 1, "ADC_12V_PCIE_FUSE_OUT Voltage" },
-	{ 0x738, 0x0, 0x0, 0x0, 0x0, 1, "ADC_IMON1_12V_PCIE Voltage" },
-	{ 0x73c, 0x0, 0x0, 0x0, 0x0, 1, "ADC_VCC_3V3_PCIE Voltage" },
-	{ 0x740, 0x0, 0x0, 0x0, 0x0, 1, "ADC_VCC_5V Voltage" },
-	{ 0x744, 0x0, 0x0, 0x0, 0x0, 1, "ADC_VCC_3V3_C10 Voltage" },
-	{ 0x748, 0x0, 0x0, 0x0, 0x0, 1, "ADC_VCC_1V8_C10 Voltage" },
-	{ 0x74c, 0x0, 0x0, 0x0, 0x0, 1, "ADC_VCC_1V2_C10 Voltage" },
 };
 
 static const struct m10bmc_sdata c6100bmc_curr_tbl[] = {
 	{ 0x600, 0x604, 0x608, 0x0, 0x0, 1, "Inlet 12V PCIe Rail Current" },
 	{ 0x618, 0x61c, 0x620, 0x0, 0x0, 1, "Inlet 12V Aux Rail Current" },
 	{ 0x630, 0x634, 0x638, 0x0, 0x0, 1, "Inlet 3V3 PCIe Rail Current" },
-	{ 0x640, 0x0, 0x0, 0x0, 0x0, 1, "FPGA Core Voltage Rail Current" },
-	{ 0x648, 0x0, 0x0, 0x0, 0x0, 1, "FPGA VCCH Rail Current" },
-	{ 0x650, 0x0, 0x0, 0x0, 0x0, 1, "FPGA VCC_1V2 Rail Current" },
-	{ 0x658, 0x65c, 0x660, 0x0, 0x0, 1, "FPGA VCCH_GXER_1V1, VCCA_1V8 Current" },
-	{ 0x668, 0x66c, 0x670, 0x0, 0x0, 1, "FPGA VCCIO_1V2 Current" },
-	{ 0x678, 0x67c, 0x680, 0x0, 0x0, 1, "ICXD SOC 3V3 Rails Inlet Current" },
-	{ 0x688, 0x68c, 0x690, 0x0, 0x0, 1, "C10LP & Board CLK PWR 3V3 Inlet Current" },
-	{ 0x6b0, 0x0, 0x0, 0x0, 0x0, 1, "Board 3V3 VR Current" },
 	{ 0x6b8, 0x6bc, 0x6c0, 0x0, 0x0, 1, "QSFP 3V3 Rail Current" },
 };
 
 static const struct m10bmc_sdata c6100bmc_power_tbl[] = {
 	{ 0x724, 0x0, 0x0, 0x0, 0x0, 1, "Board Power" },
-	{ 0x788, 0x0, 0x0, 0x0, 0x0, 1, "ICXD Package Power" },
+	{ 0x788, 0x0, 0x0, 0x0, 0x0, 1, "SOC Package Power" },
+	{ 0x694, 0x0, 0x0, 0x0, 0x0, 1, "FPGA Package Power" },
 };
 
 static const struct hwmon_channel_info *c6100bmc_hinfo[] = {
@@ -679,44 +635,21 @@ static const struct hwmon_channel_info *c6100bmc_hinfo[] = {
 			   HWMON_T_LABEL,
 			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
 			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_LABEL,
 			   HWMON_T_INPUT | HWMON_T_LABEL,
 			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
 			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			   HWMON_T_LABEL,
 			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
 			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
 			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
@@ -724,40 +657,24 @@ static const struct hwmon_channel_info *c6100bmc_hinfo[] = {
 			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
 			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
 			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL),
+			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
+			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
+			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
+			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
+			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
+			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
+			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL),
 	HWMON_CHANNEL_INFO(in,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
 			   HWMON_I_INPUT | HWMON_I_LABEL,
 			   HWMON_I_INPUT | HWMON_I_LABEL,
 			   HWMON_I_INPUT | HWMON_I_LABEL,
@@ -771,21 +688,10 @@ static const struct hwmon_channel_info *c6100bmc_hinfo[] = {
 			   HWMON_C_LABEL,
 			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
 			   HWMON_C_LABEL,
-			   HWMON_C_INPUT | HWMON_C_LABEL,
-			   HWMON_C_INPUT | HWMON_C_LABEL,
-			   HWMON_C_INPUT | HWMON_C_LABEL,
-			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
-			   HWMON_C_LABEL,
-			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
-			   HWMON_C_LABEL,
-			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
-			   HWMON_C_LABEL,
-			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
-			   HWMON_C_LABEL,
-			   HWMON_C_INPUT | HWMON_C_LABEL,
 			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
 			   HWMON_C_LABEL),
 	HWMON_CHANNEL_INFO(power,
+			   HWMON_P_INPUT | HWMON_P_LABEL,
 			   HWMON_P_INPUT | HWMON_P_LABEL,
 			   HWMON_P_INPUT | HWMON_P_LABEL),
 	NULL
