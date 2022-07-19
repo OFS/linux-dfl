@@ -894,6 +894,7 @@ struct ssam_device_id {
 struct dfl_device_id {
 	__u16 type;
 	__u16 feature_id;
+	guid_t guid;
 	kernel_ulong_t driver_data;
 };
 
