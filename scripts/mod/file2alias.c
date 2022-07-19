@@ -1440,14 +1440,32 @@ static int do_ssam_entry(const char *filename, void *symval, char *alias)
 	return 1;
 }
 
-/* Looks like: dfl:tNfN */
+/* Looks like: dfl:tNfNg{guid} */
 static int do_dfl_entry(const char *filename, void *symval, char *alias)
 {
+	int guid_cmp_val;
+	guid_t null_guid = {0};
 	DEF_FIELD(symval, dfl_device_id, type);
 	DEF_FIELD(symval, dfl_device_id, feature_id);
+	DEF_FIELD(symval, dfl_device_id, guid);
 
-	sprintf(alias, "dfl:t%04Xf%04X", type, feature_id);
+	guid_cmp_val = memcmp(&null_guid, &guid, sizeof(guid_t));
 
+	if (feature_id == 0 && guid_cmp_val == 0) {
+		warn("Invalid dfl Device ID for in '%s'\n", filename);
+		return 0;
+	}
+
+	if (feature_id == 0)
+		strcpy(alias, "dfl:t*f*");
+	else
+		snprintf(alias, ALIAS_SIZE, "dfl:t%04Xf%04X", type, feature_id);
+
+	if (guid_cmp_val) {
+		strcat(alias + strlen(alias), "g{");
+		add_guid(alias, guid);
+		strcat(alias + strlen(alias), "}");
+	}
 	add_wildcard(alias);
 	return 1;
 }
