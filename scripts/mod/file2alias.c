@@ -1311,13 +1311,33 @@ static void do_ssam_entry(struct module *mod, void *symval)
 			    domain, category, alias);
 }
 
-/* Looks like: dfl:tNfN */
+/* Looks like: dfl:tNfNg{guid} */
 static void do_dfl_entry(struct module *mod, void *symval)
 {
+	int guid_cmp_val;
+	char alias[256] = {};
+	guid_t null_guid = {};
 	DEF_FIELD(symval, dfl_device_id, type);
 	DEF_FIELD(symval, dfl_device_id, feature_id);
+	DEF_FIELD_ADDR(symval, dfl_device_id, guid);
 
-	module_alias_printf(mod, true, "dfl:t%04Xf%04X", type, feature_id);
+	guid_cmp_val = memcmp(&null_guid, guid, sizeof(guid_t));
+
+	if (feature_id == 0 && guid_cmp_val == 0) {
+		warn("Invalid dfl Device ID for in '%s'\n", mod->name);
+		return;
+	}
+
+	ADD(alias, "t", feature_id != 0, type);
+	ADD(alias, "f", feature_id != 0, feature_id);
+
+	if (guid_cmp_val) {
+		strcat(alias + strlen(alias), "g{");
+		add_guid(alias, *guid);
+		strcat(alias + strlen(alias), "}");
+	}
+
+	module_alias_printf(mod, true, "dfl:%s", alias);
 }
 
 /* Looks like: cdx:vNdN */
