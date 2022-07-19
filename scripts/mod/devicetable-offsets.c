@@ -258,6 +258,7 @@ int main(void)
 	DEVID(dfl_device_id);
 	DEVID_FIELD(dfl_device_id, type);
 	DEVID_FIELD(dfl_device_id, feature_id);
+	DEVID_FIELD(dfl_device_id, guid);
 
 	DEVID(ishtp_device_id);
 	DEVID_FIELD(ishtp_device_id, guid);
