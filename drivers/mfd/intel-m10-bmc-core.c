@@ -81,18 +81,12 @@ static struct mfd_cell m10bmc_n6000_bmc_subdevs[] = {
 	{ .name = "n6000bmc-log" }
 };
 
-static const struct regmap_range n6000_fw_handshake_regs[] = {
-	regmap_reg_range(M10BMC_PMCI_TELEM_START, M10BMC_PMCI_TELEM_END),
-};
+static const struct regmap_range null_fw_handshake_regs[0];
 
 static struct mfd_cell m10bmc_c6100_bmc_subdevs[] = {
 	{ .name = "c6100bmc-hwmon" },
 	{ .name = "n6000bmc-sec-update" },
 	{ .name = "c6100bmc-log" },
-};
-
-static const struct regmap_range c6100_fw_handshake_regs[] = {
-	regmap_reg_range(M10BMC_PMCI_TELEM_START, M10BMC_PMCI2_TELEM_END),
 };
 
 static struct mfd_cell m10bmc_d5005_subdevs[] = {
@@ -240,15 +234,12 @@ int m10bmc_sys_read(struct intel_m10bmc *m10bmc, unsigned int offset,
 	int ret;
 
 	/*
-	 * For N6000 and C6100, read the mailbox and read/write flash are two
-	 * separate channels.
-	 *
-	 * For N3000, there is only one channel for read/write mailbox and
-	 * flash. For some hardware limitation reasons, it prohibit read the
-	 * sensor registers while writing the flash.
+	 * For some Intel FPGA devices, the BMC firmware is not available
+	 * to service handshake registers during a secure update and -EBUSY
+	 * is returned for these cases.
 	 */
-	if ((m10bmc->type == M10_N6000) || (m10bmc->type == M10_C6100) ||
-			!is_handshake_sys_reg(m10bmc, offset))
+	if (m10bmc->type == M10_N6000 || m10bmc->type == M10_C6100 ||
+	    !is_handshake_sys_reg(m10bmc, offset))
 		return m10bmc_raw_read(m10bmc, m10bmc->csr->base + (offset), val);
 
 	down_read(&m10bmc->bmcfw_lock);
@@ -269,8 +260,13 @@ int m10bmc_sys_update_bits(struct intel_m10bmc *m10bmc, unsigned int offset,
 {
 	int ret;
 
-	if ((m10bmc->type == M10_N6000) || (m10bmc->type == M10_C6100) ||
-			!is_handshake_sys_reg(m10bmc, offset))
+	/*
+	 * For some Intel FPGA devices, the BMC firmware is not available
+	 * to service handshake registers during a secure update and -EBUSY
+	 * is returned for these cases.
+	 */
+	if (m10bmc->type == M10_N6000 || m10bmc->type == M10_C6100 ||
+	    !is_handshake_sys_reg(m10bmc, offset))
 		return regmap_update_bits(m10bmc->regmap,
 					  m10bmc->csr->base + (offset), msk, val);
 
@@ -455,17 +451,15 @@ int m10bmc_dev_init(struct intel_m10bmc *m10bmc)
 	case M10_N6000:
 		cells = m10bmc_n6000_bmc_subdevs;
 		n_cell = ARRAY_SIZE(m10bmc_n6000_bmc_subdevs);
-		m10bmc->handshake_sys_reg_ranges = n6000_fw_handshake_regs;
-		m10bmc->handshake_sys_reg_nranges =
-			ARRAY_SIZE(n6000_fw_handshake_regs);
+		m10bmc->handshake_sys_reg_ranges = null_fw_handshake_regs;
+		m10bmc->handshake_sys_reg_nranges = 0;
 		m10bmc->csr = &m10bmc_pmci_csr;
 		break;
 	case M10_C6100:
 		cells = m10bmc_c6100_bmc_subdevs;
 		n_cell = ARRAY_SIZE(m10bmc_c6100_bmc_subdevs);
-		m10bmc->handshake_sys_reg_ranges = c6100_fw_handshake_regs;
-		m10bmc->handshake_sys_reg_nranges =
-			ARRAY_SIZE(c6100_fw_handshake_regs);
+		m10bmc->handshake_sys_reg_ranges = null_fw_handshake_regs;
+		m10bmc->handshake_sys_reg_nranges = 0;
 		m10bmc->csr = &m10bmc_pmci2_csr;
 		break;
 	default:
