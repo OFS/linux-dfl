@@ -68,6 +68,14 @@ Description:	Read-only. Read this file to determine the status of SDM
 		static region key provisioning.
 		Format: "0x%x".
 
+What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../security/sdm_pr_provision_status
+Date:		Dec 2022
+KernelVersion:  6.1
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read-only. Read this file to determine the status of SDM
+		partial reconfiguration key provisioning.
+		Format: "0x%x".
+
 What:		/sys/bus/platform/drivers/intel-m10bmc-sec-update/.../control/available_images
 Date:		Nov 2021
 KernelVersion:  5.16
