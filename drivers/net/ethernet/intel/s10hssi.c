@@ -154,7 +154,7 @@ static int netdev_set_mac_address(struct net_device *ndev, void *p)
 {
 	struct sockaddr *addr = p;
 
-	memcpy(ndev->dev_addr, addr->sa_data, ETH_ALEN);
+	memcpy((void *)ndev->dev_addr, addr->sa_data, ETH_ALEN);
 
 	/* TODO program hardware */
 
