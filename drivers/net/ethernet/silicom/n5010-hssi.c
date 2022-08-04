@@ -135,7 +135,7 @@ static int netdev_set_mac_address(struct net_device *netdev, void *p)
 	u32 mac_part1, mac_part2;
 	int ret;
 
-	memcpy(netdev->dev_addr, addr->sa_data, ETH_ALEN);
+	memcpy((void *)netdev->dev_addr, addr->sa_data, ETH_ALEN);
 
 	mac_part1 = (addr->sa_data[0] << 8) | addr->sa_data[1];
 	mac_part2 = (addr->sa_data[2] << 24) | (addr->sa_data[3] << 16) |
