@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Intel Max10 Board Management Controller Secure Update Driver
+ * Intel MAX10 Board Management Controller Secure Update Driver
  *
- * Copyright (C) 2019-2021 Intel Corporation. All rights reserved.
+ * Copyright (C) 2019-2022 Intel Corporation. All rights reserved.
  *
  */
 #include <linux/bitfield.h>
 #include <linux/device.h>
-#include <linux/fpga/fpga-image-load.h>
+#include <linux/firmware.h>
 #include <linux/mfd/intel-m10-bmc.h>
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
@@ -49,7 +49,9 @@ struct image_load;
 struct m10bmc_sec {
 	struct device *dev;
 	struct intel_m10bmc *m10bmc;
-	struct fpga_image_load *imgld;
+	struct fw_upload *fwl;
+	char *fw_name;
+	u32 fw_name_id;
 	bool cancel_request;
 	struct image_load *image_load;		/* terminated with { } member */
 	enum fpga_sec_type type;
@@ -427,6 +429,8 @@ static struct image_load pmci_image_load_hndlrs[] = {
 	{}
 };
 
+static DEFINE_XARRAY_ALLOC(fw_upload_xa);
+
 /* Root Entry Hash (REH) support */
 #define REH_SHA256_SIZE		32
 #define REH_SHA384_SIZE		48
@@ -438,7 +442,7 @@ show_root_entry_hash(struct device *dev, u32 exp_magic,
 		     u32 prog_addr, u32 reh_addr, char *buf)
 {
 	struct m10bmc_sec *sec = dev_get_drvdata(dev);
-	int sha_num_bytes, i, cnt, ret;
+	int sha_num_bytes, i, ret, cnt = 0;
 	u8 hash[REH_SHA384_SIZE];
 	u32 magic;
 
@@ -452,14 +456,12 @@ show_root_entry_hash(struct device *dev, u32 exp_magic,
 	if (ret)
 		return ret;
 
-	dev_dbg(dev, "%s magic 0x%08x\n", __func__, magic);
-
 	if (FIELD_GET(REH_MAGIC, magic) != exp_magic)
 		return sysfs_emit(buf, "hash not programmed\n");
 
 	sha_num_bytes = FIELD_GET(REH_SHA_NUM_BYTES, magic) / 8;
 	if (sha_num_bytes != REH_SHA256_SIZE &&
-	    sha_num_bytes != REH_SHA384_SIZE)   {
+	    sha_num_bytes != REH_SHA384_SIZE) {
 		dev_err(sec->dev, "%s bad sha num bytes %d\n", __func__,
 			sha_num_bytes);
 		return -EINVAL;
@@ -472,7 +474,6 @@ show_root_entry_hash(struct device *dev, u32 exp_magic,
 		return ret;
 	}
 
-	cnt = sprintf(buf, "0x");
 	for (i = 0; i < sha_num_bytes; i++)
 		cnt += sprintf(buf + cnt, "%02x", hash[i]);
 	cnt += sprintf(buf + cnt, "\n");
@@ -1017,21 +1018,21 @@ m10bmc_sec_progress_status(struct m10bmc_sec *sec, u32 *doorbell,
 	return 0;
 }
 
-static u32 rsu_check_idle(struct m10bmc_sec *sec)
+static enum fw_upload_err rsu_check_idle(struct m10bmc_sec *sec)
 {
 	u32 doorbell;
 	int ret;
 
 	ret = m10bmc_sys_read(sec->m10bmc, doorbell_reg(sec->m10bmc), &doorbell);
 	if (ret)
-		return FPGA_IMAGE_ERR_RW_ERROR;
+		return FW_UPLOAD_ERR_RW_ERROR;
 
 	if (!rsu_progress_done(rsu_prog(doorbell))) {
 		log_error_regs(sec, doorbell);
-		return FPGA_IMAGE_ERR_BUSY;
+		return FW_UPLOAD_ERR_BUSY;
 	}
 
-	return 0;
+	return FW_UPLOAD_ERR_NONE;
 }
 
 static inline bool rsu_start_done(u32 doorbell, u32 progress, u32 status)
@@ -1071,7 +1072,7 @@ static int rsu_poll_start_done(struct m10bmc_sec *sec, u32 *doorbell,
 	return 0;
 }
 
-static u32 rsu_update_init(struct m10bmc_sec *sec)
+static enum fw_upload_err rsu_update_init(struct m10bmc_sec *sec)
 {
 	u32 doorbell, progress, status;
 	int ret;
@@ -1082,28 +1083,28 @@ static u32 rsu_update_init(struct m10bmc_sec *sec)
 				     FIELD_PREP(DRBL_HOST_STATUS,
 						HOST_STATUS_IDLE));
 	if (ret)
-		return FPGA_IMAGE_ERR_RW_ERROR;
+		return FW_UPLOAD_ERR_RW_ERROR;
 
 	ret = rsu_poll_start_done(sec, &doorbell, &progress, &status);
 	if (ret == -ETIMEDOUT) {
 		log_error_regs(sec, doorbell);
-		return FPGA_IMAGE_ERR_TIMEOUT;
+		return FW_UPLOAD_ERR_TIMEOUT;
 	} else if (ret) {
-		return FPGA_IMAGE_ERR_RW_ERROR;
+		return FW_UPLOAD_ERR_RW_ERROR;
 	}
 
 	if (status == RSU_STAT_WEAROUT) {
 		dev_warn(sec->dev, "Excessive flash update count detected\n");
-		return FPGA_IMAGE_ERR_WEAROUT;
+		return FW_UPLOAD_ERR_WEAROUT;
 	} else if (status == RSU_STAT_ERASE_FAIL) {
 		log_error_regs(sec, doorbell);
-		return FPGA_IMAGE_ERR_HW_ERROR;
+		return FW_UPLOAD_ERR_HW_ERROR;
 	}
 
-	return 0;
+	return FW_UPLOAD_ERR_NONE;
 }
 
-static u32 rsu_prog_ready(struct m10bmc_sec *sec)
+static enum fw_upload_err rsu_prog_ready(struct m10bmc_sec *sec)
 {
 	unsigned long poll_timeout;
 	u32 doorbell, progress;
@@ -1111,7 +1112,7 @@ static u32 rsu_prog_ready(struct m10bmc_sec *sec)
 
 	ret = m10bmc_sys_read(sec->m10bmc, doorbell_reg(sec->m10bmc), &doorbell);
 	if (ret)
-		return FPGA_IMAGE_ERR_RW_ERROR;
+		return FW_UPLOAD_ERR_RW_ERROR;
 
 	poll_timeout = jiffies + msecs_to_jiffies(RSU_PREP_TIMEOUT_MS);
 	while (rsu_prog(doorbell) == RSU_PROG_PREPARE) {
@@ -1121,22 +1122,22 @@ static u32 rsu_prog_ready(struct m10bmc_sec *sec)
 
 		ret = m10bmc_sys_read(sec->m10bmc, doorbell_reg(sec->m10bmc), &doorbell);
 		if (ret)
-			return FPGA_IMAGE_ERR_RW_ERROR;
+			return FW_UPLOAD_ERR_RW_ERROR;
 	}
 
 	progress = rsu_prog(doorbell);
 	if (progress == RSU_PROG_PREPARE) {
 		log_error_regs(sec, doorbell);
-		return FPGA_IMAGE_ERR_TIMEOUT;
+		return FW_UPLOAD_ERR_TIMEOUT;
 	} else if (progress != RSU_PROG_READY) {
 		log_error_regs(sec, doorbell);
-		return FPGA_IMAGE_ERR_HW_ERROR;
+		return FW_UPLOAD_ERR_HW_ERROR;
 	}
 
-	return 0;
+	return FW_UPLOAD_ERR_NONE;
 }
 
-static u32 rsu_send_data(struct m10bmc_sec *sec)
+static enum fw_upload_err rsu_send_data(struct m10bmc_sec *sec)
 {
 	u32 doorbell, status;
 	int ret;
@@ -1146,7 +1147,7 @@ static u32 rsu_send_data(struct m10bmc_sec *sec)
 				     FIELD_PREP(DRBL_HOST_STATUS,
 						HOST_STATUS_WRITE_DONE));
 	if (ret)
-		return FPGA_IMAGE_ERR_RW_ERROR;
+		return FW_UPLOAD_ERR_RW_ERROR;
 
 	ret = regmap_read_poll_timeout(sec->m10bmc->regmap,
 				       m10bmc_base(sec->m10bmc) + doorbell_reg(sec->m10bmc),
@@ -1157,21 +1158,21 @@ static u32 rsu_send_data(struct m10bmc_sec *sec)
 
 	if (ret == -ETIMEDOUT) {
 		log_error_regs(sec, doorbell);
-		return FPGA_IMAGE_ERR_TIMEOUT;
+		return FW_UPLOAD_ERR_TIMEOUT;
 	} else if (ret) {
-		return FPGA_IMAGE_ERR_RW_ERROR;
+		return FW_UPLOAD_ERR_RW_ERROR;
 	}
 
 	ret = m10bmc_sec_status(sec, &status);
 	if (ret)
-		return FPGA_IMAGE_ERR_RW_ERROR;
+		return FW_UPLOAD_ERR_HW_ERROR;
 
 	if (!rsu_status_ok(status)) {
 		log_error_regs(sec, doorbell);
-		return FPGA_IMAGE_ERR_HW_ERROR;
+		return FW_UPLOAD_ERR_HW_ERROR;
 	}
 
-	return 0;
+	return FW_UPLOAD_ERR_NONE;
 }
 
 static int rsu_check_complete(struct m10bmc_sec *sec, u32 *doorbell)
@@ -1193,52 +1194,57 @@ static int rsu_check_complete(struct m10bmc_sec *sec, u32 *doorbell)
 	return -EINVAL;
 }
 
-static u32 rsu_cancel(struct m10bmc_sec *sec)
+static enum fw_upload_err rsu_cancel(struct m10bmc_sec *sec)
 {
 	u32 doorbell;
 	int ret;
 
 	ret = m10bmc_sys_read(sec->m10bmc, doorbell_reg(sec->m10bmc), &doorbell);
 	if (ret)
-		return FPGA_IMAGE_ERR_RW_ERROR;
+		return FW_UPLOAD_ERR_RW_ERROR;
 
 	if (rsu_prog(doorbell) != RSU_PROG_READY)
-		return FPGA_IMAGE_ERR_BUSY;
+		return FW_UPLOAD_ERR_BUSY;
 
 	ret = m10bmc_sys_update_bits(sec->m10bmc, doorbell_reg(sec->m10bmc),
 				     DRBL_HOST_STATUS,
 				     FIELD_PREP(DRBL_HOST_STATUS,
 						HOST_STATUS_ABORT_RSU));
 	if (ret)
-		return FPGA_IMAGE_ERR_RW_ERROR;
+		return FW_UPLOAD_ERR_RW_ERROR;
 
-	return FPGA_IMAGE_ERR_CANCELED;
+	return FW_UPLOAD_ERR_CANCELED;
 }
 
-static u32 m10bmc_sec_prepare(struct fpga_image_load *imgld, const u8 *data,
-			      u32 size)
+static enum fw_upload_err m10bmc_sec_prepare(struct fw_upload *fwl,
+					     const u8 *data, u32 size)
 {
-	struct m10bmc_sec *sec = imgld->priv;
+	struct m10bmc_sec *sec = fwl->dd_handle;
 	u32 ret;
 
 	sec->cancel_request = false;
 
-	if (size & 0x3 || size > M10BMC_STAGING_SIZE)
-		return FPGA_IMAGE_ERR_INVALID_SIZE;
+	if (!size || size > M10BMC_STAGING_SIZE)
+		return FW_UPLOAD_ERR_INVALID_SIZE;
 
 	ret = rsu_check_idle(sec);
-	if (ret)
+	if (ret != FW_UPLOAD_ERR_NONE)
 		return ret;
 
 	ret = m10bmc_fw_state_enter(sec->m10bmc, M10BMC_FW_STATE_SEC_UPDATE);
 	if (ret)
-		return FPGA_IMAGE_ERR_BUSY;
+		return FW_UPLOAD_ERR_BUSY;
 
 	ret = rsu_update_init(sec);
-	if (ret)
+	if (ret != FW_UPLOAD_ERR_NONE)
 		goto fw_state_exit;
 
 	ret = rsu_prog_ready(sec);
+	if (ret != FW_UPLOAD_ERR_NONE)
+		goto fw_state_exit;
+
+	if (sec->cancel_request)
+		ret = rsu_cancel(sec);
 
 fw_state_exit:
 	m10bmc_fw_state_exit(sec->m10bmc);
@@ -1247,54 +1253,71 @@ fw_state_exit:
 
 #define WRITE_BLOCK_SIZE 0x4000	/* Default write-block size is 0x4000 bytes */
 
-static s32 m10bmc_sec_write(struct fpga_image_load *imgld, const u8 *data,
-			    u32 offset, u32 size)
+static enum fw_upload_err m10bmc_sec_write(struct fw_upload *fwl, const u8 *data,
+					   u32 offset, u32 size, u32 *written)
 {
-	struct m10bmc_sec *sec = imgld->priv;
-	unsigned int stride = regmap_get_reg_stride(sec->m10bmc->regmap);
-	u32 blk_size, doorbell;
+	struct m10bmc_sec *sec = fwl->dd_handle;
+	u32 blk_size, doorbell, extra_offset;
+	unsigned int stride, extra = 0;
 	int ret;
 
+	stride = regmap_get_reg_stride(sec->m10bmc->regmap);
 	if (sec->cancel_request)
-		return -rsu_cancel(sec);
+		return rsu_cancel(sec);
 
 	ret = m10bmc_sys_read(sec->m10bmc, doorbell_reg(sec->m10bmc), &doorbell);
 	if (ret) {
-		return -FPGA_IMAGE_ERR_RW_ERROR;
+		return FW_UPLOAD_ERR_RW_ERROR;
 	} else if (rsu_prog(doorbell) != RSU_PROG_READY) {
 		log_error_regs(sec, doorbell);
-		return -FPGA_IMAGE_ERR_HW_ERROR;
+		return FW_UPLOAD_ERR_HW_ERROR;
 	}
 
+	WARN_ON_ONCE(WRITE_BLOCK_SIZE % stride);
 	blk_size = min_t(u32, WRITE_BLOCK_SIZE, size);
 	ret = regmap_bulk_write(sec->m10bmc->regmap,
 				M10BMC_STAGING_BASE + offset,
 				(void *)data + offset,
-				(blk_size + stride - 1) / stride);
-
+				blk_size / stride);
 	if (ret)
-		return -FPGA_IMAGE_ERR_RW_ERROR;
+		return FW_UPLOAD_ERR_RW_ERROR;
 
-	return blk_size;
+	/*
+	 * If blk_size is not aligned to stride, then handle the extra
+	 * bytes with regmap_write.
+	 */
+	if (blk_size % stride) {
+		extra_offset = offset + ALIGN_DOWN(blk_size, stride);
+		memcpy(&extra, (u8 *)(data + extra_offset), blk_size % stride);
+		ret = regmap_write(sec->m10bmc->regmap,
+				   M10BMC_STAGING_BASE + extra_offset, extra);
+		if (ret)
+			return FW_UPLOAD_ERR_RW_ERROR;
+	}
+
+	*written = blk_size;
+	return FW_UPLOAD_ERR_NONE;
 }
 
-static s32 pmci_sec_write(struct fpga_image_load *imgld, const u8 *data,
-			  u32 offset, u32 size)
+static enum fw_upload_err pmci_sec_write(struct fw_upload *fwl, const u8 *data,
+					 u32 offset, u32 size, u32 *written)
 {
-	struct m10bmc_sec *sec = imgld->priv;
-	struct intel_m10bmc *m10bmc = sec->m10bmc;
+	struct m10bmc_sec *sec = fwl->dd_handle;
+	struct intel_m10bmc *m10bmc;
 	u32 blk_size, doorbell;
 	int ret;
 
+	m10bmc = sec->m10bmc;
+
 	if (sec->cancel_request)
-		return -rsu_cancel(sec);
+		return rsu_cancel(sec);
 
 	ret = m10bmc_sys_read(m10bmc, doorbell_reg(m10bmc), &doorbell);
 	if (ret) {
-		return -FPGA_IMAGE_ERR_RW_ERROR;
+		return FW_UPLOAD_ERR_RW_ERROR;
 	} else if (rsu_prog(doorbell) != RSU_PROG_READY) {
 		log_error_regs(sec, doorbell);
-		return -FPGA_IMAGE_ERR_HW_ERROR;
+		return FW_UPLOAD_ERR_HW_ERROR;
 	}
 
 	blk_size = min_t(u32, WRITE_BLOCK_SIZE, size);
@@ -1302,14 +1325,15 @@ static s32 pmci_sec_write(struct fpga_image_load *imgld, const u8 *data,
 					   blk_size);
 
 	if (ret)
-		return -FPGA_IMAGE_ERR_RW_ERROR;
+		return FW_UPLOAD_ERR_RW_ERROR;
 
-	return blk_size;
+	*written = blk_size;
+	return FW_UPLOAD_ERR_NONE;
 }
 
-static u32 m10bmc_sec_poll_complete(struct fpga_image_load *imgld)
+static enum fw_upload_err m10bmc_sec_poll_complete(struct fw_upload *fwl)
 {
-	struct m10bmc_sec *sec = imgld->priv;
+	struct m10bmc_sec *sec = fwl->dd_handle;
 	unsigned long poll_timeout;
 	u32 doorbell, result;
 	int ret;
@@ -1319,10 +1343,10 @@ static u32 m10bmc_sec_poll_complete(struct fpga_image_load *imgld)
 
 	ret = m10bmc_fw_state_enter(sec->m10bmc, M10BMC_FW_STATE_SEC_UPDATE);
 	if (ret)
-		return FPGA_IMAGE_ERR_BUSY;
+		return FW_UPLOAD_ERR_BUSY;
 
 	result = rsu_send_data(sec);
-	if (result)
+	if (result != FW_UPLOAD_ERR_NONE)
 		goto fw_state_exit;
 
 	poll_timeout = jiffies + msecs_to_jiffies(RSU_COMPLETE_TIMEOUT_MS);
@@ -1333,12 +1357,12 @@ static u32 m10bmc_sec_poll_complete(struct fpga_image_load *imgld)
 
 	if (ret == -EAGAIN) {
 		log_error_regs(sec, doorbell);
-		result = FPGA_IMAGE_ERR_TIMEOUT;
+		result = FW_UPLOAD_ERR_TIMEOUT;
 	} else if (ret == -EIO) {
-		result = FPGA_IMAGE_ERR_RW_ERROR;
+		result = FW_UPLOAD_ERR_RW_ERROR;
 	} else if (ret) {
 		log_error_regs(sec, doorbell);
-		result = FPGA_IMAGE_ERR_HW_ERROR;
+		result = FW_UPLOAD_ERR_HW_ERROR;
 	}
 
 fw_state_exit:
@@ -1353,24 +1377,24 @@ fw_state_exit:
  * the cancel_request flag. Other functions will check this flag and handle
  * the cancel request synchronously.
  */
-static void m10bmc_sec_cancel(struct fpga_image_load *imgld)
+static void m10bmc_sec_cancel(struct fw_upload *fwl)
 {
-	struct m10bmc_sec *sec = imgld->priv;
+	struct m10bmc_sec *sec = fwl->dd_handle;
 
 	sec->cancel_request = true;
 }
 
-static void m10bmc_sec_cleanup(struct fpga_image_load *imgld)
+static void m10bmc_sec_cleanup(struct fw_upload *fwl)
 {
-	struct m10bmc_sec *sec = imgld->priv;
+	struct m10bmc_sec *sec = fwl->dd_handle;
 
 	(void)rsu_cancel(sec);
 }
 
-static struct fpga_image_load_ops *
+static struct fw_upload_ops *
 m10bmc_ops_create(struct device *dev, enum fpga_sec_type type)
 {
-	struct fpga_image_load_ops *ops;
+	struct fw_upload_ops *ops;
 
 	ops = devm_kzalloc(dev, sizeof(*ops), GFP_KERNEL);
 	if (!ops)
@@ -1389,13 +1413,17 @@ m10bmc_ops_create(struct device *dev, enum fpga_sec_type type)
 	return ops;
 }
 
+#define SEC_UPDATE_LEN_MAX 32
 static int m10bmc_sec_probe(struct platform_device *pdev)
 {
 	const struct platform_device_id *id = platform_get_device_id(pdev);
 	enum fpga_sec_type type = (enum fpga_sec_type)id->driver_data;
-	struct fpga_image_load_ops *ops;
-	struct fpga_image_load *imgld;
+	char buf[SEC_UPDATE_LEN_MAX];
+	struct fw_upload_ops *ops;
 	struct m10bmc_sec *sec;
+	struct fw_upload *fwl;
+	unsigned int len;
+	int  ret;
 
 	sec = devm_kzalloc(&pdev->dev, sizeof(*sec), GFP_KERNEL);
 	if (!sec)
@@ -1426,13 +1454,27 @@ static int m10bmc_sec_probe(struct platform_device *pdev)
 
 	dev_set_drvdata(&pdev->dev, sec);
 
-	imgld = fpga_image_load_register(sec->dev, ops, sec);
-	if (IS_ERR(imgld)) {
-		dev_err(sec->dev, "FPGA Image Load driver failed to start\n");
-		return PTR_ERR(imgld);
+	ret = xa_alloc(&fw_upload_xa, &sec->fw_name_id, sec,
+		       xa_limit_32b, GFP_KERNEL);
+	if (ret)
+		return ret;
+
+	len = scnprintf(buf, SEC_UPDATE_LEN_MAX, "secure-update%d",
+			sec->fw_name_id);
+	sec->fw_name = kmemdup_nul(buf, len, GFP_KERNEL);
+	if (!sec->fw_name)
+		return -ENOMEM;
+
+	fwl = firmware_upload_register(THIS_MODULE, sec->dev, sec->fw_name,
+				       ops, sec);
+	if (IS_ERR(fwl)) {
+		dev_err(sec->dev, "Firmware Upload driver failed to start\n");
+		kfree(sec->fw_name);
+		xa_erase(&fw_upload_xa, sec->fw_name_id);
+		return PTR_ERR(fwl);
 	}
 
-	sec->imgld = imgld;
+	sec->fwl = fwl;
 	return 0;
 }
 
@@ -1440,7 +1482,10 @@ static int m10bmc_sec_remove(struct platform_device *pdev)
 {
 	struct m10bmc_sec *sec = dev_get_drvdata(&pdev->dev);
 
-	fpga_image_load_unregister(sec->imgld);
+	firmware_upload_unregister(sec->fwl);
+	kfree(sec->fw_name);
+	xa_erase(&fw_upload_xa, sec->fw_name_id);
+
 	return 0;
 }
 
@@ -1478,4 +1523,4 @@ module_platform_driver(intel_m10bmc_sec_driver);
 MODULE_DEVICE_TABLE(platform, intel_m10bmc_sec_ids);
 MODULE_AUTHOR("Intel Corporation");
 MODULE_DESCRIPTION("Intel MAX10 BMC Secure Update");
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL");

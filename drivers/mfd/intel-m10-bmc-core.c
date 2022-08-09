@@ -128,7 +128,14 @@ m10bmc_flash_read(struct intel_m10bmc *m10bmc, void *buf, u32 addr, u32 size)
 	unsigned int stride = regmap_get_reg_stride(m10bmc->regmap);
 	int ret;
 
-	WARN_ON(size % stride);
+	if (size % stride) {
+		dev_err(m10bmc->dev,
+			"%s: size (0x%x) not aligned to stride (0x%x)\n",
+			__func__, size, stride);
+		WARN_ON_ONCE(1);
+		return -EINVAL;
+	}
+
 	ret = regmap_bulk_read(m10bmc->regmap, addr, buf, size / stride);
 	if (ret)
 		dev_err(m10bmc->dev,
@@ -145,7 +152,7 @@ m10bmc_pmci_set_flash_host_mux(struct intel_m10bmc *m10bmc, bool request)
 
 	ret = regmap_update_bits(m10bmc->regmap, M10BMC_PMCI_FLASH_CTRL,
 				 FLASH_HOST_REQUEST,
-				 FIELD_PREP(FLASH_HOST_REQUEST,request));
+				 FIELD_PREP(FLASH_HOST_REQUEST, request));
 	if (ret)
 		return ret;
 
