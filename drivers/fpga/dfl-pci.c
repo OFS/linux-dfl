@@ -280,7 +280,8 @@ static int find_dfls_by_default(struct pci_dev *pcidev,
 			bar = FIELD_GET(FME_PORT_OFST_BAR_ID, v);
 			offset = FIELD_GET(FME_PORT_OFST_DFH_OFST, v);
 			if (bars & BIT(bar)) {
-				dev_warn(&pcidev->dev, "skipping bad port BAR %d\n", bar);
+				dev_warn(&pcidev->dev,
+					 "skipping duplicate port BAR %d\n", bar);
 				continue;
 			}
 
