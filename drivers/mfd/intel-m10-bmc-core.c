@@ -53,6 +53,10 @@ static const struct m10bmc_csr m10bmc_pmci2_csr = {
 	.pr_reh_addr = 0x00810004,
 	.pr_magic = PMCI_PR_PROG_MAGIC,
 	.rsu_update_counter = 0x00860000,
+	.pr_sdm_reh_reg = M10BMC_PMCI_PR_RH0,
+	.pr_sdm_csk_reg = M10BMC_PMCI_PR_CSK,
+	.sr_sdm_reh_reg = M10BMC_PMCI_SR_RH0,
+	.sr_sdm_csk_reg = M10BMC_PMCI_SR_CSK,
 };
 
 static const struct m10bmc_csr m10bmc_spi_csr = {
