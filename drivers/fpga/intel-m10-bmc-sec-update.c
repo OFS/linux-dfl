@@ -184,12 +184,28 @@ static int pmci_sec_sdm_sr_image_load(struct m10bmc_sec *sec)
 				  PMCI_SDM_SR_IMG_REQ, PMCI_SDM_SR_IMG_REQ);
 }
 
+static int pmci_sec_sdm_sr_cancel(struct m10bmc_sec *sec)
+{
+	return regmap_update_bits(sec->m10bmc->regmap,
+				  m10bmc_base(sec->m10bmc) +
+				  M10BMC_PMCI_SDM_SR_CNCL_CTRL_STS,
+				  PMCI_SDM_SR_CNCL_REQ, PMCI_SDM_SR_CNCL_REQ);
+}
+
 static int pmci_sec_sdm_pr_image_load(struct m10bmc_sec *sec)
 {
 	return regmap_update_bits(sec->m10bmc->regmap,
 				  m10bmc_base(sec->m10bmc) +
 				  M10BMC_PMCI_SDM_PR_CTRL_STS,
 				  PMCI_SDM_PR_IMG_REQ, PMCI_SDM_PR_IMG_REQ);
+}
+
+static int pmci_sec_sdm_pr_cancel(struct m10bmc_sec *sec)
+{
+	return regmap_update_bits(sec->m10bmc->regmap,
+				  m10bmc_base(sec->m10bmc) +
+				  M10BMC_PMCI_SDM_PR_CNCL_CTRL_STS,
+				  PMCI_SDM_PR_CNCL_REQ, PMCI_SDM_PR_CNCL_REQ);
 }
 
 static int m10bmc_sec_bmc_image_load_0(struct m10bmc_sec *sec)
@@ -435,8 +451,16 @@ static struct image_load pmci_image_load_hndlrs[] = {
 		.load_image = pmci_sec_sdm_sr_image_load,
 	},
 	{
+		.name = "sdm_sr_cancel",
+		.load_image = pmci_sec_sdm_sr_cancel,
+	},
+	{
 		.name = "sdm_pr",
 		.load_image = pmci_sec_sdm_pr_image_load,
+	},
+	{
+		.name = "sdm_pr_cancel",
+		.load_image = pmci_sec_sdm_pr_cancel,
 	},
 	{}
 };
@@ -604,6 +628,24 @@ sdm_sr_provision_status_show(struct device *dev,
 static DEVICE_ATTR_RO(sdm_sr_provision_status);
 
 static ssize_t
+sdm_sr_cancel_status_show(struct device *dev,
+			  struct device_attribute *attr, char *buf)
+{
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);
+	u32 status;
+	int ret;
+
+	ret = m10bmc_sys_read(sec->m10bmc, m10bmc_base(sec->m10bmc) +
+			      M10BMC_PMCI_SDM_SR_CNCL_CTRL_STS, &status);
+	if (ret)
+		return ret;
+
+	return sysfs_emit(buf, "0x%x\n",
+			  (unsigned int)FIELD_GET(PMCI_SDM_SR_CNCL_ERROR, status));
+}
+static DEVICE_ATTR_RO(sdm_sr_cancel_status);
+
+static ssize_t
 sdm_pr_provision_status_show(struct device *dev,
 			     struct device_attribute *attr, char *buf)
 {
@@ -621,6 +663,24 @@ sdm_pr_provision_status_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(sdm_pr_provision_status);
 
+static ssize_t
+sdm_pr_cancel_status_show(struct device *dev,
+			  struct device_attribute *attr, char *buf)
+{
+	struct m10bmc_sec *sec = dev_get_drvdata(dev);
+	u32 status;
+	int ret;
+
+	ret = m10bmc_sys_read(sec->m10bmc, m10bmc_base(sec->m10bmc) +
+			      M10BMC_PMCI_SDM_PR_CNCL_CTRL_STS, &status);
+	if (ret)
+		return ret;
+
+	return sysfs_emit(buf, "0x%x\n",
+			  (unsigned int)FIELD_GET(PMCI_SDM_PR_CNCL_ERROR, status));
+}
+static DEVICE_ATTR_RO(sdm_pr_cancel_status);
+
 static umode_t
 m10bmc_security_is_visible(struct kobject *kobj, struct attribute *attr, int n)
 {
@@ -628,7 +688,9 @@ m10bmc_security_is_visible(struct kobject *kobj, struct attribute *attr, int n)
 
 	if (sec->type != N6000BMC_SEC &&
 	    (attr == &dev_attr_sdm_sr_provision_status.attr ||
-	     attr == &dev_attr_sdm_pr_provision_status.attr))
+	     attr == &dev_attr_sdm_sr_cancel_status.attr ||
+	     attr == &dev_attr_sdm_pr_provision_status.attr ||
+	     attr == &dev_attr_sdm_pr_cancel_status.attr))
 		return 0;
 
 	return attr->mode;
@@ -643,7 +705,9 @@ static struct attribute *m10bmc_security_attrs[] = {
 	&dev_attr_pr_canceled_csks.attr,
 	&dev_attr_bmc_canceled_csks.attr,
 	&dev_attr_sdm_sr_provision_status.attr,
+	&dev_attr_sdm_sr_cancel_status.attr,
 	&dev_attr_sdm_pr_provision_status.attr,
+	&dev_attr_sdm_pr_cancel_status.attr,
 	NULL,
 };
 
