@@ -17,6 +17,7 @@ enum m10bmc_type {
 	M10_N3000,
 	M10_D5005,
 	M10_N5010,
+	M10_N5014,
 };
 
 static struct mfd_cell m10bmc_d5005_subdevs[] = {
@@ -45,6 +46,16 @@ static struct mfd_cell m10bmc_n5010_subdevs[] = {
 };
 
 static const struct regmap_range n5010_fw_handshake_regs[] = {
+	regmap_reg_range(M10BMC_N5010_TELEM_START, M10BMC_N5010_TELEM_END),
+};
+
+static struct mfd_cell m10bmc_n5014_subdevs[] = {
+	{ .name = "n5014bmc-hwmon" },
+	{ .name = "n5010bmc-sec-update" },
+	{ .name = "n5010bmc-phy" },
+};
+
+static const struct regmap_range n5014_fw_handshake_regs[] = {
 	regmap_reg_range(M10BMC_N5010_TELEM_START, M10BMC_N5010_TELEM_END),
 };
 
@@ -308,6 +319,13 @@ static int intel_m10_bmc_spi_probe(struct spi_device *spi)
 		ddata->handshake_sys_reg_nranges =
 			ARRAY_SIZE(n5010_fw_handshake_regs);
 		break;
+	case M10_N5014:
+		cells = m10bmc_n5014_subdevs;
+		n_cell = ARRAY_SIZE(m10bmc_n5014_subdevs);
+		ddata->handshake_sys_reg_ranges = n5014_fw_handshake_regs;
+		ddata->handshake_sys_reg_nranges =
+			ARRAY_SIZE(n5014_fw_handshake_regs);
+		break;
 	default:
 		return -ENODEV;
 	}
@@ -324,6 +342,7 @@ static const struct spi_device_id m10bmc_spi_id[] = {
 	{ "m10-n3000", M10_N3000 },
 	{ "m10-d5005", M10_D5005 },
 	{ "m10-n5010", M10_N5010 },
+	{ "m10-n5014", M10_N5014 },
 	{ }
 };
 MODULE_DEVICE_TABLE(spi, m10bmc_spi_id);
