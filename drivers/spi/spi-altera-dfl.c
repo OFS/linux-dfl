@@ -24,6 +24,7 @@
 
 #define FME_FEATURE_ID_MAX10_SPI	0xe
 #define FME_FEATURE_REV_MAX10_SPI_N5010	0x1
+#define FME_FEATURE_REV_MAX10_SPI_N5014	0x2
 
 #define SPI_CORE_PARAMETER      0x8
 #define SHIFT_MODE              BIT_ULL(1)
@@ -165,6 +166,8 @@ static int dfl_spi_altera_probe(struct dfl_device *dfl_dev)
 
 	if (dfl_dev->revision == FME_FEATURE_REV_MAX10_SPI_N5010)
 		strscpy(board_info.modalias, "m10-n5010", SPI_NAME_SIZE);
+	else if (dfl_dev->revision == FME_FEATURE_REV_MAX10_SPI_N5014)
+		strscpy(board_info.modalias, "m10-n5014", SPI_NAME_SIZE);
 	else
 		strscpy(board_info.modalias, "m10-d5005", SPI_NAME_SIZE);
 
