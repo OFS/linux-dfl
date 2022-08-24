@@ -340,6 +340,120 @@ static const struct m10bmc_hwmon_board_data n5010bmc_hwmon_bdata = {
 	.hinfo = n5010bmc_hinfo,
 };
 
+static const struct m10bmc_sdata n5014bmc_temp_tbl[] = {
+	{ 0x100, 0x0, 0x104, 0x0, 0x0, 125, "Board Front Temperature" },
+	{ 0x108, 0x0, 0x10c, 0x0, 0x0, 125, "FPGA Core Temperature" },
+	{ 0x110, 0x0, 0x114, 0x0, 0x0, 125, "FPGA P-TILE Temperature" },
+	{ 0x118, 0x0, 0x11c, 0x0, 0x0, 125, "FPGA E-TILE Temperature" },
+	{ 0x120, 0x0, 0x0, 0x0, 0x0, 1000, "Board Middle Temperature" },
+	{ 0x124, 0x0, 0x0, 0x0, 0x0, 1000, "Board Rear Temperature" },
+	{ 0x130, 0x0, 0x0, 0x0, 0x0, 1000, "1V2 FPGA Temperature" },
+	{ 0x13c, 0x0, 0x0, 0x0, 0x0, 1000, "5V FPGA Temperature" },
+	{ 0x148, 0x0, 0x0, 0x0, 0x0, 1000, "0V9 FPGA Temperature" },
+	{ 0x154, 0x0, 0x0, 0x0, 0x0, 1000, "0V85 FPGA Temperature" },
+	{ 0x160, 0x0, 0x0, 0x0, 0x0, 1000, "12V AUX Temperature" },
+	{ 0x16c, 0x0, 0x0, 0x0, 0x0, 1000, "12V PCIE Temperature" },
+	{ 0x1b0, 0x0, 0x0, 0x0, 0x0, 1000, "QSFP28-1 Temperature" },
+	{ 0x1b4, 0x0, 0x0, 0x0, 0x0, 1000, "QSFP28-2 Temperature" },
+	{ 0x1b8, 0x0, 0x0, 0x0, 0x0, 1000, "QSFP28-3 Temperature" },
+	{ 0x1bc, 0x0, 0x0, 0x0, 0x0, 1000, "QSFP28-4 Temperature" },
+	{ 0x1c0, 0x0, 0x0, 0x0, 0x0, 1000, "CVL1 Internal Temperature" },
+	{ 0x1c4, 0x0, 0x0, 0x0, 0x0, 1000, "CVL2 Internal Temperature" },
+};
+
+static const struct m10bmc_sdata n5014bmc_in_tbl[] = {
+	{ 0x128, 0x0, 0x0, 0x0, 0x0, 1, "1V2 FPGA Voltage" },
+	{ 0x134, 0x0, 0x0, 0x0, 0x0, 1, "5V FPGA Voltage" },
+	{ 0x140, 0x0, 0x0, 0x0, 0x0, 1, "0V9 FPGA Voltage" },
+	{ 0x14c, 0x0, 0x0, 0x0, 0x0, 1, "0V85 FPGA Voltage" },
+	{ 0x158, 0x0, 0x0, 0x0, 0x0, 1, "12V AUX Voltage" },
+	{ 0x164, 0x0, 0x0, 0x0, 0x0, 1, "12V PCIE Voltage" },
+	{ 0x174, 0x0, 0x0, 0x0, 0x0, 1, "CVL2 0V9 Voltage" },
+	{ 0x17c, 0x0, 0x0, 0x0, 0x0, 1, "1V2 Voltage" },
+	{ 0x184, 0x0, 0x0, 0x0, 0x0, 1, "FPGA 1V8 Voltage" },
+	{ 0x194, 0x0, 0x0, 0x0, 0x0, 1, "CVL1 0V8 Voltage" },
+	{ 0x19c, 0x0, 0x0, 0x0, 0x0, 1, "CVL1 0V9 Voltage" },
+	{ 0x1a4, 0x0, 0x0, 0x0, 0x0, 1, "CVL2 0V8 Voltage" },
+	{ 0x1ac, 0x0, 0x0, 0x0, 0x0, 1, "CVL1/2 AVDD_ETH 0V9 Voltage" },
+};
+
+static const struct m10bmc_sdata n5014bmc_curr_tbl[] = {
+	{ 0x12c, 0x0, 0x0, 0x0, 0x0, 1, "1V2 FPGA Current" },
+	{ 0x138, 0x0, 0x0, 0x0, 0x0, 1, "5V FPGA Current" },
+	{ 0x144, 0x0, 0x0, 0x0, 0x0, 1, "0V9 FPGA Current" },
+	{ 0x150, 0x0, 0x0, 0x0, 0x0, 1, "0V85 FPGA Current" },
+	{ 0x15c, 0x0, 0x0, 0x0, 0x0, 1, "12V AUX Current" },
+	{ 0x168, 0x0, 0x0, 0x0, 0x0, 1, "12V PCIE Current" },
+	{ 0x170, 0x0, 0x0, 0x0, 0x0, 1, "CVL2 0V9 Current" },
+	{ 0x178, 0x0, 0x0, 0x0, 0x0, 1, "1V2 Current" },
+	{ 0x180, 0x0, 0x0, 0x0, 0x0, 1, "FPGA 1V8 Current" },
+	{ 0x190, 0x0, 0x0, 0x0, 0x0, 1, "CVL1 0V8 Current" },
+	{ 0x198, 0x0, 0x0, 0x0, 0x0, 1, "CVL1 0V9 Current" },
+	{ 0x1a0, 0x0, 0x0, 0x0, 0x0, 1, "CVL2 0V8 Current" },
+	{ 0x1a8, 0x0, 0x0, 0x0, 0x0, 1, "CVL1/2 AVDD_ETH 0V9 Current" },
+};
+
+static const struct hwmon_channel_info *n5014bmc_hinfo[] = {
+	HWMON_CHANNEL_INFO(temp,
+			   HWMON_T_INPUT | HWMON_T_CRIT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_CRIT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_CRIT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_CRIT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL,
+			   HWMON_T_INPUT | HWMON_T_LABEL),
+	HWMON_CHANNEL_INFO(in,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL,
+			   HWMON_I_INPUT | HWMON_I_LABEL),
+	HWMON_CHANNEL_INFO(curr,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL,
+			   HWMON_C_INPUT | HWMON_C_LABEL),
+	NULL
+};
+
+static const struct m10bmc_hwmon_board_data n5014bmc_hwmon_bdata = {
+	.tables = {
+		[hwmon_temp] = n5014bmc_temp_tbl,
+		[hwmon_in] = n5014bmc_in_tbl,
+		[hwmon_curr] = n5014bmc_curr_tbl,
+	},
+
+	.hinfo = n5014bmc_hinfo,
+};
+
 static umode_t
 m10bmc_hwmon_is_visible(const void *data, enum hwmon_sensor_types type,
 			u32 attr, int channel)
@@ -548,6 +662,10 @@ static const struct platform_device_id intel_m10bmc_hwmon_ids[] = {
 	{
 		.name = "n5010bmc-hwmon",
 		.driver_data = (unsigned long)&n5010bmc_hwmon_bdata,
+	},
+	{
+		.name = "n5014bmc-hwmon",
+		.driver_data = (unsigned long)&n5014bmc_hwmon_bdata,
 	},
 	{ }
 };
