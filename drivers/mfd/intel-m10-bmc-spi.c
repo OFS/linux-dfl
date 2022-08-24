@@ -136,6 +136,12 @@ static struct mfd_cell m10bmc_n5010_subdevs[] = {
 	{ .name = "n5010bmc-sec-update" },
 };
 
+static struct mfd_cell m10bmc_n5014_subdevs[] = {
+	{ .name = "n5014bmc-hwmon" },
+	{ .name = "n5010bmc-sec-update" },
+	{ .name = "n5010bmc-phy" },
+};
+
 static const struct intel_m10bmc_platform_info m10bmc_spi_n3000 = {
 	.cells = m10bmc_pacn3000_subdevs,
 	.n_cells = ARRAY_SIZE(m10bmc_pacn3000_subdevs),
@@ -160,10 +166,19 @@ static const struct intel_m10bmc_platform_info m10bmc_spi_n5010 = {
 	.csr_map = &m10bmc_n3000_csr_map,
 };
 
+static const struct intel_m10bmc_platform_info m10bmc_spi_n5014 = {
+	.cells = m10bmc_n5014_subdevs,
+	.n_cells = ARRAY_SIZE(m10bmc_n5014_subdevs),
+	.handshake_sys_reg_ranges = m10bmc_n3000_fw_handshake_regs,
+	.handshake_sys_reg_nranges = ARRAY_SIZE(m10bmc_n3000_fw_handshake_regs),
+	.csr_map = &m10bmc_n3000_csr_map,
+};
+
 static const struct spi_device_id m10bmc_spi_id[] = {
 	{ "m10-n3000", (kernel_ulong_t)&m10bmc_spi_n3000 },
 	{ "m10-d5005", (kernel_ulong_t)&m10bmc_spi_d5005 },
 	{ "m10-n5010", (kernel_ulong_t)&m10bmc_spi_n5010 },
+	{ "m10-n5014", (kernel_ulong_t)&m10bmc_spi_n5014 },
 	{ }
 };
 MODULE_DEVICE_TABLE(spi, m10bmc_spi_id);
