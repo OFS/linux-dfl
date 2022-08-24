@@ -20,6 +20,7 @@ enum m10bmc_type {
 	M10_N5010,
 	M10_N6000,
 	M10_C6100,
+	M10_N5014,
 };
 
 #define M10BMC_LEGACY_BUILD_VER		0x300468

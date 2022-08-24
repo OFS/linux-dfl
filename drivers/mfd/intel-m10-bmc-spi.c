@@ -64,6 +64,7 @@ static const struct spi_device_id m10bmc_spi_id[] = {
 	{ "m10-n3000", M10_N3000 },
 	{ "m10-d5005", M10_D5005 },
 	{ "m10-n5010", M10_N5010 },
+	{ "m10-n5014", M10_N5014 },
 	{ }
 };
 MODULE_DEVICE_TABLE(spi, m10bmc_spi_id);

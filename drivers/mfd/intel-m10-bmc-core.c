@@ -125,6 +125,16 @@ static const struct regmap_range n5010_fw_handshake_regs[] = {
 	regmap_reg_range(M10BMC_N5010_TELEM_START, M10BMC_N5010_TELEM_END),
 };
 
+static struct mfd_cell m10bmc_n5014_subdevs[] = {
+	{ .name = "n5014bmc-hwmon" },
+	{ .name = "n5010bmc-sec-update" },
+	{ .name = "n5010bmc-phy" },
+};
+
+static const struct regmap_range n5014_fw_handshake_regs[] = {
+	regmap_reg_range(M10BMC_N5010_TELEM_START, M10BMC_N5010_TELEM_END),
+};
+
 static int
 m10bmc_flash_read(struct intel_m10bmc *m10bmc, void *buf, u32 addr, u32 size)
 {
@@ -475,6 +485,14 @@ int m10bmc_dev_init(struct intel_m10bmc *m10bmc)
 		m10bmc->handshake_sys_reg_ranges = null_fw_handshake_regs;
 		m10bmc->handshake_sys_reg_nranges = 0;
 		m10bmc->csr = &m10bmc_pmci2_csr;
+		break;
+	case M10_N5014:
+		cells = m10bmc_n5014_subdevs;
+		n_cell = ARRAY_SIZE(m10bmc_n5014_subdevs);
+		m10bmc->handshake_sys_reg_ranges = n5014_fw_handshake_regs;
+		m10bmc->handshake_sys_reg_nranges =
+			ARRAY_SIZE(n5014_fw_handshake_regs);
+		m10bmc->csr = &m10bmc_spi_csr;
 		break;
 	default:
 		return -ENODEV;
