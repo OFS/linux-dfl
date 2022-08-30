@@ -595,8 +595,7 @@ static void sdm_work(struct work_struct *work)
 {
 	struct m10bmc_sec *sec = container_of(work, struct m10bmc_sec,
 						work);
-	if (!sdm_check_config_status(sec))
-		sdm_trigger_prov_data(sec);
+	sdm_trigger_prov_data(sec);
 }
 
 static ssize_t
