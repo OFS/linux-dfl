@@ -100,15 +100,19 @@ static int dfl_uart_probe(struct dfl_device *dfl_dev)
 	if (!dfluart)
 		return -ENOMEM;
 
+	dfluart->dev = dev;
+
 	dfluart->csr_base = devm_ioremap_resource(dev, &dfl_dev->mmio_res);
 	if (IS_ERR(dfluart->csr_base)) {
 		dev_err(dev, "failed to get mem resource!\n");
 		return PTR_ERR(dfluart->csr_base);
 	}
 
-	dfluart->dev = dev;
-
 	ret = feature_uart_walk(dfluart, resource_size(&dfl_dev->mmio_res));
+
+	devm_iounmap(dev, dfluart->csr_base);
+	devm_release_mem_region(dev, dfl_dev->mmio_res.start, resource_size(&dfl_dev->mmio_res));
+
 	if (ret < 0) {
 		dev_err(dev, "failed to uart feature walk %d\n", ret);
 		return -EINVAL;
@@ -138,10 +142,11 @@ static int dfl_uart_probe(struct dfl_device *dfl_dev)
 	}
 
 	uart.port.iotype = UPIO_MEM32;
-	uart.port.membase = dfluart->csr_base + dfluart->csr_addr;
+	uart.port.mapbase = dfl_dev->mmio_res.start + dfluart->csr_addr;
 	uart.port.mapsize = dfluart->csr_size;
 	uart.port.regshift = dfluart->reg_shift;
 	uart.port.uartclk = dfluart->uart_clk;
+	uart.port.flags |= UPF_IOREMAP;
 
 	/* register the port */
 	ret = serial8250_register_8250_port(&uart);
