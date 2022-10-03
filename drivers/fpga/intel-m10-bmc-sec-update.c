@@ -1219,7 +1219,7 @@ static int rsu_poll_start_done(struct m10bmc_sec *sec, u32 *doorbell,
 	unsigned long poll_timeout;
 	int ret;
 
-	poll_timeout = jiffies + msecs_to_jiffies(NIOS_HANDSHAKE_TIMEOUT_US);
+	poll_timeout = jiffies + usecs_to_jiffies(NIOS_HANDSHAKE_TIMEOUT_US);
 	do {
 		usleep_range(NIOS_HANDSHAKE_INTERVAL_US,
 			     NIOS_HANDSHAKE_INTERVAL_US + 10);
