@@ -573,8 +573,11 @@ static int sdm_trigger_prov_data(struct m10bmc_sec *sec)
 				       cmd, sdm_status(cmd) == SDM_CMD_STATUS_IDLE,
 				       NIOS_HANDSHAKE_INTERVAL_US,
 				       NIOS_HANDSHAKE_TIMEOUT_US);
-	if (ret || (sdm_error(cmd) != SDM_CMD_SUCC)) {
-		dev_err(sec->dev, "poll SDM STRL failed %ld\n", sdm_status(cmd));
+	if (ret) {
+		dev_err(sec->dev, "Error polling SDM CTRL register: %d\n", ret);
+		return ret;
+	} else if (sdm_error(cmd) != SDM_CMD_SUCC) {
+		dev_err(sec->dev, "SDM trigger failure: %ld\n", sdm_error(cmd));
 		return -EIO;
 	}
 
@@ -584,8 +587,8 @@ static int sdm_trigger_prov_data(struct m10bmc_sec *sec)
 				       NIOS_HANDSHAKE_INTERVAL_US,
 				       2 * NIOS_HANDSHAKE_TIMEOUT_US);
 	if (ret) {
-		dev_err(sec->dev, "poll SDM operation done failed %d\n", ret);
-		return -EIO;
+		dev_err(sec->dev, "Error polling for SDM operation done: %d\n", ret);
+		return ret;
 	}
 
 	return 0;
