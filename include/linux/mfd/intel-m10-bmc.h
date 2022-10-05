@@ -337,6 +337,7 @@ enum m10bmc_type {
 #define pr_sdm_csk_reg(m9bmc) ((m10bmc)->csr->pr_sdm_csk_reg)
 #define sr_sdm_reh_reg(m10bmc) ((m10bmc)->csr->sr_sdm_reh_reg)
 #define sr_sdm_csk_reg(m10bmc) ((m10bmc)->csr->sr_sdm_csk_reg)
+#define staging_size(m10bmc) ((m10bmc)->csr->staging_size)
 
 enum m10bmc_fw_state {
 	M10BMC_FW_STATE_NORMAL,
@@ -368,6 +369,7 @@ struct m10bmc_csr {
 	unsigned int pr_sdm_csk_reg;
 	unsigned int sr_sdm_reh_reg;
 	unsigned int sr_sdm_csk_reg;
+	unsigned int staging_size;
 };
 
 /**
