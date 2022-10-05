@@ -33,6 +33,7 @@ static const struct m10bmc_csr m10bmc_pmci_csr = {
 	.pr_sdm_csk_reg = M10BMC_PMCI_PR_CSK,
 	.sr_sdm_reh_reg = M10BMC_PMCI_SR_RH0,
 	.sr_sdm_csk_reg = M10BMC_PMCI_SR_CSK,
+	.staging_size = M10BMC_STAGING_SIZE,
 };
 
 static const struct m10bmc_csr m10bmc_pmci2_csr = {
@@ -57,6 +58,7 @@ static const struct m10bmc_csr m10bmc_pmci2_csr = {
 	.pr_sdm_csk_reg = M10BMC_PMCI_PR_CSK,
 	.sr_sdm_reh_reg = M10BMC_PMCI_SR_RH0,
 	.sr_sdm_csk_reg = M10BMC_PMCI_SR_CSK,
+	.staging_size = M10BMC_STAGING_SIZE,
 };
 
 static const struct m10bmc_csr m10bmc_spi_csr = {
@@ -77,6 +79,7 @@ static const struct m10bmc_csr m10bmc_spi_csr = {
 	.pr_reh_addr = PR_REH_ADDR,
 	.pr_magic = PR_PROG_MAGIC,
 	.rsu_update_counter = STAGING_FLASH_COUNT,
+	.staging_size = M10BMC_STAGING_SIZE,
 };
 
 static struct mfd_cell m10bmc_n6000_bmc_subdevs[] = {
