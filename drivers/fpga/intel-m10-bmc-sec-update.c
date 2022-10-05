@@ -1391,7 +1391,7 @@ static enum fw_upload_err m10bmc_sec_prepare(struct fw_upload *fwl,
 
 	sec->cancel_request = false;
 
-	if (!size || size > M10BMC_STAGING_SIZE)
+	if (!size || size > staging_size(sec->m10bmc))
 		return FW_UPLOAD_ERR_INVALID_SIZE;
 
 	ret = rsu_check_idle(sec);
