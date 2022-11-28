@@ -45,7 +45,6 @@ typedef struct {
 typedef struct {
 	__u8 b[16];
 } uuid_t;
-
 #define	UUID_STRING_LEN		36
 
 /* Big exception to the "don't include kernel headers into userspace, which
