@@ -36,6 +36,7 @@ enum dfl_id_type {
  * @dfh_version: version of DFH for the device
  * @param_size: size of the block parameters in bytes
  * @params: pointer to block of parameters copied memory
+ * @guid: feature GUID of the dfl device.
  */
 struct dfl_device {
 	struct device dev;
@@ -51,6 +52,7 @@ struct dfl_device {
 	u8 dfh_version;
 	unsigned int param_size;
 	void *params;
+	guid_t guid;
 };
 
 /**
