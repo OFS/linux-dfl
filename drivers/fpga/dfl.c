@@ -251,7 +251,8 @@ static DEFINE_IDA(dfl_device_ida);
 static const struct dfl_device_id *
 dfl_match_one_device(const struct dfl_device_id *id, struct dfl_device *ddev)
 {
-	if (id->type == ddev->type && id->feature_id == ddev->feature_id)
+	if ((dfl_guid_is_valid(&ddev->guid) && guid_equal(&id->guid, &ddev->guid)) ||
+	    (id->type == ddev->type && id->feature_id == ddev->feature_id))
 		return id;
 
 	return NULL;
@@ -265,7 +266,7 @@ static int dfl_bus_match(struct device *dev, struct device_driver *drv)
 
 	id_entry = ddrv->id_table;
 	if (id_entry) {
-		while (id_entry->feature_id) {
+		while (id_entry->feature_id || dfl_guid_is_valid(&id_entry->guid)) {
 			if (dfl_match_one_device(id_entry, ddev)) {
 				ddev->id_entry = id_entry;
 				return 1;
@@ -294,12 +295,19 @@ static void dfl_bus_remove(struct device *dev)
 		ddrv->remove(ddev);
 }
 
+#define DFL_ALIAS_BUF_LEN 64
+
 static int dfl_bus_uevent(struct device *dev, struct kobj_uevent_env *env)
 {
 	struct dfl_device *ddev = to_dfl_dev(dev);
+	char alias[DFL_ALIAS_BUF_LEN];
 
-	return add_uevent_var(env, "MODALIAS=dfl:t%04Xf%04X",
-			      ddev->type, ddev->feature_id);
+	scnprintf(alias, DFL_ALIAS_BUF_LEN, "dfl:t%04Xf%04X", ddev->type, ddev->feature_id);
+
+	if (!guid_is_null(&ddev->guid))
+		scnprintf(alias + strlen(alias), DFL_ALIAS_BUF_LEN, "g{%pUL}", &ddev->guid);
+
+	return add_uevent_var(env, "MODALIAS=%s", alias);
 }
 
 static ssize_t
@@ -320,9 +328,22 @@ feature_id_show(struct device *dev, struct device_attribute *attr, char *buf)
 }
 static DEVICE_ATTR_RO(feature_id);
 
+static ssize_t
+guid_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct dfl_device *ddev = to_dfl_dev(dev);
+
+	if (!ddev->dfh_version)
+		return -ENOENT;
+
+	return sysfs_emit(buf, "%pUL\n", &ddev->guid);
+}
+static DEVICE_ATTR_RO(guid);
+
 static struct attribute *dfl_dev_attrs[] = {
 	&dev_attr_type.attr,
 	&dev_attr_feature_id.attr,
+	&dev_attr_guid.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(dfl_dev);
@@ -381,6 +402,7 @@ dfl_dev_add(struct dfl_feature_platform_data *pdata,
 		goto put_dev;
 
 	ddev->type = feature_dev_id_type(pdev);
+	ddev->cdev = pdata->dfl_cdev;
 	ddev->feature_id = feature->id;
 	ddev->revision = feature->revision;
 	ddev->dfh_version = feature->dfh_version;
@@ -393,6 +415,9 @@ dfl_dev_add(struct dfl_feature_platform_data *pdata,
 		}
 		ddev->param_size = feature->param_size;
 	}
+
+	if (ddev->dfh_version == 1)
+		guid_copy(&ddev->guid, &feature->guid);
 
 	/* add mmio resource */
 	parent_res = &pdev->resource[feature->resource_index];
@@ -557,8 +582,10 @@ static bool dfl_feature_drv_match(struct dfl_feature *feature,
 	const struct dfl_feature_id *ids = driver->id_table;
 
 	if (ids) {
-		while (ids->id) {
-			if (ids->id == feature->id)
+		while (ids->id || dfl_guid_is_valid(&ids->guid)) {
+			if ((dfl_guid_is_valid(&feature->guid) &&
+			     guid_equal(&ids->guid, &feature->guid)) ||
+					ids->id == feature->id)
 				return true;
 			ids++;
 		}
@@ -721,7 +748,8 @@ struct build_feature_devs_info {
  *
  * @fid: id of this sub feature.
  * @revision: revision of this sub feature
- * @dfh_version: version of Device Feature Header (DFH)
+ * @dfh_version: device feature header version.
+ * @guid: guid of this sub feature.
  * @mmio_res: mmio resource of this sub feature.
  * @ioaddr: mapped base address of mmio resource.
  * @node: node in sub_features linked list.
@@ -734,6 +762,7 @@ struct dfl_feature_info {
 	u16 fid;
 	u8 revision;
 	u8 dfh_version;
+	guid_t guid;
 	struct resource mmio_res;
 	void __iomem *ioaddr;
 	struct list_head node;
@@ -827,6 +856,8 @@ static int build_info_commit_dev(struct build_feature_devs_info *binfo)
 
 			feature->param_size = finfo->param_size;
 		}
+		if (feature->dfh_version == 1)
+			guid_copy(&feature->guid, &finfo->guid);
 		/*
 		 * the FIU header feature has some fundamental functions (sriov
 		 * set, port enable/disable) needed for the dfl bus device and
@@ -1139,6 +1170,7 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 	struct dfl_feature_info *finfo;
 	resource_size_t start, end;
 	int dfh_psize = 0;
+	u64 guid_l, guid_h;
 	u8 revision = 0;
 	u64 v, addr_off;
 	u8 dfh_ver = 0;
@@ -1148,6 +1180,7 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 		v = readq(binfo->ioaddr + ofst);
 		revision = FIELD_GET(DFH_REVISION, v);
 		dfh_ver = FIELD_GET(DFH_VERSION, v);
+
 		/* read feature size and id if inputs are invalid */
 		size = size ? size : feature_size(v);
 		fid = fid ? fid : feature_id(v);
@@ -1189,6 +1222,27 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 	} else {
 		start = binfo->start + ofst;
 		end = start + size - 1;
+	}
+
+	if (finfo->dfh_version == 1) {
+		guid_l = readq(binfo->ioaddr + ofst + GUID_L);
+		guid_h = readq(binfo->ioaddr + ofst + GUID_H);
+
+		if (guid_l || guid_h) {
+			dev_dbg(binfo->dev, "dfl: GUID_H = 0x%llx , GUID_L = 0x%llx\n",
+				guid_h, guid_l);
+			finfo->guid = GUID_INIT(FIELD_GET(DFL_GUID_H_A, guid_h),
+						FIELD_GET(DFL_GUID_H_B, guid_h),
+					FIELD_GET(DFL_GUID_H_C, guid_h),
+					FIELD_GET(DFL_GUID_L_D0, guid_l),
+					FIELD_GET(DFL_GUID_L_D1, guid_l),
+					FIELD_GET(DFL_GUID_L_D2, guid_l),
+					FIELD_GET(DFL_GUID_L_D3, guid_l),
+					FIELD_GET(DFL_GUID_L_D4, guid_l),
+					FIELD_GET(DFL_GUID_L_D5, guid_l),
+					FIELD_GET(DFL_GUID_L_D6, guid_l),
+					FIELD_GET(DFL_GUID_L_D7, guid_l));
+		}
 	}
 	finfo->mmio_res.flags = IORESOURCE_MEM;
 	finfo->mmio_res.start = start;
