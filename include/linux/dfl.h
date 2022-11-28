@@ -96,6 +96,8 @@ enum dfl_id_type {
  * @id: id of the dfl device.
  * @type: type of DFL FIU of the device. See enum dfl_id_type.
  * @feature_id: feature identifier local to its DFL FIU type.
+ * @dfh_version: device feature header version.
+ * @guid: feature GUID of the dfl device.
  * @mmio_res: mmio resource of this dfl device.
  * @irqs: list of Linux IRQ numbers of this dfl device.
  * @num_irqs: number of IRQs supported by this dfl device.
@@ -108,6 +110,8 @@ struct dfl_device {
 	u16 type;
 	u16 feature_id;
 	u8 revision;
+	u8 dfh_version;
+	guid_t guid;
 	struct resource mmio_res;
 	int *irqs;
 	unsigned int num_irqs;

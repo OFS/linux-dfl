@@ -179,9 +179,11 @@ int dfl_fpga_check_port_id(struct platform_device *pdev, void *pport_id);
  * struct dfl_feature_id - dfl private feature id
  *
  * @id: unique dfl private feature id.
+ * @guid: unique dfl private guid.
  */
 struct dfl_feature_id {
 	u16 id;
+	guid_t guid;
 };
 
 /**
@@ -213,6 +215,8 @@ struct dfl_feature_irq_ctx {
  *
  * @dev: ptr to pdev of the feature device which has the sub feature.
  * @id: sub feature id.
+ * @dfh_version: device feature header version.
+ * @guid: unique dfl private guid.
  * @resource_index: each sub feature has one mmio resource for its registers.
  *		    this index is used to find its mmio resource from the
  *		    feature dev (platform device)'s resources.
@@ -227,6 +231,8 @@ struct dfl_feature {
 	struct platform_device *dev;
 	u16 id;
 	u8 revision;
+	u8 dfh_version;
+	guid_t guid;
 	int resource_index;
 	void __iomem *ioaddr;
 	struct dfl_feature_irq_ctx *irq_ctx;
@@ -407,6 +413,35 @@ static inline u8 dfl_feature_revision(void __iomem *base)
 {
 	return (u8)FIELD_GET(DFH_REVISION, readq(base + DFH));
 }
+
+#define DFL_GUID_INVALID \
+	GUID_INIT(0xffffffff, 0xffff, 0xffff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff)
+
+static inline bool dfl_guid_is_valid(const guid_t *guid)
+{
+	bool ret = true;
+	guid_t *guid_invalid =  &DFL_GUID_INVALID;
+
+	if (guid_is_null(guid) || guid_equal(guid, guid_invalid))
+		ret = false;
+	return ret;
+}
+
+/*
+ *  Bit definitions masks extract from GUID_H and GUID_L
+ *  GUID_INIT(a, b, c, d0, d1, d2, d3, d4, d5, d6, d7)
+ */
+#define DFL_GUID_H_A   GENMASK_ULL(63, 32)
+#define DFL_GUID_H_B   GENMASK_ULL(31, 16)
+#define DFL_GUID_H_C   GENMASK_ULL(15, 0)
+#define DFL_GUID_L_D0  GENMASK_ULL(63, 56)
+#define DFL_GUID_L_D1  GENMASK_ULL(55, 48)
+#define DFL_GUID_L_D2  GENMASK_ULL(47, 40)
+#define DFL_GUID_L_D3  GENMASK_ULL(39, 32)
+#define DFL_GUID_L_D4  GENMASK_ULL(31, 24)
+#define DFL_GUID_L_D5  GENMASK_ULL(23, 16)
+#define DFL_GUID_L_D6  GENMASK_ULL(15, 8)
+#define DFL_GUID_L_D7  GENMASK_ULL(7, 0)
 
 /**
  * struct dfl_fpga_enum_info - DFL FPGA enumeration information
