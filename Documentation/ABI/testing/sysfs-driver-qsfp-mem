@@ -1,0 +1,8 @@
+What:		/sys/bus/.../drivers/qsfp-mem/.../qsfp_connected
+Date:		February 2023
+KernelVersion:  6.3
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read only.  Returns the plug-in status of the QSFP module.
+		1 means that the QSFP module is connected to a live network,
+		0 means that it is not.
+		Format: "%u".
