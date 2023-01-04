@@ -2355,6 +2355,7 @@ config MFD_INTEL_M10_BMC_PMCI
 	depends on FPGA_DFL
 	select MFD_INTEL_M10_BMC_CORE
 	select REGMAP
+	select REGMAP_INDIRECT_REGISTER
 	help
 	  Support for the Intel MAX 10 board management controller via PMCI.
 
