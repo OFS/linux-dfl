@@ -353,6 +353,12 @@ static struct mfd_cell m10bmc_pmci_n6000_bmc_subdevs[] = {
 	{ .name = "n6000bmc-log" },
 };
 
+static struct mfd_cell m10bmc_pmci_c6100_bmc_subdevs[] = {
+	{ .name = "c6100bmc-hwmon" },
+	{ .name = "n6000bmc-sec-update" },
+	{ .name = "c6100bmc-log" },
+};
+
 static const struct m10bmc_csr_map m10bmc_n6000_csr_map = {
 	.base = M10BMC_N6000_SYS_BASE,
 	.build_version = M10BMC_N6000_BUILD_VER,
@@ -378,18 +384,61 @@ static const struct m10bmc_csr_map m10bmc_n6000_csr_map = {
 	.staging_size = M10BMC_STAGING_SIZE,
 };
 
+static const struct m10bmc_csr_map m10bmc_c6100_csr_map = {
+	.base = M10BMC_N6000_SYS_BASE,
+	.build_version = M10BMC_N6000_BUILD_VER,
+	.fw_version = NIOS2_N6000_FW_VERSION,
+	.mac_low = M10BMC_N6000_MAC_LOW,
+	.mac_high = M10BMC_N6000_MAC_HIGH,
+	.doorbell = M10BMC_N6000_DOORBELL,
+	.auth_result = M10BMC_N6000_AUTH_RESULT,
+	.bmc_prog_addr = M10BMC_C6100_BMC_PROG_ADDR,
+	.bmc_reh_addr = M10BMC_C6100_BMC_REH_ADDR,
+	.bmc_magic = M10BMC_N6000_BMC_PROG_MAGIC,
+	.sr_prog_addr = M10BMC_C6100_SR_PROG_ADDR,
+	.sr_reh_addr = M10BMC_C6100_SR_REH_ADDR,
+	.sr_magic = M10BMC_N6000_SR_PROG_MAGIC,
+	.pr_prog_addr = M10BMC_C6100_PR_PROG_ADDR,
+	.pr_reh_addr = M10BMC_C6100_PR_REH_ADDR,
+	.pr_magic = M10BMC_N6000_PR_PROG_MAGIC,
+	.rsu_update_counter = M10BMC_C6100_STAGING_FLASH_COUNT,
+	.pr_sdm_reh_reg = M10BMC_PMCI_PR_RH0,
+	.pr_sdm_csk_reg = M10BMC_PMCI_PR_CSK,
+	.sr_sdm_reh_reg = M10BMC_PMCI_SR_RH0,
+	.sr_sdm_csk_reg = M10BMC_PMCI_SR_CSK,
+	.staging_size = M10BMC_STAGING_SIZE,
+};
+
 static const struct intel_m10bmc_platform_info m10bmc_pmci_n6000 = {
 	.cells = m10bmc_pmci_n6000_bmc_subdevs,
 	.n_cells = ARRAY_SIZE(m10bmc_pmci_n6000_bmc_subdevs),
 	.csr_map = &m10bmc_n6000_csr_map,
 };
 
+static const struct intel_m10bmc_platform_info m10bmc_pmci_c6100 = {
+	.cells = m10bmc_pmci_c6100_bmc_subdevs,
+	.n_cells = ARRAY_SIZE(m10bmc_pmci_c6100_bmc_subdevs),
+	.csr_map = &m10bmc_c6100_csr_map,
+};
+
 static int m10bmc_pmci_probe(struct dfl_device *ddev)
 {
+	const struct intel_m10bmc_platform_info *pinfo;
 	struct device *dev = &ddev->dev;
 	struct m10bmc_pmci_device *pmci;
 	struct indirect_ctx *ctx;
 	int ret;
+
+	switch (ddev->revision) {
+	case 1:
+		pinfo = &m10bmc_pmci_n6000;
+		break;
+	case 2:
+		pinfo = &m10bmc_pmci_c6100;
+		break;
+	default:
+		return -ENODEV;
+	}
 
 	pmci = devm_kzalloc(dev, sizeof(*pmci), GFP_KERNEL);
 	if (!pmci)
@@ -418,7 +467,7 @@ static int m10bmc_pmci_probe(struct dfl_device *ddev)
 		goto destroy_mutex;
 	}
 
-	ret = m10bmc_dev_init(&pmci->m10bmc, &m10bmc_pmci_n6000);
+	ret = m10bmc_dev_init(&pmci->m10bmc, pinfo);
 	if (ret)
 		goto destroy_mutex;
 	return 0;
