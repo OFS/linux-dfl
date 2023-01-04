@@ -235,10 +235,22 @@ static const struct m10bmc_log_cfg m10bmc_log_n6000_cfg = {
 	.bi_off = M10BMC_N6000_BOM_INFO_ADDR,
 };
 
+static const struct m10bmc_log_cfg m10bmc_log_c6100_cfg = {
+	.el_size = M10BMC_N6000_ERROR_LOG_SIZE,
+	.el_off = M10BMC_C6100_ERROR_LOG_ADDR,
+
+	.id_size = M10BMC_C6100_FPGA_IMAGE_DIR_SIZE,
+	.id_off = M10BMC_C6100_FPGA_IMAGE_DIR_ADDR,
+};
+
 static const struct platform_device_id intel_m10bmc_log_ids[] = {
 	{
 		.name = "n6000bmc-log",
 		.driver_data = (unsigned long)&m10bmc_log_n6000_cfg,
+	},
+	{
+		.name = "c6100bmc-log",
+		.driver_data = (unsigned long)&m10bmc_log_c6100_cfg,
 	},
 	{ }
 };
