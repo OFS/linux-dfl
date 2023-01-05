@@ -285,6 +285,7 @@ static const struct m10bmc_csr_map m10bmc_n6000_csr_map = {
 	.pr_sdm_csk_reg = M10BMC_PMCI_PR_CSK,
 	.sr_sdm_reh_reg = M10BMC_PMCI_SR_RH0,
 	.sr_sdm_csk_reg = M10BMC_PMCI_SR_CSK,
+	.staging_size = M10BMC_STAGING_SIZE,
 };
 
 static const struct m10bmc_csr_map m10bmc_c6100_csr_map = {
@@ -309,6 +310,7 @@ static const struct m10bmc_csr_map m10bmc_c6100_csr_map = {
 	.pr_sdm_csk_reg = M10BMC_PMCI_PR_CSK,
 	.sr_sdm_reh_reg = M10BMC_PMCI_SR_RH0,
 	.sr_sdm_csk_reg = M10BMC_PMCI_SR_CSK,
+	.staging_size = M10BMC_STAGING_SIZE,
 };
 
 static const struct intel_m10bmc_platform_info m10bmc_pmci_n6000 = {

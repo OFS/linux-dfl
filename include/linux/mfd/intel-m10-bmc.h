@@ -361,6 +361,7 @@ struct m10bmc_csr_map {
 	unsigned int pr_sdm_csk_reg;
 	unsigned int sr_sdm_reh_reg;
 	unsigned int sr_sdm_csk_reg;
+	unsigned int staging_size;
 };
 
 /**
