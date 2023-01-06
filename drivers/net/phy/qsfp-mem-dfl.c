@@ -5,8 +5,8 @@
  * Copyright (C) 2022 Intel Corporation. All rights reserved.
  */
 #include <linux/dfl.h>
-#include <linux/phy/qsfp-mem.h>
 #include <linux/module.h>
+#include <linux/phy/qsfp-mem.h>
 
 ssize_t dfl_qsfp_connected_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -28,7 +28,7 @@ static int qsfp_dfl_probe(struct dfl_device *dfl_dev)
 {
 	struct device *dev = &dfl_dev->dev;
 	struct qsfp *qsfp;
-	int ret = 0;
+	int ret;
 
 	qsfp = devm_kzalloc(dev, sizeof(*qsfp), GFP_KERNEL);
 	if (!qsfp)
@@ -44,10 +44,10 @@ static int qsfp_dfl_probe(struct dfl_device *dfl_dev)
 	dev_set_drvdata(dev, qsfp);
 
 	ret = qsfp_init_work(qsfp);
-	if (ret != 0) {
-		dev_err(dev, "Failed to initialize delayed work to read QSFP\n");
-		return ret;
-	}
+	if (ret)
+		return dev_err_probe(dev, ret,
+				     "Failed to initialize delayed work to read QSFP\n");
+
 	return qsfp_register_regmap(qsfp);
 }
 

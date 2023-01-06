@@ -5,11 +5,11 @@
  * Copyright (C) 2022 Intel Corporation. All rights reserved.
  */
 
-#include <linux/phy/qsfp-mem.h>
 #include <linux/bitfield.h>
 #include <linux/module.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
+#include <linux/phy/qsfp-mem.h>
 #include <linux/processor.h>
 #include <linux/slab.h>
 
@@ -21,7 +21,7 @@ static int qsfp_platform_probe(struct platform_device *pdev)
 	struct resource *region = NULL;
 	struct resource *qsfpconfig = NULL;
 	struct qsfp *qsfp = NULL;
-	int ret = 0;
+	int ret;
 
 	qsfp = devm_kzalloc(dev, sizeof(*qsfp), GFP_KERNEL);
 	if (!qsfp)
@@ -52,10 +52,9 @@ static int qsfp_platform_probe(struct platform_device *pdev)
 	}
 
 	ret = qsfp_init_work(qsfp);
-	if (ret != 0) {
-		dev_err(dev, "Failed to initialize delayed work to read QSFP\n");
-		return ret;
-	}
+	if (ret)
+		return dev_err_probe(dev, ret,
+				     "Failed to initialize delayed work to read QSFP\n");
 
 	return qsfp_register_regmap(qsfp);
 }
@@ -70,8 +69,7 @@ static int qsfp_platform_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id intel_fpga_qsfp_mem_ids[] = {
-	{ .compatible = "intel,qsfp-mem",
-		.data = NULL, },
+	{ .compatible = "intel,qsfp-mem", .data = NULL, },
 	{},
 };
 MODULE_DEVICE_TABLE(of, intel_fpga_qsfp_mem_ids);
@@ -92,4 +90,3 @@ module_platform_driver(qsfp_driver);
 MODULE_DESCRIPTION("Intel(R) Memory based QSFP Platform driver");
 MODULE_AUTHOR("Intel Corporation");
 MODULE_LICENSE("GPL");
-
