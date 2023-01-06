@@ -52,11 +52,23 @@ static int qsfp_platform_probe(struct platform_device *pdev)
 	}
 
 	ret = qsfp_init_work(qsfp);
-	if (ret)
-		return dev_err_probe(dev, ret,
-				     "Failed to initialize delayed work to read QSFP\n");
+	if (ret) {
+		dev_err_probe(dev, ret,
+			      "Failed to initialize delayed work to read QSFP\n");
+		goto exit;
+	}
 
-	return qsfp_register_regmap(qsfp);
+	ret = qsfp_register_regmap(qsfp);
+	if (ret)
+		goto cancel_work;
+
+	return 0;
+
+cancel_work:
+	qsfp_remove_device(qsfp);
+exit:
+	mutex_destroy(&qsfp->lock);
+	return ret;
 }
 
 static int qsfp_platform_remove(struct platform_device *pdev)
@@ -65,6 +77,7 @@ static int qsfp_platform_remove(struct platform_device *pdev)
 	struct qsfp *qsfp = dev_get_drvdata(dev);
 
 	qsfp_remove_device(qsfp);
+	mutex_destroy(&qsfp->lock);
 	return 0;
 }
 
