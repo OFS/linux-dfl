@@ -1,0 +1,36 @@
+What: /sys/bus/platform/devices/intel-m10-bmc-log.*.auto/time_sync_frequency
+Date:		Jan 2023
+KernelVersion:	6.3
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read/write. This sysfs node controls the frequency (in
+		seconds) that the host writes to the MAX10 BMC registers
+		to synchronize the timestamp registers used for the BMC
+		error log. Write zero to stop the timestamp synchronization.
+		Write a non-zero integer value to restart or modify the
+		update frequency. Reading from this file will return the
+		same integer value.
+		Format: %u
+
+What:		/sys/bus/platform/devices/intel-m10-bmc-log.*.auto/bmc_event_log*/nvmem
+Date:		Jan 2023
+KernelVersion:	6.3
+Contact:	Tianfei zhang <tianfei.zhang@intel.com>
+Description:	Read-only. This file returns the contents of the "error log"
+		partition in flash. This partition includes the error info for
+		the BMC.
+
+What:		/sys/bus/platform/devices/intel-m10-bmc-log.*.auto/fpga_image_directory*/nvmem
+Date:		Jan 2023
+KernelVersion:	6.3
+Contact:	Tianfei zhang <tianfei.zhang@intel.com>
+Description:	Read-only. This file returns the contents of the "FPGA image
+		directory" partition in flash. This partition includes
+		information like the FPGA Image versions and state.
+
+What:		/sys/bus/platform/devices/intel-m10-bmc-log.*.auto/bom_info*/nvmem
+Date:		Jan 2023
+KernelVersion:	6.3
+Contact:	Tianfei zhang <tianfei.zhang@intel.com>
+Description:	Read-only. This file returns the contents of the "BOM info"
+		partition in flash. This partition includes information such
+		as the BOM critical components, PBA#, MMID.
