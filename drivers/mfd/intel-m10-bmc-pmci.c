@@ -350,6 +350,7 @@ static struct regmap_config m10bmc_pmci_regmap_config = {
 static struct mfd_cell m10bmc_pmci_n6000_bmc_subdevs[] = {
 	{ .name = "n6000bmc-hwmon" },
 	{ .name = "n6000bmc-sec-update" },
+	{ .name = "n6000bmc-log" },
 };
 
 static const struct regmap_range null_fw_handshake_regs[0];
