@@ -8,22 +8,6 @@
 #include <linux/module.h>
 #include <linux/phy/qsfp-mem.h>
 
-ssize_t dfl_qsfp_connected_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	struct qsfp *qsfp = dev_get_drvdata(dev);
-	u32 plugin = qsfp_connected_show(qsfp);
-
-	return sysfs_emit(buf, "%u\n", plugin);
-}
-
-static DEVICE_ATTR_RO(dfl_qsfp_connected);
-
-static struct attribute *qsfp_mem_attrs[] = {
-	&dev_attr_dfl_qsfp_connected.attr,
-	NULL,
-};
-ATTRIBUTE_GROUPS(qsfp_mem);
-
 static int qsfp_dfl_probe(struct dfl_device *dfl_dev)
 {
 	struct device *dev = &dfl_dev->dev;

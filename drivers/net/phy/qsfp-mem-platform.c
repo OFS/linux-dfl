@@ -94,6 +94,7 @@ static struct platform_driver qsfp_driver = {
 	.resume     = NULL,
 	.driver     = {
 		.name   = "intel,qsfp-mem",
+		.dev_groups = qsfp_mem_groups,
 		.owner  = THIS_MODULE,
 		.of_match_table = intel_fpga_qsfp_mem_ids,
 	},
