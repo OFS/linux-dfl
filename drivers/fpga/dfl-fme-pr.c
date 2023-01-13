@@ -159,7 +159,7 @@ free_exit:
 
 /**
  * dfl_fme_create_mgr - create fpga mgr platform device as child device
- *
+ * @feature: sub feature info
  * @pdata: fme platform_device's pdata
  * @feature: the dfl fme PR sub feature
  *
