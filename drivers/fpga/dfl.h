@@ -2,7 +2,7 @@
 /*
  * Driver Header File for FPGA Device Feature List (DFL) Support
  *
- * Copyright (C) 2017-2022 Intel Corporation, Inc.
+ * Copyright (C) 2017-2018 Intel Corporation, Inc.
  *
  * Authors:
  *   Kang Luwei <luwei.kang@intel.com>
@@ -54,13 +54,68 @@
 #define PORT_FEATURE_ID_UINT		0x12
 #define PORT_FEATURE_ID_STP		0x13
 
+/*
+ * Device Feature Header Register Set
+ *
+ * For FIUs, they all have DFH + GUID + NEXT_AFU as common header registers.
+ * For AFUs, they have DFH + GUID as common header registers.
+ * For private features, they only have DFH register as common header.
+ */
+#define DFH			0x0
+#define GUID_L			0x8
+#define GUID_H			0x10
+#define NEXT_AFU		0x18
+
+#define DFH_SIZE		0x8
+
 /* Device Feature Header Register Bitfield */
+#define DFH_ID			GENMASK_ULL(11, 0)	/* Feature ID */
 #define DFH_ID_FIU_FME		0
 #define DFH_ID_FIU_PORT		1
+#define DFH_REVISION		GENMASK_ULL(15, 12)	/* Feature revision */
+#define DFH_NEXT_HDR_OFST	GENMASK_ULL(39, 16)	/* Offset to next DFH */
+#define DFH_EOL			BIT_ULL(40)		/* End of list */
+#define DFH_VERSION		GENMASK_ULL(59, 52)	/* DFH version */
+#define DFH_TYPE		GENMASK_ULL(63, 60)	/* Feature type */
 #define DFH_TYPE_AFU		1
 #define DFH_TYPE_PRIVATE	3
 #define DFH_TYPE_FIU		4
 #define DFH_TYPE_INTERFACE	5
+
+/*
+ * DFHv1 Register Offset definitons
+ * In DHFv1, DFH + GUID + CSR_START + CSR_SIZE_GROUP + PARAM_HDR + PARAM_DATA
+ * as common header registers
+ */
+#define DFHv1_CSR_ADDR		0x18  /* CSR Register start address */
+#define DFHv1_CSR_SIZE_GRP	0x20  /* Size of Reg Block and Group/tag */
+#define DFHv1_PARAM_HDR		0x28  /* Optional First Param header */
+
+/*
+ * CSR Rel Bit, 1'b0 = relative (offset from feature DFH start),
+ * 1'b1 = absolute (ARM or other non-PCIe use)
+ */
+#define DFHv1_CSR_ADDR_REL	BIT_ULL(0)
+
+/* CSR Header Register Bit Definitions */
+#define DFHv1_CSR_ADDR_MASK       GENMASK_ULL(63, 1)  /* 63:1 of CSR address */
+
+/* CSR SIZE Goup Register Bit Definitions */
+#define DFHv1_CSR_SIZE_GRP_INSTANCE_ID	GENMASK_ULL(15, 0)	/* Enumeration instantiated IP */
+#define DFHv1_CSR_SIZE_GRP_GROUPING_ID	GENMASK_ULL(30, 16)	/* Group Features/interfaces */
+#define DFHv1_CSR_SIZE_GRP_HAS_PARAMS	BIT_ULL(31)		/* Presence of Parameters */
+#define DFHv1_CSR_SIZE_GRP_SIZE		GENMASK_ULL(63, 32)	/* Size of CSR Block in bytes */
+
+/* PARAM Header Register Bit Definitions */
+#define DFHv1_PARAM_HDR_ID		GENMASK_ULL(15, 0) /* Id of this Param  */
+#define DFHv1_PARAM_HDR_VER		GENMASK_ULL(31, 16) /* Version Param */
+#define DFHv1_PARAM_HDR_NEXT_OFFSET	GENMASK_ULL(63, 35) /* Offset of next Param */
+#define DFHv1_PARAM_HDR_NEXT_EOP	BIT_ULL(32)
+#define DFHv1_PARAM_DATA		0x08  /* Offset of Param data from Param header */
+
+#define DFHv1_PARAM_ID_MSI_X		0x1
+#define DFHv1_PARAM_MSI_X_NUMV		GENMASK_ULL(63, 32)
+#define DFHv1_PARAM_MSI_X_STARTV	GENMASK_ULL(31, 0)
 
 /* Next AFU Register Bitfield */
 #define NEXT_AFU_NEXT_DFH_OFST	GENMASK_ULL(23, 0)	/* Offset to next AFU */
@@ -219,8 +274,7 @@ struct dfl_feature_irq_ctx {
  *
  * @dev: ptr to pdev of the feature device which has the sub feature.
  * @id: sub feature id.
- * @dfh_version: device feature header version.
- * @guid: unique dfl private guid.
+ * @revision: revisition of the instance of a feature.
  * @resource_index: each sub feature has one mmio resource for its registers.
  *		    this index is used to find its mmio resource from the
  *		    feature dev (platform device)'s resources.
@@ -230,13 +284,15 @@ struct dfl_feature_irq_ctx {
  * @ops: ops of this sub feature.
  * @ddev: ptr to the dfl device of this sub feature.
  * @priv: priv data of this feature.
+ * @dfh_version: version of the DFH
+ * @param_size: size of dfh parameters
+ * @params: point to memory copy of dfh parameters
+ * @guid: unique dfl private guid.
  */
 struct dfl_feature {
 	struct platform_device *dev;
 	u16 id;
 	u8 revision;
-	u8 dfh_version;
-	guid_t guid;
 	int resource_index;
 	void __iomem *ioaddr;
 	struct dfl_feature_irq_ctx *irq_ctx;
@@ -244,6 +300,10 @@ struct dfl_feature {
 	const struct dfl_feature_ops *ops;
 	struct dfl_device *ddev;
 	void *priv;
+	u8 dfh_version;
+	unsigned int param_size;
+	void *params;
+	guid_t guid;
 };
 
 #define FEATURE_DEV_ID_UNUSED	(-1)
