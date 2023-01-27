@@ -391,7 +391,6 @@ dfl_dev_add(struct dfl_feature_dev_data *fdata,
 		goto put_dev;
 
 	ddev->type = fdata->type;
-	ddev->cdev = fdata->dfl_cdev;
 	ddev->feature_id = feature->id;
 	ddev->revision = feature->revision;
 	ddev->dfh_version = feature->dfh_version;
