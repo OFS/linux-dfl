@@ -12,6 +12,7 @@
  */
 #include <linux/dfl.h>
 #include <linux/fpga-dfl.h>
+#include <linux/minmax.h>
 #include <linux/module.h>
 #include <linux/overflow.h>
 #include <linux/uaccess.h>
@@ -1182,13 +1183,14 @@ static int
 create_feature_instance(struct build_feature_devs_info *binfo,
 			resource_size_t ofst, resource_size_t size, u16 fid)
 {
+	resource_size_t start, end, csr_size;
 	struct dfl_feature_info *finfo;
-	resource_size_t start, end;
 	int dfh_psize = 0;
 	u64 guid_l, guid_h;
 	u8 revision = 0;
 	u64 v, addr_off;
 	u8 dfh_ver = 0;
+	bool rel_addr;
 	int ret;
 
 	if (fid != FEATURE_ID_AFU) {
@@ -1228,13 +1230,31 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 		v = readq(binfo->ioaddr + ofst + DFHv1_CSR_ADDR);
 		addr_off = FIELD_GET(DFHv1_CSR_ADDR_MASK, v) << 1;
 
-		if (FIELD_GET(DFHv1_CSR_ADDR_REL, v))
+		if (FIELD_GET(DFHv1_CSR_ADDR_REL, v)) {
 			start = addr_off;
-		else
+			rel_addr = false;
+		} else {
 			start = binfo->start + ofst + (int64_t)addr_off;
+			rel_addr = true;
+		}
 
 		v = readq(binfo->ioaddr + ofst + DFHv1_CSR_SIZE_GRP);
-		end = start + FIELD_GET(DFHv1_CSR_SIZE_GRP_SIZE, v) - 1;
+		csr_size = FIELD_GET(DFHv1_CSR_SIZE_GRP_SIZE, v);
+		end = csr_size ? (start + csr_size - 1) : start;
+
+		/*
+		 * CSR start and end must be within MMIO space for relative address.
+		 */
+		if (rel_addr && !(in_range(start, binfo->start, binfo->len) &&
+				  in_range(end, binfo->start, binfo->len))) {
+			kfree(finfo);
+			dev_warn(binfo->dev,
+				 "CSR[start=%pa,size=%pa] is out of MMIO[start=%pa,size=%pa] range\n",
+				 &start, &csr_size, &binfo->start, &binfo->len);
+                        /* Ignore invalid DFH so DFL enumeration may continue. */
+			return 0;
+		}
+
 		guid_l = readq(binfo->ioaddr + ofst + GUID_L);
 		guid_h = readq(binfo->ioaddr + ofst + GUID_H);
 
