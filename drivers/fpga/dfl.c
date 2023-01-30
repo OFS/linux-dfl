@@ -1164,6 +1164,18 @@ static int dfh_get_param_size(void __iomem *dfh_base, resource_size_t max)
 	return -ENOENT;
 }
 
+static bool dfl_csr_blk_is_outside_mmio(resource_size_t csr_start,
+					resource_size_t csr_end,
+					resource_size_t mmio_start,
+					resource_size_t mmio_end)
+{
+	/*
+	 * CSR start and end is within MMIO space for relative address
+	 */
+	return  !(csr_start >= mmio_start && csr_start <= mmio_end &&
+		csr_end >= mmio_start && csr_end <= mmio_end);
+}
+
 /*
  * when create sub feature instances, for private features, it doesn't need
  * to provide resource size and feature id as they could be read from DFH
@@ -1177,11 +1189,14 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 {
 	struct dfl_feature_info *finfo;
 	resource_size_t start, end;
+	resource_size_t csr_size;
+	resource_size_t mmio_end;
 	int dfh_psize = 0;
 	u64 guid_l, guid_h;
 	u8 revision = 0;
 	u64 v, addr_off;
 	u8 dfh_ver = 0;
+	bool rel_addr;
 	int ret;
 
 	if (fid != FEATURE_ID_AFU) {
@@ -1221,13 +1236,27 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 		v = readq(binfo->ioaddr + ofst + DFHv1_CSR_ADDR);
 		addr_off = FIELD_GET(DFHv1_CSR_ADDR_MASK, v) << 1;
 
-		if (FIELD_GET(DFHv1_CSR_ADDR_REL, v))
+		if (FIELD_GET(DFHv1_CSR_ADDR_REL, v)) {
 			start = addr_off;
-		else
+			rel_addr = false;
+		} else {
 			start = binfo->start + ofst + (int64_t)addr_off;
+			rel_addr = true;
+		}
 
 		v = readq(binfo->ioaddr + ofst + DFHv1_CSR_SIZE_GRP);
-		end = start + FIELD_GET(DFHv1_CSR_SIZE_GRP_SIZE, v) - 1;
+		csr_size = FIELD_GET(DFHv1_CSR_SIZE_GRP_SIZE, v);
+		end = csr_size ? (start + csr_size - 1) : start;
+		mmio_end =  binfo->len ? (binfo->start + binfo->len - 1) : binfo->start;
+
+		if (rel_addr && dfl_csr_blk_is_outside_mmio(start, end, binfo->start, mmio_end)) {
+			kfree(finfo);
+			dev_warn(binfo->dev,
+				 "Out of MMIO, CSR[St=%pa,End=%pa] MMIO[St=%pa,End=%pa]\n",
+				 &start, &end, &binfo->start, &mmio_end);
+			return 0;
+		}
+
 		guid_l = readq(binfo->ioaddr + ofst + GUID_L);
 		guid_h = readq(binfo->ioaddr + ofst + GUID_H);
 
