@@ -1182,6 +1182,7 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 	u8 revision = 0;
 	u64 v, addr_off;
 	u8 dfh_ver = 0;
+	bool rel_addr;
 	int ret;
 
 	if (fid != FEATURE_ID_AFU) {
@@ -1220,13 +1221,22 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 	if (dfh_ver == 1) {
 		v = readq(binfo->ioaddr + ofst + DFHv1_CSR_ADDR);
 		addr_off = FIELD_GET(DFHv1_CSR_ADDR_MASK, v);
-		if (FIELD_GET(DFHv1_CSR_ADDR_REL, v))
+		if (FIELD_GET(DFHv1_CSR_ADDR_REL, v)) {
 			start = addr_off << 1;
-		else
+			rel_addr = false;
+		} else {
 			start = binfo->start + ofst + addr_off;
+			rel_addr = true;
+		}
 
 		v = readq(binfo->ioaddr + ofst + DFHv1_CSR_SIZE_GRP);
 		end = start + FIELD_GET(DFHv1_CSR_SIZE_GRP_SIZE, v) - 1;
+		if (rel_addr && (end > (binfo->start + ofst) + size)) {
+			kfree(finfo);
+			dev_warn(binfo->dev, "Invalid DFHv1 length at 0x%llx\n", ofst);
+			return 0;
+		}
+
 		guid_l = readq(binfo->ioaddr + ofst + GUID_L);
 		guid_h = readq(binfo->ioaddr + ofst + GUID_H);
 
