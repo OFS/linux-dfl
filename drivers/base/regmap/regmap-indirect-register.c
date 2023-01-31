@@ -12,16 +12,17 @@
 #include <linux/seq_file.h>
 #include <linux/slab.h>
 
-#define INDIRECT_CMD_OFF	0x0
-#define INDIRECT_CMD_RD	BIT(0)
-#define INDIRECT_CMD_WR	BIT(1)
+#define INDIRECT_CMD_OFF	0
+#define INDIRECT_CMD_CLR	0
+#define INDIRECT_CMD_RD		BIT(0)
+#define INDIRECT_CMD_WR		BIT(1)
 #define INDIRECT_CMD_ACK	BIT(2)
 
 #define INDIRECT_ADDR_OFF	0x4
-#define INDIRECT_RD_OFF	0x8
-#define INDIRECT_WR_OFF	0xc
+#define INDIRECT_RD_OFF		0x8
+#define INDIRECT_WR_OFF		0xc
 
-#define INDIRECT_INT_US	1
+#define INDIRECT_INT_US		1
 #define INDIRECT_TIMEOUT_US	10000
 
 struct indirect_ctx {
@@ -29,82 +30,79 @@ struct indirect_ctx {
 	struct device *dev;
 };
 
-static int indirect_bus_clr_cmd(struct indirect_ctx *ctx)
+static int indirect_bus_clear_cmd(struct indirect_ctx *ctx)
 {
 	unsigned int cmd;
 	int ret;
 
-	writel(0, ctx->base + INDIRECT_CMD_OFF);
+	writel(INDIRECT_CMD_CLR, ctx->base + INDIRECT_CMD_OFF);
 
-	ret = readl_poll_timeout((ctx->base + INDIRECT_CMD_OFF), cmd,
-				 (!cmd), INDIRECT_INT_US, INDIRECT_TIMEOUT_US);
-
+	ret = readl_poll_timeout(ctx->base + INDIRECT_CMD_OFF, cmd,
+				 cmd == INDIRECT_CMD_CLR,
+				 INDIRECT_INT_US, INDIRECT_TIMEOUT_US);
 	if (ret)
-		dev_err(ctx->dev, "%s timed out on clearing cmd 0x%x\n", __func__, cmd);
+		dev_err(ctx->dev, "timed out waiting clear cmd (residual cmd=0x%x)\n", cmd);
 
 	return ret;
 }
 
-static int indirect_bus_reg_read(void *context, unsigned int reg,
-				     unsigned int *val)
+static int indirect_bus_reg_read(void *context, unsigned int reg, unsigned int *val)
 {
 	struct indirect_ctx *ctx = context;
-	unsigned int cmd;
-	int ret;
+	unsigned int cmd, ack, tmpval;
+	int ret, ret2;
 
 	cmd = readl(ctx->base + INDIRECT_CMD_OFF);
-
-	if (cmd)
-		dev_warn(ctx->dev, "%s non-zero cmd 0x%x\n", __func__, cmd);
+	if (cmd != INDIRECT_CMD_CLR)
+		dev_warn(ctx->dev, "residual cmd 0x%x on read entry\n", cmd);
 
 	writel(reg, ctx->base + INDIRECT_ADDR_OFF);
-
 	writel(INDIRECT_CMD_RD, ctx->base + INDIRECT_CMD_OFF);
 
-	ret = readl_poll_timeout((ctx->base + INDIRECT_CMD_OFF), cmd,
-				 (cmd & INDIRECT_CMD_ACK), INDIRECT_INT_US,
-				 INDIRECT_TIMEOUT_US);
+	ret = readl_poll_timeout(ctx->base + INDIRECT_CMD_OFF, ack,
+				 (ack & INDIRECT_CMD_ACK) == INDIRECT_CMD_ACK,
+				 INDIRECT_INT_US, INDIRECT_TIMEOUT_US);
+	if (ret)
+		dev_err(ctx->dev, "read timed out on reg 0x%x ack 0x%x\n", reg, ack);
+	else
+		tmpval = readl(ctx->base + INDIRECT_RD_OFF);
 
-	*val = readl(ctx->base + INDIRECT_RD_OFF);
+	ret2 = indirect_bus_clear_cmd(ctx);
 
 	if (ret)
-		dev_err(ctx->dev, "%s timed out on reg 0x%x cmd 0x%x\n", __func__, reg, cmd);
+		return ret;
+	if (ret2)
+		return ret2;
 
-	if (indirect_bus_clr_cmd(ctx))
-		ret = -ETIME;
-
-	return ret;
+	*val = tmpval;
+	return 0;
 }
 
-static int indirect_bus_reg_write(void *context, unsigned int reg,
-				      unsigned int val)
+static int indirect_bus_reg_write(void *context, unsigned int reg, unsigned int val)
 {
 	struct indirect_ctx *ctx = context;
-	unsigned int cmd;
-	int ret;
+	unsigned int cmd, ack;
+	int ret, ret2;
 
 	cmd = readl(ctx->base + INDIRECT_CMD_OFF);
-
-	if (cmd)
-		dev_warn(ctx->dev, "%s non-zero cmd 0x%x\n", __func__, cmd);
+	if (cmd != INDIRECT_CMD_CLR)
+		dev_warn(ctx->dev, "residual cmd 0x%x on write entry\n", cmd);
 
 	writel(val, ctx->base + INDIRECT_WR_OFF);
-
 	writel(reg, ctx->base + INDIRECT_ADDR_OFF);
-
 	writel(INDIRECT_CMD_WR, ctx->base + INDIRECT_CMD_OFF);
 
-	ret = readl_poll_timeout((ctx->base + INDIRECT_CMD_OFF), cmd,
-				 (cmd & INDIRECT_CMD_ACK), INDIRECT_INT_US,
-				 INDIRECT_TIMEOUT_US);
+	ret = readl_poll_timeout(ctx->base + INDIRECT_CMD_OFF, ack,
+				 (ack & INDIRECT_CMD_ACK) == INDIRECT_CMD_ACK,
+				 INDIRECT_INT_US, INDIRECT_TIMEOUT_US);
+	if (ret)
+		dev_err(ctx->dev, "write timed out on reg 0x%x ack 0x%x\n", reg, ack);
+
+	ret2 = indirect_bus_clear_cmd(ctx);
 
 	if (ret)
-		dev_err(ctx->dev, "%s timed out on reg 0x%x cmd 0x%x\n", __func__, reg, cmd);
-
-	if (indirect_bus_clr_cmd(ctx))
-		ret = -ETIME;
-
-	return ret;
+		return ret;
+	return ret2;
 }
 
 static const struct regmap_bus indirect_bus = {
@@ -133,6 +131,9 @@ struct regmap *devm_regmap_init_indirect_register(struct device *dev,
 
 	ctx->base = base;
 	ctx->dev = dev;
+
+	/* Reset any previous commands */
+	indirect_bus_clear_cmd(ctx);
 
 	return devm_regmap_init(dev, &indirect_bus, ctx, cfg);
 }
