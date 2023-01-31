@@ -1,17 +1,22 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Intel Max10 Board Management Controller Secure Update Driver
+ * Intel Max10 Board Management Controller Log Driver
  *
- * Copyright (C) 2021 Intel Corporation. All rights reserved.
- *
+ * Copyright (C) 2021-2023 Intel Corporation.
  */
 
 #include <linux/bitfield.h>
-#include <linux/mfd/intel-m10-bmc.h>
+#include <linux/dev_printk.h>
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/nvmem-provider.h>
 #include <linux/mod_devicetable.h>
+#include <linux/types.h>
+
+#include <linux/mfd/intel-m10-bmc.h>
+
+#define M10BMC_TIMESTAMP_FREQ			60	/* 60 secs between updates */
 
 struct m10bmc_log_cfg {
 	int el_size;
@@ -29,48 +34,42 @@ struct m10bmc_log {
 	struct intel_m10bmc *m10bmc;
 	unsigned int freq_s;		/* update frequency in seconds */
 	struct delayed_work dwork;
-	struct m10bmc_log_cfg *log_cfg;
+	const struct m10bmc_log_cfg *log_cfg;
 	struct nvmem_device *bmc_event_log_nvmem;
 	struct nvmem_device *fpga_image_dir_nvmem;
 	struct nvmem_device *bom_info_nvmem;
 };
 
-#define M10BMC_TIMESTAMP_FREQ   60	/* 60 seconds between updates */
-#define TIME_LOW	GENMASK(31, 0)
-#define TIME_HIGH	GENMASK(63, 32)
 static void m10bmc_log_time_sync(struct work_struct *work)
 {
-	struct delayed_work *dwork;
-	u32 time_high, time_low;
+	struct delayed_work *dwork = to_delayed_work(work);
+	const struct m10bmc_csr_map *csr_map;
 	struct m10bmc_log *log;
 	s64 time_ms;
 	int ret;
 
-	dwork = to_delayed_work(work);
 	log = container_of(dwork, struct m10bmc_log, dwork);
+	csr_map = log->m10bmc->info->csr_map;
 
 	time_ms = ktime_to_ms(ktime_get_real());
-	time_low = (u32)FIELD_GET(TIME_LOW, time_ms);
-	time_high = (u32)FIELD_GET(TIME_HIGH, time_ms);
-	ret = regmap_write(log->m10bmc->regmap, m10bmc_base(log->m10bmc) +
-			   M10BMC_PMCI_TIME_HIGH, time_high);
-	if (!ret)
-		ret = regmap_write(log->m10bmc->regmap,
-				   m10bmc_base(log->m10bmc) +
-				   M10BMC_PMCI_TIME_LOW, time_low);
+	ret = regmap_write(log->m10bmc->regmap, csr_map->base + M10BMC_N6000_TIME_HIGH,
+			   upper_32_bits(time_ms));
+	if (!ret) {
+		ret = regmap_write(log->m10bmc->regmap, csr_map->base + M10BMC_N6000_TIME_LOW,
+				   lower_32_bits(time_ms));
+	}
 	if (ret)
-		dev_err_once(log->dev,
-			     "Failed to update BMC timestamp: %d\n", ret);
+		dev_err_once(log->dev, "Failed to update BMC timestamp: %d\n", ret);
 
 	schedule_delayed_work(&log->dwork, log->freq_s * HZ);
 }
 
-static ssize_t
-time_sync_frequency_store(struct device *dev, struct device_attribute *attr,
-			  const char *buf, size_t count)
+static ssize_t time_sync_frequency_store(struct device *dev, struct device_attribute *attr,
+					 const char *buf, size_t count)
 {
 	struct m10bmc_log *ddata = dev_get_drvdata(dev);
-	unsigned int ret, old_freq = ddata->freq_s;
+	unsigned int old_freq = ddata->freq_s;
+	int ret;
 
 	ret = kstrtouint(buf, 0, &ddata->freq_s);
 	if (ret)
@@ -85,9 +84,8 @@ time_sync_frequency_store(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
-static ssize_t
-time_sync_frequency_show(struct device *dev, struct device_attribute *attr,
-			 char *buf)
+static ssize_t time_sync_frequency_show(struct device *dev, struct device_attribute *attr,
+					char *buf)
 {
 	struct m10bmc_log *ddata = dev_get_drvdata(dev);
 
@@ -104,13 +102,13 @@ ATTRIBUTE_GROUPS(m10bmc_log);
 static int bmc_nvmem_read(struct m10bmc_log *ddata, unsigned int addr,
 			  unsigned int off, void *val, size_t count)
 {
+	struct intel_m10bmc *m10bmc = ddata->m10bmc;
 	int ret;
 
-	if (!ddata->m10bmc->ops.flash_read)
+	if (!m10bmc->flash_bulk_ops)
 		return -ENODEV;
 
-	ret = ddata->m10bmc->ops.flash_read(ddata->m10bmc, val,
-					    addr + off, count);
+	ret = m10bmc->flash_bulk_ops->read(m10bmc, val, addr + off, count);
 	if (ret) {
 		dev_err(ddata->dev, "failed to read flash %x (%d)\n", addr, ret);
 		return ret;
@@ -119,24 +117,21 @@ static int bmc_nvmem_read(struct m10bmc_log *ddata, unsigned int addr,
 	return 0;
 }
 
-static int bmc_event_log_nvmem_read(void *priv, unsigned int off,
-				    void *val, size_t count)
+static int bmc_event_log_nvmem_read(void *priv, unsigned int off, void *val, size_t count)
 {
 	struct m10bmc_log *ddata = priv;
 
 	return bmc_nvmem_read(ddata, ddata->log_cfg->el_off, off, val, count);
 }
 
-static int fpga_image_dir_nvmem_read(void *priv, unsigned int off,
-				     void *val, size_t count)
+static int fpga_image_dir_nvmem_read(void *priv, unsigned int off, void *val, size_t count)
 {
 	struct m10bmc_log *ddata = priv;
 
 	return bmc_nvmem_read(ddata, ddata->log_cfg->id_off, off, val, count);
 }
 
-static int bom_info_nvmem_read(void *priv, unsigned int off,
-			       void *val, size_t count)
+static int bom_info_nvmem_read(void *priv, unsigned int off, void *val, size_t count)
 {
 	struct m10bmc_log *ddata = priv;
 
@@ -227,36 +222,37 @@ static int m10bmc_log_remove(struct platform_device *pdev)
 	struct m10bmc_log *ddata = dev_get_drvdata(&pdev->dev);
 
 	cancel_delayed_work_sync(&ddata->dwork);
+
 	return 0;
 }
 
-static const struct m10bmc_log_cfg n6000_cfg = {
-	.el_size = PMCI_ERROR_LOG_SIZE,
-	.el_off = PMCI_ERROR_LOG_ADDR,
+static const struct m10bmc_log_cfg m10bmc_log_n6000_cfg = {
+	.el_size = M10BMC_N6000_ERROR_LOG_SIZE,
+	.el_off = M10BMC_N6000_ERROR_LOG_ADDR,
 
-	.id_size = PMCI_FPGA_IMAGE_DIR_SIZE,
-	.id_off = PMCI_FPGA_IMAGE_DIR_ADDR,
+	.id_size = M10BMC_N6000_FPGA_IMAGE_DIR_SIZE,
+	.id_off = M10BMC_N6000_FPGA_IMAGE_DIR_ADDR,
 
-	.bi_size = PMCI_BOM_INFO_SIZE,
-	.bi_off = PMCI_BOM_INFO_ADDR,
+	.bi_size = M10BMC_N6000_BOM_INFO_SIZE,
+	.bi_off = M10BMC_N6000_BOM_INFO_ADDR,
 };
 
-static const struct m10bmc_log_cfg c6100_cfg = {
-	.el_size = PMCI_ERROR_LOG_SIZE,
-	.el_off = 0x00a80000,
+static const struct m10bmc_log_cfg m10bmc_log_c6100_cfg = {
+	.el_size = M10BMC_N6000_ERROR_LOG_SIZE,
+	.el_off = M10BMC_C6100_ERROR_LOG_ADDR,
 
-	.id_size = 0x00030000,
-	.id_off = 0x00910000,
+	.id_size = M10BMC_C6100_FPGA_IMAGE_DIR_SIZE,
+	.id_off = M10BMC_C6100_FPGA_IMAGE_DIR_ADDR,
 };
 
 static const struct platform_device_id intel_m10bmc_log_ids[] = {
 	{
 		.name = "n6000bmc-log",
-		.driver_data = (unsigned long)&n6000_cfg,
+		.driver_data = (unsigned long)&m10bmc_log_n6000_cfg,
 	},
 	{
 		.name = "c6100bmc-log",
-		.driver_data = (unsigned long)&c6100_cfg,
+		.driver_data = (unsigned long)&m10bmc_log_c6100_cfg,
 	},
 	{ }
 };
@@ -275,4 +271,4 @@ module_platform_driver(intel_m10bmc_log_driver);
 MODULE_DEVICE_TABLE(platform, intel_m10bmc_log_ids);
 MODULE_AUTHOR("Intel Corporation");
 MODULE_DESCRIPTION("Intel MAX10 BMC Log");
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL");
