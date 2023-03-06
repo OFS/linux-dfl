@@ -1271,12 +1271,7 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 			dev_warn(binfo->dev, "Invalid DFHv1 length at 0x%llx\n", ofst);
 			return 0;
 		}
-	} else {
-		start = binfo->start + ofst;
-		end = start + size - 1;
-	}
 
-	if (finfo->dfh_version == 1) {
 		guid_l = readq(binfo->ioaddr + ofst + GUID_L);
 		guid_h = readq(binfo->ioaddr + ofst + GUID_H);
 
@@ -1295,7 +1290,11 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 					FIELD_GET(DFL_GUID_L_D6, guid_l),
 					FIELD_GET(DFL_GUID_L_D7, guid_l));
 		}
+	} else {
+		start = binfo->start + ofst;
+		end = start + size - 1;
 	}
+
 	finfo->mmio_res.flags = IORESOURCE_MEM;
 	finfo->mmio_res.start = start;
 	finfo->mmio_res.end = end;
