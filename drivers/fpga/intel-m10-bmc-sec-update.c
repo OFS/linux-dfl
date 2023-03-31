@@ -1076,7 +1076,7 @@ power_on_image_store(struct device *dev,
 
 	tokens = kmemdup_nul(buf, count, GFP_KERNEL);
 	if (!tokens)
-		ret = -ENOMEM;
+		return -ENOMEM;
 
 	ret = fpga_images(sec, tokens, images);
 	if (ret)
