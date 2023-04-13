@@ -16,6 +16,12 @@
 #include <linux/uaccess.h>
 #include <linux/phy/qsfp-mem.h>
 
+/* The QSFP controller defines 64-bit wide registers, but support
+ * for 64-bit IO in regmap-mmio was removed in upstream commit
+ * 159dfabd207628c983e0c3c5ef607f496ff5e6a5. Hence the regmap
+ * register ranges are defined in terms of 32-bit wide registers.
+ */
+
 #define CONF_OFF	0x20
 #define CONF_RST_MOD	BIT(0)
 #define CONF_RST_CON	BIT(1)
@@ -24,6 +30,7 @@
 #define CONF_POLL_EN	BIT(4)
 
 #define STAT_OFF	0x28
+#define STAT_END	0x2c
 #define MODPRSL         BIT(0)
 #define DELAY_REG       0x38
 #define DELAY_VALUE       0xffffff
@@ -45,14 +52,14 @@
 #define COUNT_PERIOD_HOLD 0x28
 
 #define QSFP_SHADOW_CSRS_BASE_OFF	0x100
-#define QSFP_SHADOW_CSRS_BASE_END	0x3f8
+#define QSFP_SHADOW_CSRS_BASE_END	0x3fc
 
 #define DELAY_US 1000
 
 #define QSFP_CHECK_TIME 500
 
 static const struct regmap_range qsfp_mem_regmap_range[] = {
-	regmap_reg_range(CONF_OFF, STAT_OFF),
+	regmap_reg_range(CONF_OFF, STAT_END),
 	regmap_reg_range(QSFP_SHADOW_CSRS_BASE_OFF, QSFP_SHADOW_CSRS_BASE_END),
 };
 
@@ -73,9 +80,9 @@ static void qsfp_init_i2c(struct qsfp *qsfp)
 }
 
 static const struct regmap_config mmio_cfg = {
-	.reg_bits = 64,
-	.reg_stride = 8,
-	.val_bits = 64,
+	.reg_bits = 32,
+	.reg_stride = 4,
+	.val_bits = 32,
 	.fast_io = true,
 	.rd_table = &qsfp_mem_access_table,
 	.max_register = QSFP_SHADOW_CSRS_BASE_END,
