@@ -232,6 +232,18 @@ config FPGA_DFL_PCI_SVA
 	  Select this option to enable PASID and IOMMU binding of DFL-based
 	  devices that support shared virtual memory.
 
+config FPGA_DFL_PLATFORM
+	tristate "FPGA DFL Platform Driver"
+	depends on FPGA_DFL
+	depends on OF || COMPILE_TEST
+	help
+	  Select this option to enable the Device Feature List (DFL) platform driver.
+	  For more detailed information about DFL, please refer to the Linux DFL
+	  documentation available at: <https://docs.kernel.org/fpga/dfl.html>.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called dfl_platform.
+
 config FPGA_DFL_HSSI
 	tristate "FPGA DFL HSSI Driver"
 	depends on FPGA_DFL
