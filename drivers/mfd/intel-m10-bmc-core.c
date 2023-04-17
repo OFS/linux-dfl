@@ -31,7 +31,7 @@ int m10bmc_fw_state_enter(struct intel_m10bmc *m10bmc,
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(m10bmc_fw_state_enter);
+EXPORT_SYMBOL_NS_GPL(m10bmc_fw_state_enter, INTEL_M10_BMC_CORE);
 
 void m10bmc_fw_state_exit(struct intel_m10bmc *m10bmc)
 {
@@ -41,7 +41,7 @@ void m10bmc_fw_state_exit(struct intel_m10bmc *m10bmc)
 
 	up_write(&m10bmc->bmcfw_lock);
 }
-EXPORT_SYMBOL_GPL(m10bmc_fw_state_exit);
+EXPORT_SYMBOL_NS_GPL(m10bmc_fw_state_exit, INTEL_M10_BMC_CORE);
 
 static bool is_handshake_sys_reg(struct intel_m10bmc *m10bmc, unsigned int offset)
 {
@@ -73,7 +73,7 @@ int m10bmc_sys_read(struct intel_m10bmc *m10bmc, unsigned int offset, unsigned i
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(m10bmc_sys_read);
+EXPORT_SYMBOL_NS_GPL(m10bmc_sys_read, INTEL_M10_BMC_CORE);
 
 int m10bmc_sys_update_bits(struct intel_m10bmc *m10bmc, unsigned int offset,
 			   unsigned int msk, unsigned int val)
@@ -100,7 +100,7 @@ int m10bmc_sys_update_bits(struct intel_m10bmc *m10bmc, unsigned int offset,
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(m10bmc_sys_update_bits);
+EXPORT_SYMBOL_NS_GPL(m10bmc_sys_update_bits, INTEL_M10_BMC_CORE);
 
 static ssize_t bmc_version_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
@@ -188,7 +188,7 @@ const struct attribute_group *m10bmc_dev_groups[] = {
 	&m10bmc_group,
 	NULL,
 };
-EXPORT_SYMBOL_GPL(m10bmc_dev_groups);
+EXPORT_SYMBOL_NS_GPL(m10bmc_dev_groups, INTEL_M10_BMC_CORE);
 
 int m10bmc_dev_init(struct intel_m10bmc *m10bmc, const struct intel_m10bmc_platform_info *info)
 {
@@ -206,7 +206,7 @@ int m10bmc_dev_init(struct intel_m10bmc *m10bmc, const struct intel_m10bmc_platf
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(m10bmc_dev_init);
+EXPORT_SYMBOL_NS_GPL(m10bmc_dev_init, INTEL_M10_BMC_CORE);
 
 MODULE_DESCRIPTION("Intel MAX 10 BMC core driver");
 MODULE_AUTHOR("Intel Corporation");
