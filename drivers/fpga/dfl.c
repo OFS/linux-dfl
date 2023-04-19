@@ -35,6 +35,7 @@ static DEFINE_MUTEX(dfl_id_mutex);
 enum dfl_fpga_devt_type {
 	DFL_FPGA_DEVT_FME,
 	DFL_FPGA_DEVT_PORT,
+	DFL_FPGA_DEVT_PRIV_FEAT,
 	DFL_FPGA_DEVT_MAX,
 };
 
@@ -43,6 +44,7 @@ static struct lock_class_key dfl_pdata_keys[DFL_ID_MAX];
 static const char *dfl_pdata_key_strings[DFL_ID_MAX] = {
 	"dfl-fme-pdata",
 	"dfl-port-pdata",
+	"dfl-priv-feat-pdata"
 };
 
 /**
@@ -65,6 +67,8 @@ static struct dfl_dev_info dfl_devs[] = {
 	 .devt_type = DFL_FPGA_DEVT_FME},
 	{.name = DFL_FPGA_FEATURE_DEV_PORT, .dfh_id = DFH_ID_FIU_PORT,
 	 .devt_type = DFL_FPGA_DEVT_PORT},
+	{.name = DFL_FPGA_FEATURE_DEV_PRIV_FEAT, .dfh_id = DFH_ID_FIU_PRIV_FEAT,
+	 .devt_type = DFL_FPGA_DEVT_PORT},
 };
 
 /**
@@ -81,6 +85,7 @@ struct dfl_chardev_info {
 static struct dfl_chardev_info dfl_chrdevs[] = {
 	{.name = DFL_FPGA_FEATURE_DEV_FME},
 	{.name = DFL_FPGA_FEATURE_DEV_PORT},
+	{.name = DFL_FPGA_FEATURE_DEV_PRIV_FEAT},
 };
 
 static void dfl_ids_init(void)
@@ -779,6 +784,15 @@ static void dfl_fpga_cdev_add_port_data(struct dfl_fpga_cdev *cdev,
 	mutex_unlock(&cdev->lock);
 }
 
+static void dfl_fpga_cdev_add_priv_feat_data(struct dfl_fpga_cdev *cdev,
+					     struct dfl_feature_dev_data *fdata)
+
+{
+	mutex_lock(&cdev->lock);
+	list_add(&fdata->node, &cdev->priv_feat_dev_list);
+	mutex_unlock(&cdev->lock);
+}
+
 static struct dfl_feature_dev_data *
 binfo_create_feature_dev_data(struct build_feature_devs_info *binfo)
 {
@@ -967,6 +981,8 @@ static int build_info_commit_dev(struct build_feature_devs_info *binfo)
 
 	if (binfo->type == PORT_ID)
 		dfl_fpga_cdev_add_port_data(binfo->cdev, fdata);
+	else if (binfo->type == PRIV_FEAT_ID)
+		dfl_fpga_cdev_add_priv_feat_data(binfo->cdev, fdata);
 	else
 		binfo->cdev->fme_dev = get_device(&fdata->dev->dev);
 
@@ -1448,11 +1464,19 @@ static int parse_feature_fiu(struct build_feature_devs_info *binfo,
 static int parse_feature_private(struct build_feature_devs_info *binfo,
 				 resource_size_t ofst)
 {
-	if (!is_feature_dev_detected(binfo)) {
+	u8 dfh_ver;
+	u64 v;
+
+	v = readq(binfo->ioaddr + DFH);
+	dfh_ver = FIELD_GET(DFH_VERSION, v);
+
+	if (dfh_ver == 0 && !is_feature_dev_detected(binfo)) {
 		dev_err(binfo->dev, "the private feature 0x%x does not belong to any AFU.\n",
 			feature_id(readq(binfo->ioaddr + ofst)));
 		return -EINVAL;
 	}
+
+	binfo->type = PRIV_FEAT_ID;
 
 	return create_feature_instance(binfo, ofst, 0, 0);
 }
@@ -1686,6 +1710,8 @@ dfl_fpga_feature_devs_enumerate(struct dfl_fpga_enum_info *info)
 	cdev->parent = info->dev;
 	mutex_init(&cdev->lock);
 	INIT_LIST_HEAD(&cdev->port_dev_list);
+
+	INIT_LIST_HEAD(&cdev->priv_feat_dev_list);
 
 	cdev->region = fpga_region_register(info->dev, NULL, NULL);
 	if (IS_ERR(cdev->region)) {
