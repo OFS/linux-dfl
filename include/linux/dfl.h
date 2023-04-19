@@ -17,6 +17,7 @@
 enum dfl_id_type {
 	FME_ID = 0,
 	PORT_ID = 1,
+	PRIV_FEAT_ID = 2,
 	DFL_ID_MAX,
 };
 
