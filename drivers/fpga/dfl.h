@@ -72,6 +72,7 @@
 #define DFH_ID			GENMASK_ULL(11, 0)	/* Feature ID */
 #define DFH_ID_FIU_FME		0
 #define DFH_ID_FIU_PORT		1
+#define DFH_ID_FIU_PRIV_FEAT	2
 #define DFH_REVISION		GENMASK_ULL(15, 12)	/* Feature revision */
 #define DFH_NEXT_HDR_OFST	GENMASK_ULL(39, 16)	/* Offset to next DFH */
 #define DFH_EOL			BIT_ULL(40)		/* End of list */
@@ -416,6 +417,7 @@ struct dfl_feature_ops {
 
 #define DFL_FPGA_FEATURE_DEV_FME		"dfl-fme"
 #define DFL_FPGA_FEATURE_DEV_PORT		"dfl-port"
+#define DFL_FPGA_FEATURE_DEV_PRIV_FEAT		"dfl-priv-feat"
 
 void dfl_fpga_dev_feature_uinit(struct platform_device *pdev);
 int dfl_fpga_dev_feature_init(struct platform_device *pdev,
@@ -579,6 +581,7 @@ struct dfl_fpga_cdev {
 	struct device *fme_dev;
 	struct mutex lock;
 	struct list_head port_dev_list;
+	struct list_head priv_feat_dev_list;
 	int released_port_num;
 };
 
