@@ -199,6 +199,16 @@ config FPGA_DFL_AFU
 	  to the FPGA infrastructure via a Port. There may be more than one
 	  Port/AFU per DFL based FPGA device.
 
+config FPGA_DFL_PRIV_FEAT
+	tristate "FPGA DFL PRIV FEAT Driver"
+	depends on FPGA_DFL
+	help
+	  This is the driver for FPGA Private Features which will implement
+	  FIU feature start.
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called dfl_priv_feat.
+
 config FPGA_DFL_NIOS_INTEL_PAC_N3000
 	tristate "FPGA DFL NIOS Driver for Intel PAC N3000"
 	depends on FPGA_DFL
