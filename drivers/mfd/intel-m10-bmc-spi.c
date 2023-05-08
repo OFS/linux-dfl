@@ -148,7 +148,6 @@ static const struct intel_m10bmc_platform_info m10bmc_spi_n3000 = {
 	.n_cells = ARRAY_SIZE(m10bmc_pacn3000_subdevs),
 	.handshake_sys_reg_ranges = m10bmc_n3000_fw_handshake_regs,
 	.handshake_sys_reg_nranges = ARRAY_SIZE(m10bmc_n3000_fw_handshake_regs),
-	.handshake_sec_update_busy = true,
 	.csr_map = &m10bmc_n3000_csr_map,
 };
 
@@ -157,7 +156,6 @@ static const struct intel_m10bmc_platform_info m10bmc_spi_d5005 = {
 	.n_cells = ARRAY_SIZE(m10bmc_d5005_subdevs),
 	.handshake_sys_reg_ranges = m10bmc_d5005_fw_handshake_regs,
 	.handshake_sys_reg_nranges = ARRAY_SIZE(m10bmc_d5005_fw_handshake_regs),
-	.handshake_sec_update_busy = true,
 	.csr_map = &m10bmc_n3000_csr_map,
 };
 
@@ -166,7 +164,6 @@ static const struct intel_m10bmc_platform_info m10bmc_spi_n5010 = {
 	.n_cells = ARRAY_SIZE(m10bmc_n5010_subdevs),
 	.handshake_sys_reg_ranges = m10bmc_n3000_fw_handshake_regs,
 	.handshake_sys_reg_nranges = ARRAY_SIZE(m10bmc_n3000_fw_handshake_regs),
-	.handshake_sec_update_busy = true,
 	.csr_map = &m10bmc_n3000_csr_map,
 };
 
@@ -175,7 +172,6 @@ static const struct intel_m10bmc_platform_info m10bmc_spi_n5014 = {
 	.n_cells = ARRAY_SIZE(m10bmc_n5014_subdevs),
 	.handshake_sys_reg_ranges = m10bmc_n3000_fw_handshake_regs,
 	.handshake_sys_reg_nranges = ARRAY_SIZE(m10bmc_n3000_fw_handshake_regs),
-	.handshake_sec_update_busy = true,
 	.csr_map = &m10bmc_n3000_csr_map,
 };
 

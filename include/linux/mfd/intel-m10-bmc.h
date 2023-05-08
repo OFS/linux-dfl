@@ -370,7 +370,6 @@ struct m10bmc_csr_map {
  * @n_cells: MFD cells ARRAY_SIZE()
  * @handshake_sys_reg_ranges: array of register ranges for fw handshake regs
  * @handshake_sys_reg_nranges: number of register ranges for fw handshake regs
- * @handshake_sec_update_busy: BMC firmware can't service fw handshake regs during sec update
  * @csr_map: the mappings for register definition of MAX10 BMC
  */
 struct intel_m10bmc_platform_info {
@@ -378,7 +377,6 @@ struct intel_m10bmc_platform_info {
 	int n_cells;
 	const struct regmap_range *handshake_sys_reg_ranges;
 	unsigned int handshake_sys_reg_nranges;
-	bool handshake_sec_update_busy;
 	const struct m10bmc_csr_map *csr_map;
 };
 
@@ -403,7 +401,10 @@ struct intel_m10bmc_flash_bulk_ops {
 
 enum m10bmc_fw_state {
 	M10BMC_FW_STATE_NORMAL,
-	M10BMC_FW_STATE_SEC_UPDATE,
+	M10BMC_FW_STATE_SEC_UPDATE_PREPARE,
+	M10BMC_FW_STATE_SEC_UPDATE_WRITE,
+	M10BMC_FW_STATE_SEC_UPDATE_PROGRAM,
+	M10BMC_FW_RETIMER_EEPROM_LOAD,
 };
 
 /**
@@ -413,14 +414,15 @@ enum m10bmc_fw_state {
  * @info: the platform information for MAX10 BMC
  * @flash_bulk_ops: optional device specific operations for flash R/W
  * @bmcfw_lock: read/write semaphore to BMC firmware running state
- * @bmcfw_state: BMC firmware running state
+ * @bmcfw_state: BMC firmware running state. Available only when
+ *		 handshake_sys_reg_nranges > 0.
  */
 struct intel_m10bmc {
 	struct device *dev;
 	struct regmap *regmap;
 	const struct intel_m10bmc_platform_info *info;
 	const struct intel_m10bmc_flash_bulk_ops *flash_bulk_ops;
-	struct rw_semaphore bmcfw_lock;
+	struct rw_semaphore bmcfw_lock;		/* Protects bmcfw_state */
 	enum m10bmc_fw_state bmcfw_state;
 };
 
@@ -445,23 +447,15 @@ m10bmc_raw_read(struct intel_m10bmc *m10bmc, unsigned int addr,
 	return ret;
 }
 
-int m10bmc_sys_read(struct intel_m10bmc *m10bmc, unsigned int offset,
-		    unsigned int *val);
-
+int m10bmc_sys_read(struct intel_m10bmc *m10bmc, unsigned int offset, unsigned int *val);
 int m10bmc_sys_update_bits(struct intel_m10bmc *m10bmc, unsigned int offset,
 			   unsigned int msk, unsigned int val);
 
 /*
- * Track the state of the firmware, as it is not available for
- * register handshakes during secure updates.
- *
- * m10bmc_fw_state_enter - firmware is unavailable for handshakes
- * m10bmc_fw_state_exit  - firmware is available for handshakes
+ * Track the state of the firmware, as it is not available for register
+ * handshakes during secure updates on some MAX 10 cards.
  */
-int m10bmc_fw_state_enter(struct intel_m10bmc *m10bmc,
-			  enum m10bmc_fw_state new_state);
-
-void m10bmc_fw_state_exit(struct intel_m10bmc *m10bmc);
+void m10bmc_fw_state_set(struct intel_m10bmc *m10bmc, enum m10bmc_fw_state new_state);
 
 /*
  * MAX10 BMC Core support

@@ -12,63 +12,66 @@
 #include <linux/mfd/intel-m10-bmc.h>
 #include <linux/module.h>
 
-int m10bmc_fw_state_enter(struct intel_m10bmc *m10bmc,
-			  enum m10bmc_fw_state new_state)
+void m10bmc_fw_state_set(struct intel_m10bmc *m10bmc, enum m10bmc_fw_state new_state)
 {
-	int ret = 0;
-
-	if (new_state == M10BMC_FW_STATE_NORMAL)
-		return -EINVAL;
+	/* bmcfw_state is only needed if handshake_sys_reg_nranges > 0 */
+	if (!m10bmc->info->handshake_sys_reg_nranges)
+		return;
 
 	down_write(&m10bmc->bmcfw_lock);
-
-	if (m10bmc->bmcfw_state == M10BMC_FW_STATE_NORMAL)
-		m10bmc->bmcfw_state = new_state;
-	else if (m10bmc->bmcfw_state != new_state)
-		ret = -EBUSY;
-
-	up_write(&m10bmc->bmcfw_lock);
-
-	return ret;
-}
-EXPORT_SYMBOL_NS_GPL(m10bmc_fw_state_enter, INTEL_M10_BMC_CORE);
-
-void m10bmc_fw_state_exit(struct intel_m10bmc *m10bmc)
-{
-	down_write(&m10bmc->bmcfw_lock);
-
-	m10bmc->bmcfw_state = M10BMC_FW_STATE_NORMAL;
-
+	m10bmc->bmcfw_state = new_state;
 	up_write(&m10bmc->bmcfw_lock);
 }
-EXPORT_SYMBOL_NS_GPL(m10bmc_fw_state_exit, INTEL_M10_BMC_CORE);
+EXPORT_SYMBOL_NS_GPL(m10bmc_fw_state_set, INTEL_M10_BMC_CORE);
 
-static bool is_handshake_sys_reg(struct intel_m10bmc *m10bmc, unsigned int offset)
+/*
+ * For some Intel FPGA devices, the BMC firmware is not available to service
+ * handshake registers during a secure update.
+ */
+static bool m10bmc_reg_always_available(struct intel_m10bmc *m10bmc, unsigned int offset)
 {
-	return regmap_reg_in_ranges(offset, m10bmc->info->handshake_sys_reg_ranges,
-				    m10bmc->info->handshake_sys_reg_nranges);
+	if (!m10bmc->info->handshake_sys_reg_nranges)
+		return true;
+
+	return !regmap_reg_in_ranges(offset, m10bmc->info->handshake_sys_reg_ranges,
+				     m10bmc->info->handshake_sys_reg_nranges);
 }
 
+/*
+ * m10bmc_handshake_reg_unavailable - Checks if reg access collides with secure update state
+ * @m10bmc: M10 BMC structure
+ *
+ * For some Intel FPGA devices, the BMC firmware is not available to service
+ * handshake registers during a secure update erase and write phases.
+ *
+ * Context: @m10bmc->bmcfw_lock must be held.
+ */
+static bool m10bmc_handshake_reg_unavailable(struct intel_m10bmc *m10bmc)
+{
+	return m10bmc->bmcfw_state == M10BMC_FW_STATE_SEC_UPDATE_PREPARE ||
+	       m10bmc->bmcfw_state == M10BMC_FW_STATE_SEC_UPDATE_WRITE ||
+	       m10bmc->bmcfw_state == M10BMC_FW_RETIMER_EEPROM_LOAD;
+}
+
+/*
+ * This function helps to simplify the accessing of the system registers.
+ *
+ * The base of the system registers is configured through the struct
+ * csr_map.
+ */
 int m10bmc_sys_read(struct intel_m10bmc *m10bmc, unsigned int offset, unsigned int *val)
 {
 	const struct m10bmc_csr_map *csr_map = m10bmc->info->csr_map;
 	int ret;
 
-	/*
-	 * For some Intel FPGA devices, the BMC firmware is not available
-	 * to service handshake registers during a secure update and -EBUSY
-	 * is returned for these cases.
-	 */
-	if (!m10bmc->info->handshake_sec_update_busy || !is_handshake_sys_reg(m10bmc, offset))
+	if (m10bmc_reg_always_available(m10bmc, offset))
 		return m10bmc_raw_read(m10bmc, csr_map->base + offset, val);
 
 	down_read(&m10bmc->bmcfw_lock);
-
-	if (m10bmc->bmcfw_state == M10BMC_FW_STATE_SEC_UPDATE)
-		ret = -EBUSY;
+	if (m10bmc_handshake_reg_unavailable(m10bmc))
+		ret = -EBUSY;	/* Reg not available during secure update */
 	else
 		ret = m10bmc_raw_read(m10bmc, csr_map->base + offset, val);
-
 	up_read(&m10bmc->bmcfw_lock);
 
 	return ret;
@@ -81,21 +84,14 @@ int m10bmc_sys_update_bits(struct intel_m10bmc *m10bmc, unsigned int offset,
 	const struct m10bmc_csr_map *csr_map = m10bmc->info->csr_map;
 	int ret;
 
-	/*
-	 * For some Intel FPGA devices, the BMC firmware is not available
-	 * to service handshake registers during a secure update and -EBUSY
-	 * is returned for these cases.
-	 */
-	if (!m10bmc->info->handshake_sec_update_busy || !is_handshake_sys_reg(m10bmc, offset))
+	if (m10bmc_reg_always_available(m10bmc, offset))
 		return regmap_update_bits(m10bmc->regmap, csr_map->base + offset, msk, val);
 
 	down_read(&m10bmc->bmcfw_lock);
-
-	if (m10bmc->bmcfw_state == M10BMC_FW_STATE_SEC_UPDATE)
-		ret = -EBUSY;
+	if (m10bmc_handshake_reg_unavailable(m10bmc))
+		ret = -EBUSY;	/* Reg not available during secure update */
 	else
 		ret = regmap_update_bits(m10bmc->regmap, csr_map->base + offset, msk, val);
-
 	up_read(&m10bmc->bmcfw_lock);
 
 	return ret;
