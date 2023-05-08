@@ -1,86 +1,99 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * DFL device driver for ToD private feature
+ * DFL device driver for Time-of-Day (ToD) private feature
  *
- * Copyright (C) 2021 Intel Corporation, Inc.
- *
+ * Copyright (C) 2023 Intel Corporation
  */
 
-#include <linux/clk.h>
+#include <linux/bitfield.h>
 #include <linux/delay.h>
 #include <linux/dfl.h>
 #include <linux/gcd.h>
-#include <linux/io.h>
-#include <linux/math64.h>
+#include <linux/iopoll.h>
 #include <linux/module.h>
-#include <linux/mutex.h>
 #include <linux/ptp_clock_kernel.h>
+#include <linux/spinlock.h>
+#include <linux/units.h>
 
 #define FME_FEATURE_ID_TOD		0x22
 
-#define NOMINAL_PPB			1000000000ULL
-#define TOD_PERIOD_MAX			0xfffff
-#define TOD_PERIOD_MIN			0
-#define TOD_DRIFT_ADJUST_FNS_MAX	0xffff
-#define TOD_DRIFT_ADJUST_RATE_MAX	0xffff
-#define TOD_ADJUST_COUNT_MAX		0xfffff
-#define TOD_ADJUST_MS_MAX		(((((TOD_PERIOD_MAX) >> 16) + 1) * \
-					  ((TOD_ADJUST_COUNT_MAX) + 1)) /  \
-					 1000000UL)
+/* ToD clock register space. */
+#define TOD_CLK_FREQ			0x038
 
-/* Time-of-Day (ToD) clock register space. */
-#define CLK_F				0x38
-#define SECONDSH			0x100
-#define SECONDSL			0x104
-#define NANOSEC				0x108
-#define PERIOD				0x110
-#define ADJUST_PERIOD			0x114
-#define ADJUST_COUNT			0x118
-#define DRIFT_ADJUST			0x11c
-#define DRIFT_ADJUST_RATE		0x120
+/*
+ * The read sequence of ToD timestamp registers: TOD_NANOSEC, TOD_SECONDSL and
+ * TOD_SECONDSH, because there is a hardware snapshot whenever the TOD_NANOSEC
+ * register is read.
+ *
+ * The ToD IP requires writing registers in the reverse order to the read sequence.
+ * The timestamp is corrected when the TOD_NANOSEC register is written, so the
+ * sequence of write TOD registers: TOD_SECONDSH, TOD_SECONDSL and TOD_NANOSEC.
+ */
+#define TOD_SECONDSH			0x100
+#define TOD_SECONDSL			0x104
+#define TOD_NANOSEC			0x108
+#define TOD_PERIOD			0x110
+#define TOD_ADJUST_PERIOD		0x114
+#define TOD_ADJUST_COUNT		0x118
+#define TOD_DRIFT_ADJUST		0x11c
+#define TOD_DRIFT_ADJUST_RATE		0x120
+#define PERIOD_FRAC_OFFSET		16
+#define SECONDS_MSB			GENMASK_ULL(47, 32)
+#define SECONDS_LSB			GENMASK_ULL(31, 0)
+#define TOD_SECONDSH_SEC_MSB		GENMASK_ULL(15, 0)
+
+#define CAL_SECONDS(m, l)		((FIELD_GET(TOD_SECONDSH_SEC_MSB, (m)) << 32) | (l))
+
+#define TOD_PERIOD_MASK		GENMASK_ULL(19, 0)
+#define TOD_PERIOD_MAX			FIELD_MAX(TOD_PERIOD_MASK)
+#define TOD_PERIOD_MIN			0
+#define TOD_DRIFT_ADJUST_MASK		GENMASK_ULL(15, 0)
+#define TOD_DRIFT_ADJUST_FNS_MAX	FIELD_MAX(TOD_DRIFT_ADJUST_MASK)
+#define TOD_DRIFT_ADJUST_RATE_MAX	TOD_DRIFT_ADJUST_FNS_MAX
+#define TOD_ADJUST_COUNT_MASK		GENMASK_ULL(19, 0)
+#define TOD_ADJUST_COUNT_MAX		FIELD_MAX(TOD_ADJUST_COUNT_MASK)
+#define TOD_ADJUST_INTERVAL_US		10
+#define TOD_ADJUST_MS			\
+		(((TOD_PERIOD_MAX >> 16) + 1) * (TOD_ADJUST_COUNT_MAX + 1))
+#define TOD_ADJUST_MS_MAX		(TOD_ADJUST_MS / MICRO)
+#define TOD_ADJUST_MAX_US		(TOD_ADJUST_MS_MAX * USEC_PER_MSEC)
+#define TOD_MAX_ADJ			(500 * MEGA)
 
 struct dfl_tod {
-	struct device *dev;
 	struct ptp_clock_info ptp_clock_ops;
+	struct device *dev;
 	struct ptp_clock *ptp_clock;
 
-	/* Time-of-Day (ToD) Clock address space */
+	/* ToD Clock address space */
 	void __iomem *tod_ctrl;
 
 	/* ToD clock registers protection */
 	spinlock_t tod_lock;
 };
 
-/* A fine ToD HW clock offset adjustment.
- * To perform the fine offset adjustment the AdjustPeriod register is used
- * to replace the Period register for AdjustCount clock cycles in hardware.
- * The dt->tod_lock spinlock must be held when calling this function.
+/*
+ * A fine ToD HW clock offset adjustment. To perform the fine offset adjustment, the
+ * adjust_period and adjust_count argument are used to update the TOD_ADJUST_PERIOD
+ * and TOD_ADJUST_COUNT register for in hardware. The dt->tod_lock spinlock must be
+ * held when calling this function.
  */
 static int fine_adjust_tod_clock(struct dfl_tod *dt, u32 adjust_period,
 				 u32 adjust_count)
 {
 	void __iomem *base = dt->tod_ctrl;
-	int limit;
+	u32 val;
 
-	writel(adjust_period, base + ADJUST_PERIOD);
-	writel(adjust_count, base + ADJUST_COUNT);
+	writel(adjust_period, base + TOD_ADJUST_PERIOD);
+	writel(adjust_count, base + TOD_ADJUST_COUNT);
 
 	/* Wait for present offset adjustment update to complete */
-	limit = TOD_ADJUST_MS_MAX;
-	while (limit--) {
-		if (!readl(base + ADJUST_COUNT))
-			break;
-		mdelay(1);
-	}
-	if (limit < 0)
-		return -EBUSY;
-	return 0;
+	return readl_poll_timeout_atomic(base + TOD_ADJUST_COUNT, val, !val, TOD_ADJUST_INTERVAL_US,
+				  TOD_ADJUST_MAX_US);
 }
 
-/* A coarse ToD HW clock offset adjustment.
- * The coarse time adjustment performs by adding or subtracting the delta value
- * from the current ToD HW clock time.
- * The dt->tod_lock spinlock must be held when calling this function.
+/*
+ * A coarse ToD HW clock offset adjustment. The coarse time adjustment performs by
+ * adding or subtracting the delta value from the current ToD HW clock time.
  */
 static int coarse_adjust_tod_clock(struct dfl_tod *dt, s64 delta)
 {
@@ -91,23 +104,21 @@ static int coarse_adjust_tod_clock(struct dfl_tod *dt, s64 delta)
 	if (delta == 0)
 		return 0;
 
-	/* Get current time */
-	nanosec = readl(base + NANOSEC);
-	seconds_lsb = readl(base + SECONDSL);
-	seconds_msb = readl(base + SECONDSH);
+	nanosec = readl(base + TOD_NANOSEC);
+	seconds_lsb = readl(base + TOD_SECONDSL);
+	seconds_msb = readl(base + TOD_SECONDSH);
 
 	/* Calculate new time */
-	seconds = (((u64)(seconds_msb & 0x0000ffff)) << 32) | seconds_lsb;
+	seconds = CAL_SECONDS(seconds_msb, seconds_lsb);
 	now = seconds * NSEC_PER_SEC + nanosec + delta;
 
 	seconds = div_u64_rem(now, NSEC_PER_SEC, &nanosec);
-	seconds_msb = upper_32_bits(seconds) & 0x0000ffff;
-	seconds_lsb = lower_32_bits(seconds);
+	seconds_msb = FIELD_GET(SECONDS_MSB, seconds);
+	seconds_lsb = FIELD_GET(SECONDS_LSB, seconds);
 
-	/* Set corrected time */
-	writel(seconds_msb, base + SECONDSH);
-	writel(seconds_lsb, base + SECONDSL);
-	writel(nanosec, base + NANOSEC);
+	writel(seconds_msb, base + TOD_SECONDSH);
+	writel(seconds_lsb, base + TOD_SECONDSL);
+	writel(nanosec, base + TOD_NANOSEC);
 
 	return 0;
 }
@@ -121,40 +132,37 @@ static int dfl_tod_adjust_fine(struct ptp_clock_info *ptp, long scaled_ppm)
 	u64 ppb;
 
 	/* Get the clock rate from clock frequency register offset */
-	rate = readl(base + CLK_F);
+	rate = readl(base + TOD_CLK_FREQ);
 
-	/* From scaled_ppm_to_ppb */
-	ppb = 1 + scaled_ppm;
-	ppb *= 125;
-	ppb >>= 13;
+	/* add GIGA as nominal ppb */
+	ppb = scaled_ppm_to_ppb(scaled_ppm) + GIGA;
 
-	ppb += NOMINAL_PPB;
-
-	tod_period = div_u64_rem(ppb << 16, rate, &tod_rem);
+	tod_period = div_u64_rem(ppb << PERIOD_FRAC_OFFSET, rate, &tod_rem);
 	if (tod_period > TOD_PERIOD_MAX)
 		return -ERANGE;
 
-	/* The drift of ToD adjusted periodically by adding a drift_adjust_fns
+	/*
+	 * The drift of ToD adjusted periodically by adding a drift_adjust_fns
 	 * correction value every drift_adjust_rate count of clock cycles.
 	 */
 	tod_drift_adjust_fns = tod_rem / gcd(tod_rem, rate);
 	tod_drift_adjust_rate = rate / gcd(tod_rem, rate);
 
-	while ((tod_drift_adjust_fns > TOD_DRIFT_ADJUST_FNS_MAX) |
-		(tod_drift_adjust_rate > TOD_DRIFT_ADJUST_RATE_MAX)) {
-		tod_drift_adjust_fns = tod_drift_adjust_fns >> 1;
-		tod_drift_adjust_rate = tod_drift_adjust_rate >> 1;
+	while ((tod_drift_adjust_fns > TOD_DRIFT_ADJUST_FNS_MAX) ||
+	       (tod_drift_adjust_rate > TOD_DRIFT_ADJUST_RATE_MAX)) {
+		tod_drift_adjust_fns >>= 1;
+		tod_drift_adjust_rate >>= 1;
 	}
 
 	if (tod_drift_adjust_fns == 0)
 		tod_drift_adjust_rate = 0;
 
 	spin_lock_irqsave(&dt->tod_lock, flags);
-	writel(tod_period, base + PERIOD);
-	writel(0, base + ADJUST_PERIOD);
-	writel(0, base + ADJUST_COUNT);
-	writel(tod_drift_adjust_fns, base + DRIFT_ADJUST);
-	writel(tod_drift_adjust_rate, base + DRIFT_ADJUST_RATE);
+	writel(tod_period, base + TOD_PERIOD);
+	writel(0, base + TOD_ADJUST_PERIOD);
+	writel(0, base + TOD_ADJUST_COUNT);
+	writel(tod_drift_adjust_fns, base + TOD_DRIFT_ADJUST);
+	writel(tod_drift_adjust_rate, base + TOD_DRIFT_ADJUST_RATE);
 	spin_unlock_irqrestore(&dt->tod_lock, flags);
 
 	return 0;
@@ -165,56 +173,47 @@ static int dfl_tod_adjust_time(struct ptp_clock_info *ptp, s64 delta)
 	struct dfl_tod *dt = container_of(ptp, struct dfl_tod, ptp_clock_ops);
 	u32 period, diff, rem, rem_period, adj_period;
 	void __iomem *base = dt->tod_ctrl;
-	int neg_adj = 0, ret = 0;
 	unsigned long flags;
+	bool neg_adj;
 	u64 count;
+	int ret;
 
-	if (delta < 0) {
-		neg_adj = 1;
+	neg_adj = delta < 0;
+	if (neg_adj)
 		delta = -delta;
-	}
 
 	spin_lock_irqsave(&dt->tod_lock, flags);
 
-	/* Get the maximum possible value of the Period register offset
+	/*
+	 * Get the maximum possible value of the Period register offset
 	 * adjustment in nanoseconds scale. This depends on the current
 	 * Period register setting and the maximum and minimum possible
 	 * values of the Period register.
 	 */
-	period = readl(base + PERIOD);
-
-	if (neg_adj)
-		diff = (period - TOD_PERIOD_MIN) >> 16;
-	else
-		diff = (TOD_PERIOD_MAX - period) >> 16;
-
-	/* Find the number of cycles required for the
-	 * time adjustment
-	 */
-	count = div_u64_rem(delta, diff, &rem);
+	period = readl(base + TOD_PERIOD);
 
 	if (neg_adj) {
-		adj_period = period - (diff << 16);
-		rem_period = period - (rem << 16);
+		diff = (period - TOD_PERIOD_MIN) >> PERIOD_FRAC_OFFSET;
+		adj_period = period - (diff << PERIOD_FRAC_OFFSET);
+		count = div_u64_rem(delta, diff, &rem);
+		rem_period = period - (rem << PERIOD_FRAC_OFFSET);
 	} else {
-		adj_period = period + (diff << 16);
-		rem_period = period + (rem << 16);
+		diff = (TOD_PERIOD_MAX - period) >> PERIOD_FRAC_OFFSET;
+		adj_period = period + (diff << PERIOD_FRAC_OFFSET);
+		count = div_u64_rem(delta, diff, &rem);
+		rem_period = period + (rem << PERIOD_FRAC_OFFSET);
 	}
 
-	/* If count is larger than the maximum count,
-	 * just set the time.
-	 */
+	ret = 0;
+
 	if (count > TOD_ADJUST_COUNT_MAX) {
-		/* Perform the coarse time offset adjustment */
 		ret = coarse_adjust_tod_clock(dt, delta);
 	} else {
-		/* Adjust the period for count cycles to adjust the time */
+		/* Adjust the period by count cycles to adjust the time */
 		if (count)
 			ret = fine_adjust_tod_clock(dt, adj_period, count);
 
-		/* If there is a remainder, adjust the period for an
-		 * additional cycle
-		 */
+		/* If there is a remainder, adjust the period for an additional cycle */
 		if (rem)
 			ret = fine_adjust_tod_clock(dt, rem_period, 1);
 	}
@@ -224,7 +223,8 @@ static int dfl_tod_adjust_time(struct ptp_clock_info *ptp, s64 delta)
 	return ret;
 }
 
-static int dfl_tod_get_time(struct ptp_clock_info *ptp, struct timespec64 *ts)
+static int dfl_tod_get_timex(struct ptp_clock_info *ptp, struct timespec64 *ts,
+			     struct ptp_system_timestamp *sts)
 {
 	struct dfl_tod *dt = container_of(ptp, struct dfl_tod, ptp_clock_ops);
 	u32 seconds_msb, seconds_lsb, nanosec;
@@ -233,15 +233,17 @@ static int dfl_tod_get_time(struct ptp_clock_info *ptp, struct timespec64 *ts)
 	u64 seconds;
 
 	spin_lock_irqsave(&dt->tod_lock, flags);
-	nanosec = readl(base + NANOSEC);
-	seconds_lsb = readl(base + SECONDSL);
-	seconds_msb = readl(base + SECONDSH);
+	ptp_read_system_prets(sts);
+	nanosec = readl(base + TOD_NANOSEC);
+	seconds_lsb = readl(base + TOD_SECONDSL);
+	seconds_msb = readl(base + TOD_SECONDSH);
+	ptp_read_system_postts(sts);
 	spin_unlock_irqrestore(&dt->tod_lock, flags);
 
-	seconds = (((u64)(seconds_msb & 0x0000ffff)) << 32) | seconds_lsb;
+	seconds = CAL_SECONDS(seconds_msb, seconds_lsb);
 
 	ts->tv_nsec = nanosec;
-	ts->tv_sec = (__kernel_old_time_t)seconds;
+	ts->tv_sec = seconds;
 
 	return 0;
 }
@@ -250,40 +252,29 @@ static int dfl_tod_set_time(struct ptp_clock_info *ptp,
 			    const struct timespec64 *ts)
 {
 	struct dfl_tod *dt = container_of(ptp, struct dfl_tod, ptp_clock_ops);
-	u32 seconds_msb = upper_32_bits(ts->tv_sec) & 0x0000ffff;
-	u32 seconds_lsb = lower_32_bits(ts->tv_sec);
-	u32 nanosec = lower_32_bits(ts->tv_nsec);
+	u32 seconds_msb = FIELD_GET(SECONDS_MSB, ts->tv_sec);
+	u32 seconds_lsb = FIELD_GET(SECONDS_LSB, ts->tv_sec);
+	u32 nanosec = FIELD_GET(SECONDS_LSB, ts->tv_nsec);
 	void __iomem *base = dt->tod_ctrl;
 	unsigned long flags;
 
 	spin_lock_irqsave(&dt->tod_lock, flags);
-	writel(seconds_msb, base + SECONDSH);
-	writel(seconds_lsb, base + SECONDSL);
-	writel(nanosec, base + NANOSEC);
+	writel(seconds_msb, base + TOD_SECONDSH);
+	writel(seconds_lsb, base + TOD_SECONDSL);
+	writel(nanosec, base + TOD_NANOSEC);
 	spin_unlock_irqrestore(&dt->tod_lock, flags);
 
 	return 0;
 }
 
-static int dfl_tod_enable_feature(struct ptp_clock_info *ptp,
-				  struct ptp_clock_request *request, int on)
-{
-	return -EOPNOTSUPP;
-}
-
 static struct ptp_clock_info dfl_tod_clock_ops = {
 	.owner = THIS_MODULE,
 	.name = "dfl_tod",
-	.max_adj = 500000000,
-	.n_alarm = 0,
-	.n_ext_ts = 0,
-	.n_per_out = 0,
-	.pps = 0,
+	.max_adj = TOD_MAX_ADJ,
 	.adjfine = dfl_tod_adjust_fine,
 	.adjtime = dfl_tod_adjust_time,
-	.gettime64 = dfl_tod_get_time,
+	.gettimex64 = dfl_tod_get_timex,
 	.settime64 = dfl_tod_set_time,
-	.enable = dfl_tod_enable_feature,
 };
 
 static int dfl_tod_probe(struct dfl_device *ddev)
@@ -295,7 +286,6 @@ static int dfl_tod_probe(struct dfl_device *ddev)
 	if (!dt)
 		return -ENOMEM;
 
-	/* Time-of-Day (ToD) Clock address space */
 	dt->tod_ctrl = devm_ioremap_resource(dev, &ddev->mmio_res);
 	if (IS_ERR(dt->tod_ctrl))
 		return PTR_ERR(dt->tod_ctrl);
@@ -304,18 +294,12 @@ static int dfl_tod_probe(struct dfl_device *ddev)
 	spin_lock_init(&dt->tod_lock);
 	dev_set_drvdata(dev, dt);
 
-	dev_info(&ddev->dev, "\tTOD Ctrl at 0x%08lx\n",
-		 (unsigned long)ddev->mmio_res.start);
-
-	/* Register the PTP clock driver to the kernel */
 	dt->ptp_clock_ops = dfl_tod_clock_ops;
 
 	dt->ptp_clock = ptp_clock_register(&dt->ptp_clock_ops, dev);
-	if (IS_ERR(dt->ptp_clock)) {
-		dev_err(&ddev->dev, "Unable to register PTP clock\n");
-		dt->ptp_clock = NULL;
-		return PTR_ERR(dt->ptp_clock);
-	}
+	if (IS_ERR(dt->ptp_clock))
+		return dev_err_probe(dt->dev, PTR_ERR(dt->ptp_clock),
+				     "Unable to register PTP clock\n");
 
 	return 0;
 }
@@ -324,16 +308,12 @@ static void dfl_tod_remove(struct dfl_device *ddev)
 {
 	struct dfl_tod *dt = dev_get_drvdata(&ddev->dev);
 
-	/* Unregister the PTP clock driver from the kernel */
-	if (dt->ptp_clock) {
-		ptp_clock_unregister(dt->ptp_clock);
-		dt->ptp_clock = NULL;
-	}
+	ptp_clock_unregister(dt->ptp_clock);
 }
 
 static const struct dfl_device_id dfl_tod_ids[] = {
-		{ FME_ID, FME_FEATURE_ID_TOD },
-		{ }
+	{ FME_ID, FME_FEATURE_ID_TOD },
+	{ }
 };
 MODULE_DEVICE_TABLE(dfl, dfl_tod_ids);
 
@@ -347,6 +327,6 @@ static struct dfl_driver dfl_tod_driver = {
 };
 module_dfl_driver(dfl_tod_driver);
 
-MODULE_DESCRIPTION("DFL ToD driver");
+MODULE_DESCRIPTION("FPGA DFL ToD driver");
 MODULE_AUTHOR("Intel Corporation");
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL");
