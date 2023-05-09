@@ -49,7 +49,8 @@ static bool m10bmc_reg_always_available(struct intel_m10bmc *m10bmc, unsigned in
 static bool m10bmc_handshake_reg_unavailable(struct intel_m10bmc *m10bmc)
 {
 	return m10bmc->bmcfw_state == M10BMC_FW_STATE_SEC_UPDATE_PREPARE ||
-	       m10bmc->bmcfw_state == M10BMC_FW_STATE_SEC_UPDATE_WRITE;
+	       m10bmc->bmcfw_state == M10BMC_FW_STATE_SEC_UPDATE_WRITE ||
+	       m10bmc->bmcfw_state == M10BMC_FW_RETIMER_EEPROM_LOAD;
 }
 
 /*
