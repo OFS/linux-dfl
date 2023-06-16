@@ -1178,11 +1178,12 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 	finfo->dfh_version = dfh_ver;
 	if (dfh_ver == 1) {
 		v = readq(binfo->ioaddr + ofst + DFHv1_CSR_ADDR);
-		addr_off = FIELD_GET(DFHv1_CSR_ADDR_MASK, v);
+		addr_off = FIELD_GET(DFHv1_CSR_ADDR_MASK, v) << 1;
+
 		if (FIELD_GET(DFHv1_CSR_ADDR_REL, v))
-			start = addr_off << 1;
+			start = addr_off;
 		else
-			start = binfo->start + ofst + addr_off;
+			start = binfo->start + ofst + (int64_t)addr_off;
 
 		v = readq(binfo->ioaddr + ofst + DFHv1_CSR_SIZE_GRP);
 		end = start + FIELD_GET(DFHv1_CSR_SIZE_GRP_SIZE, v) - 1;
