@@ -170,9 +170,19 @@ The format of Version 1 of the Device Feature Header (DFH) is shown below::
 
 - Offset 0x18
 
-  * Reg Address/Offset - If Rel bit is set, then the value is the high 63 bits
-    of a 16-bit aligned absolute address of the feature's registers. Otherwise
-    the value is the offset from the start of the DFH of the feature's registers.
+  * CSR_ADDR[63:1]: the value is the high 63 bits of a 16-bit aligned
+  address/offset of the feature's registers.
+
+  * CSR_ADDR_REL_N [0]: This bit controls whether the address is an absolute
+  address or a relative offset.
+  When CSR_ADDR_REL_N is set to 1, it indicates that the address is an unsigned
+  absolute address. In this case, the 64-bit value of the register is read, and
+  bit 0 is masked (set to 0).
+  When CSR_ADDR_REL_N is set to 0, it signifies that the offset is a signed relative
+  offset from the DFH start. Again, the 64-bit value of the register is read,
+  and bit 0 is masked.
+  In both cases, the purpose of masking bit 0 is to ensure that the resulting address
+  or offset is aligned.
 
 - Offset 0x20
 
