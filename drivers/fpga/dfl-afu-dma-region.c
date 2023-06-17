@@ -152,8 +152,7 @@ static int afu_dma_region_add(struct dfl_feature_dev_data *fdata,
 	struct device *dev = &fdata->dev->dev;
 	struct rb_node **new, *parent = NULL;
 
-	dev_dbg(dev, "add region (iova = %llx)\n",
-		(unsigned long long)region->iova);
+	dev_dbg(dev, "add region (iova = %llx)\n", region->iova);
 
 	new = &afu->dma_regions.rb_node;
 
@@ -194,8 +193,7 @@ static void afu_dma_region_remove(struct dfl_feature_dev_data *fdata,
 	struct device *dev = &fdata->dev->dev;
 	struct dfl_afu *afu;
 
-	dev_dbg(dev, "del region (iova = %llx)\n",
-		(unsigned long long)region->iova);
+	dev_dbg(dev, "del region (iova = %llx)\n", region->iova);
 
 	afu = dfl_fpga_fdata_get_private(fdata);
 	rb_erase(&region->node, &afu->dma_regions);
@@ -217,7 +215,7 @@ void afu_dma_region_destroy(struct dfl_feature_dev_data *fdata)
 		region = container_of(node, struct dfl_afu_dma_region, node);
 
 		dev_dbg(&fdata->dev->dev, "del region (iova = %llx)\n",
-			(unsigned long long)region->iova);
+			region->iova);
 
 		rb_erase(node, &afu->dma_regions);
 
@@ -262,7 +260,7 @@ afu_dma_region_find(struct dfl_feature_dev_data *fdata, u64 iova, u64 size)
 
 		if (dma_region_check_iova(region, iova, size)) {
 			dev_dbg(dev, "find region (iova = %llx)\n",
-				(unsigned long long)region->iova);
+				region->iova);
 			return region;
 		}
 
@@ -275,8 +273,8 @@ afu_dma_region_find(struct dfl_feature_dev_data *fdata, u64 iova, u64 size)
 			break;
 	}
 
-	dev_dbg(dev, "region with iova %llx and size %llx is not found\n",
-		(unsigned long long)iova, (unsigned long long)size);
+	dev_dbg(dev, "region with iova %llx and size %llx is not found\n", iova,
+		size);
 
 	return NULL;
 }
