@@ -10,6 +10,7 @@
  */
 
 #include <linux/dma-mapping.h>
+#include <linux/pfn.h>
 #include <linux/sched/signal.h>
 #include <linux/uaccess.h>
 #include <linux/mm.h>
@@ -34,7 +35,7 @@ void afu_dma_region_init(struct dfl_feature_platform_data *pdata)
 static int afu_dma_pin_pages(struct dfl_feature_platform_data *pdata,
 			     struct dfl_afu_dma_region *region)
 {
-	int npages = region->length >> PAGE_SHIFT;
+	int npages = PFN_DOWN(region->length);
 	struct device *dev = &pdata->dev->dev;
 	int ret, pinned;
 
@@ -82,7 +83,7 @@ unlock_vm:
 static void afu_dma_unpin_pages(struct dfl_feature_platform_data *pdata,
 				struct dfl_afu_dma_region *region)
 {
-	long npages = region->length >> PAGE_SHIFT;
+	long npages = PFN_DOWN(region->length);
 	struct device *dev = &pdata->dev->dev;
 
 	unpin_user_pages(region->pages, npages);
@@ -101,7 +102,7 @@ static void afu_dma_unpin_pages(struct dfl_feature_platform_data *pdata,
  */
 static bool afu_dma_check_continuous_pages(struct dfl_afu_dma_region *region)
 {
-	int npages = region->length >> PAGE_SHIFT;
+	int npages = PFN_DOWN(region->length);
 	int i;
 
 	for (i = 0; i < npages - 1; i++)
