@@ -52,7 +52,7 @@ static ssize_t pcie0_errors_show(struct device *dev,
 	value = readq(base + PCIE0_ERROR);
 	mutex_unlock(&fdata->lock);
 
-	return sprintf(buf, "0x%llx\n", (unsigned long long)value);
+	return sysfs_emit(buf, "0x%llx\n", value);
 }
 
 static ssize_t pcie0_errors_store(struct device *dev,
@@ -97,7 +97,7 @@ static ssize_t pcie1_errors_show(struct device *dev,
 	value = readq(base + PCIE1_ERROR);
 	mutex_unlock(&fdata->lock);
 
-	return sprintf(buf, "0x%llx\n", (unsigned long long)value);
+	return sysfs_emit(buf, "0x%llx\n", value);
 }
 
 static ssize_t pcie1_errors_store(struct device *dev,
@@ -137,8 +137,7 @@ static ssize_t nonfatal_errors_show(struct device *dev,
 
 	base = dfl_get_feature_ioaddr_by_id(fdata, FME_FEATURE_ID_GLOBAL_ERR);
 
-	return sprintf(buf, "0x%llx\n",
-		       (unsigned long long)readq(base + RAS_NONFAT_ERROR));
+	return sysfs_emit(buf, "0x%llx\n", readq(base + RAS_NONFAT_ERROR));
 }
 static DEVICE_ATTR_RO(nonfatal_errors);
 
@@ -150,8 +149,7 @@ static ssize_t catfatal_errors_show(struct device *dev,
 
 	base = dfl_get_feature_ioaddr_by_id(fdata, FME_FEATURE_ID_GLOBAL_ERR);
 
-	return sprintf(buf, "0x%llx\n",
-		       (unsigned long long)readq(base + RAS_CATFAT_ERROR));
+	return sysfs_emit(buf, "0x%llx\n", readq(base + RAS_CATFAT_ERROR));
 }
 static DEVICE_ATTR_RO(catfatal_errors);
 
@@ -168,8 +166,7 @@ static ssize_t inject_errors_show(struct device *dev,
 	v = readq(base + RAS_ERROR_INJECT);
 	mutex_unlock(&fdata->lock);
 
-	return sprintf(buf, "0x%llx\n",
-		       (unsigned long long)FIELD_GET(INJECT_ERROR_MASK, v));
+	return sysfs_emit(buf, "0x%llx\n", FIELD_GET(INJECT_ERROR_MASK, v));
 }
 
 static ssize_t inject_errors_store(struct device *dev,
@@ -213,7 +210,7 @@ static ssize_t fme_errors_show(struct device *dev,
 	value = readq(base + FME_ERROR);
 	mutex_unlock(&fdata->lock);
 
-	return sprintf(buf, "0x%llx\n", (unsigned long long)value);
+	return sysfs_emit(buf, "0x%llx\n", value);
 }
 
 static ssize_t fme_errors_store(struct device *dev,
@@ -260,7 +257,7 @@ static ssize_t first_error_show(struct device *dev,
 	value = readq(base + FME_FIRST_ERROR);
 	mutex_unlock(&fdata->lock);
 
-	return sprintf(buf, "0x%llx\n", (unsigned long long)value);
+	return sysfs_emit(buf, "0x%llx\n", value);
 }
 static DEVICE_ATTR_RO(first_error);
 
@@ -277,7 +274,7 @@ static ssize_t next_error_show(struct device *dev,
 	value = readq(base + FME_NEXT_ERROR);
 	mutex_unlock(&fdata->lock);
 
-	return sprintf(buf, "0x%llx\n", (unsigned long long)value);
+	return sysfs_emit(buf, "0x%llx\n", value);
 }
 static DEVICE_ATTR_RO(next_error);
 
