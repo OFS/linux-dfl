@@ -125,7 +125,7 @@ static ssize_t errors_show(struct device *dev, struct device_attribute *attr,
 	error = readq(base + PORT_ERROR);
 	mutex_unlock(&pdata->lock);
 
-	return sprintf(buf, "0x%llx\n", (unsigned long long)error);
+	return sysfs_emit(buf, "0x%llx\n", error);
 }
 
 static ssize_t errors_store(struct device *dev, struct device_attribute *attr,
@@ -156,7 +156,7 @@ static ssize_t first_error_show(struct device *dev,
 	error = readq(base + PORT_FIRST_ERROR);
 	mutex_unlock(&pdata->lock);
 
-	return sprintf(buf, "0x%llx\n", (unsigned long long)error);
+	return sysfs_emit(buf, "0x%llx\n", error);
 }
 static DEVICE_ATTR_RO(first_error);
 
@@ -175,8 +175,7 @@ static ssize_t first_malformed_req_show(struct device *dev,
 	req1 = readq(base + PORT_MALFORMED_REQ1);
 	mutex_unlock(&pdata->lock);
 
-	return sprintf(buf, "0x%016llx%016llx\n",
-		       (unsigned long long)req1, (unsigned long long)req0);
+	return sysfs_emit(buf, "0x%016llx%016llx\n", req1, req0);
 }
 static DEVICE_ATTR_RO(first_malformed_req);
 
