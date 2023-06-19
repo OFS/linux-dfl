@@ -730,9 +730,7 @@ afu_ioctl_dma_map(struct dfl_feature_platform_data *pdata, void __user *arg)
 	}
 
 	dev_dbg(&pdata->dev->dev, "dma map: ua=%llx, len=%llx, iova=%llx\n",
-		(unsigned long long)map.user_addr,
-		(unsigned long long)map.length,
-		(unsigned long long)map.iova);
+		map.user_addr, map.length, map.iova);
 
 	return 0;
 }
