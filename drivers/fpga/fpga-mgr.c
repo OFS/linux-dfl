@@ -618,7 +618,7 @@ static ssize_t name_show(struct device *dev,
 {
 	struct fpga_manager *mgr = to_fpga_manager(dev);
 
-	return sprintf(buf, "%s\n", mgr->name);
+	return sysfs_emit(buf, "%s\n", mgr->name);
 }
 
 static ssize_t state_show(struct device *dev,
@@ -626,7 +626,7 @@ static ssize_t state_show(struct device *dev,
 {
 	struct fpga_manager *mgr = to_fpga_manager(dev);
 
-	return sprintf(buf, "%s\n", state_str[mgr->state]);
+	return sysfs_emit(buf, "%s\n", state_str[mgr->state]);
 }
 
 static ssize_t status_show(struct device *dev,

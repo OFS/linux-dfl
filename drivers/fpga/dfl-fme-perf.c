@@ -524,20 +524,18 @@ static ssize_t fme_perf_event_show(struct device *dev,
 {
 	struct dev_ext_attribute *eattr;
 	unsigned long config;
-	char *ptr = buf;
 
 	eattr = container_of(attr, struct dev_ext_attribute, attr);
 	config = (unsigned long)eattr->var;
 
-	ptr += sprintf(ptr, "event=0x%02x", (unsigned int)get_event(config));
-	ptr += sprintf(ptr, ",evtype=0x%02x", (unsigned int)get_evtype(config));
+	if (!is_portid_root(get_portid(config)))
+		return sysfs_emit(buf,
+				  "event=0x%02llx,evtype=0x%02llx,portid=?\n",
+				  get_event(config), get_evtype(config));
 
-	if (is_portid_root(get_portid(config)))
-		ptr += sprintf(ptr, ",portid=0x%02x\n", FME_PORTID_ROOT);
-	else
-		ptr += sprintf(ptr, ",portid=?\n");
-
-	return (ssize_t)(ptr - buf);
+	return sysfs_emit(buf, "event=0x%02llx,evtype=0x%02llx,portid=0x%02x\n",
+			  get_event(config), get_evtype(config),
+			  FME_PORTID_ROOT);
 }
 
 #define FME_EVENT_ATTR(_name) \

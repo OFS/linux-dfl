@@ -157,7 +157,7 @@ id_show(struct device *dev, struct device_attribute *attr, char *buf)
 	struct dfl_feature_dev_data *fdata = to_dfl_feature_dev_data(dev);
 	int id = port_get_id(fdata);
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", id);
+	return sysfs_emit(buf, "%d\n", id);
 }
 static DEVICE_ATTR_RO(id);
 
@@ -174,7 +174,7 @@ ltr_show(struct device *dev, struct device_attribute *attr, char *buf)
 	v = readq(base + PORT_HDR_CTRL);
 	mutex_unlock(&fdata->lock);
 
-	return sprintf(buf, "%x\n", (u8)FIELD_GET(PORT_CTRL_LATENCY, v));
+	return sysfs_emit(buf, "%llx\n", FIELD_GET(PORT_CTRL_LATENCY, v));
 }
 
 static ssize_t
@@ -215,7 +215,7 @@ ap1_event_show(struct device *dev, struct device_attribute *attr, char *buf)
 	v = readq(base + PORT_HDR_STS);
 	mutex_unlock(&fdata->lock);
 
-	return sprintf(buf, "%x\n", (u8)FIELD_GET(PORT_STS_AP1_EVT, v));
+	return sysfs_emit(buf, "%llx\n", FIELD_GET(PORT_STS_AP1_EVT, v));
 }
 
 static ssize_t
@@ -253,7 +253,7 @@ ap2_event_show(struct device *dev, struct device_attribute *attr,
 	v = readq(base + PORT_HDR_STS);
 	mutex_unlock(&fdata->lock);
 
-	return sprintf(buf, "%x\n", (u8)FIELD_GET(PORT_STS_AP2_EVT, v));
+	return sysfs_emit(buf, "%llx\n", FIELD_GET(PORT_STS_AP2_EVT, v));
 }
 
 static ssize_t
@@ -290,7 +290,7 @@ power_state_show(struct device *dev, struct device_attribute *attr, char *buf)
 	v = readq(base + PORT_HDR_STS);
 	mutex_unlock(&fdata->lock);
 
-	return sprintf(buf, "0x%x\n", (u8)FIELD_GET(PORT_STS_PWR_STATE, v));
+	return sysfs_emit(buf, "0x%llx\n", FIELD_GET(PORT_STS_PWR_STATE, v));
 }
 static DEVICE_ATTR_RO(power_state);
 
@@ -350,7 +350,7 @@ userclk_freqsts_show(struct device *dev, struct device_attribute *attr,
 	userclk_freqsts = readq(base + PORT_HDR_USRCLK_STS0);
 	mutex_unlock(&fdata->lock);
 
-	return sprintf(buf, "0x%llx\n", (unsigned long long)userclk_freqsts);
+	return sysfs_emit(buf, "0x%llx\n", userclk_freqsts);
 }
 static DEVICE_ATTR_RO(userclk_freqsts);
 
@@ -368,8 +368,7 @@ userclk_freqcntrsts_show(struct device *dev, struct device_attribute *attr,
 	userclk_freqcntrsts = readq(base + PORT_HDR_USRCLK_STS1);
 	mutex_unlock(&fdata->lock);
 
-	return sprintf(buf, "0x%llx\n",
-		       (unsigned long long)userclk_freqcntrsts);
+	return sysfs_emit(buf, "0x%llx\n", userclk_freqcntrsts);
 }
 static DEVICE_ATTR_RO(userclk_freqcntrsts);
 
@@ -476,7 +475,7 @@ afu_id_show(struct device *dev, struct device_attribute *attr, char *buf)
 	guidh = readq(base + GUID_H);
 	mutex_unlock(&fdata->lock);
 
-	return scnprintf(buf, PAGE_SIZE, "%016llx%016llx\n", guidh, guidl);
+	return sysfs_emit(buf, "%016llx%016llx\n", guidh, guidl);
 }
 static DEVICE_ATTR_RO(afu_id);
 
