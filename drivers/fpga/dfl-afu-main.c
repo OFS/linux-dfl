@@ -16,6 +16,7 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/pfn.h>
 #include <linux/uaccess.h>
 #include <linux/fpga-dfl.h>
 
@@ -816,7 +817,7 @@ static int afu_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	pdata = dev_get_platdata(&pdev->dev);
 
-	offset = vma->vm_pgoff << PAGE_SHIFT;
+	offset = PFN_PHYS(vma->vm_pgoff);
 	ret = afu_mmio_region_get_by_offset(pdata, offset, size, &region);
 	if (ret)
 		return ret;
@@ -837,7 +838,7 @@ static int afu_mmap(struct file *filp, struct vm_area_struct *vma)
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
 	return remap_pfn_range(vma, vma->vm_start,
-			(region.phys + (offset - region.offset)) >> PAGE_SHIFT,
+			PFN_DOWN(region.phys + (offset - region.offset)),
 			size, vma->vm_page_prot);
 }
 
