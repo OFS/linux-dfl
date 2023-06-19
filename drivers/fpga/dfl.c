@@ -295,7 +295,7 @@ type_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct dfl_device *ddev = to_dfl_dev(dev);
 
-	return sprintf(buf, "0x%x\n", ddev->type);
+	return sysfs_emit(buf, "0x%x\n", ddev->type);
 }
 static DEVICE_ATTR_RO(type);
 
@@ -304,7 +304,7 @@ feature_id_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct dfl_device *ddev = to_dfl_dev(dev);
 
-	return sprintf(buf, "0x%x\n", ddev->feature_id);
+	return sysfs_emit(buf, "0x%x\n", ddev->feature_id);
 }
 static DEVICE_ATTR_RO(feature_id);
 
