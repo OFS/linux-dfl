@@ -150,7 +150,7 @@ static int fme_mgr_write_init(struct fpga_manager *mgr,
 	priv->pr_error = fme_mgr_pr_error_handle(fme_pr);
 	if (priv->pr_error)
 		dev_dbg(dev, "previous PR error detected %llx\n",
-			(unsigned long long)priv->pr_error);
+			priv->pr_error);
 
 	dev_dbg(dev, "set PR port ID\n");
 
@@ -242,8 +242,7 @@ static int fme_mgr_write_complete(struct fpga_manager *mgr,
 	dev_dbg(dev, "PR operation complete, checking status\n");
 	priv->pr_error = fme_mgr_pr_error_handle(fme_pr);
 	if (priv->pr_error) {
-		dev_dbg(dev, "PR error detected %llx\n",
-			(unsigned long long)priv->pr_error);
+		dev_dbg(dev, "PR error detected %llx\n", priv->pr_error);
 		return -EIO;
 	}
 
