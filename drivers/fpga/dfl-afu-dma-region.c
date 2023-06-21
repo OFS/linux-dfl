@@ -87,8 +87,8 @@ unlock_vm:
 static void afu_dma_unpin_pages(struct dfl_feature_dev_data *fdata,
 				struct dfl_afu_dma_region *region)
 {
-	struct device *dev = &fdata->dev->dev;
 	long npages = PFN_DOWN(region->length);
+	struct device *dev = &fdata->dev->dev;
 
 	unpin_user_pages(region->pages, npages);
 	kfree(region->pages);
