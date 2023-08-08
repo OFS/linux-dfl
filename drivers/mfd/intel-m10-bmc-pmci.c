@@ -359,6 +359,12 @@ static struct mfd_cell m10bmc_pmci_c6100_bmc_subdevs[] = {
 	{ .name = "c6100bmc-log" },
 };
 
+static struct mfd_cell m10bmc_pmci_cmc_bmc_subdevs[] = {
+	{ .name = "cmcbmc-hwmon" },
+	{ .name = "cmcbmc-sec-update" },
+	{ .name = "cmcbmc-log" },
+};
+
 static const struct m10bmc_csr_map m10bmc_n6000_csr_map = {
 	.base = M10BMC_N6000_SYS_BASE,
 	.build_version = M10BMC_N6000_BUILD_VER,
@@ -421,6 +427,12 @@ static const struct intel_m10bmc_platform_info m10bmc_pmci_c6100 = {
 	.csr_map = &m10bmc_c6100_csr_map,
 };
 
+static const struct intel_m10bmc_platform_info m10bmc_pmci_cmc = {
+	.cells = m10bmc_pmci_cmc_bmc_subdevs,
+	.n_cells = ARRAY_SIZE(m10bmc_pmci_cmc_bmc_subdevs),
+	.csr_map = &m10bmc_c6100_csr_map,
+};
+
 static int m10bmc_pmci_probe(struct dfl_device *ddev)
 {
 	const struct intel_m10bmc_platform_info *pinfo;
@@ -435,6 +447,9 @@ static int m10bmc_pmci_probe(struct dfl_device *ddev)
 		break;
 	case 2:
 		pinfo = &m10bmc_pmci_c6100;
+		break;
+	case 3:
+		pinfo = &m10bmc_pmci_cmc;
 		break;
 	default:
 		return -ENODEV;
