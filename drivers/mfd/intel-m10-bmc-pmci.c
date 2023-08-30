@@ -264,7 +264,7 @@ static struct mfd_cell m10bmc_pmci_c6100_bmc_subdevs[] = {
 static struct mfd_cell m10bmc_pmci_cmc_bmc_subdevs[] = {
 	{ .name = "cmcbmc-hwmon" },
 	{ .name = "n6000bmc-sec-update" },
-	{ .name = "n6000bmc-log" },
+	{ .name = "cmcbmc-log" },
 };
 
 static const struct m10bmc_csr_map m10bmc_n6000_csr_map = {
@@ -332,7 +332,7 @@ static const struct intel_m10bmc_platform_info m10bmc_pmci_c6100 = {
 static const struct intel_m10bmc_platform_info m10bmc_pmci_cmc = {
 	.cells = m10bmc_pmci_cmc_bmc_subdevs,
 	.n_cells = ARRAY_SIZE(m10bmc_pmci_cmc_bmc_subdevs),
-	.csr_map = &m10bmc_n6000_csr_map,
+	.csr_map = &m10bmc_c6100_csr_map,
 };
 
 static int m10bmc_pmci_probe(struct dfl_device *ddev)
