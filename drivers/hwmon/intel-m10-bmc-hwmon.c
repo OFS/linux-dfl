@@ -822,141 +822,142 @@ static const struct m10bmc_hwmon_board_data c6100bmc_hwmon_bdata = {
 };
 
 static const struct m10bmc_sdata cmcbmc_temp_tbl[] = {
-	{ 0x440, 0x0, 0x0, 0x0, 0x0, 500, "FPGA E-TILE Max Temperature" },
-	{ 0x444, 0x448, 0x44c, 0x0, 0x0, 500, "FPGA E-TILE Temperature #1" },
-	{ 0x450, 0x454, 0x458, 0x0, 0x0, 500, "FPGA E-TILE Temperature #2" },
-	{ 0x45c, 0x460, 0x464, 0x0, 0x0, 500, "FPGA E-TILE Temperature #3" },
-	{ 0x468, 0x46c, 0x470, 0x0, 0x0, 500, "FPGA E-TILE Temperature #4" },
-	{ 0x474, 0x478, 0x47c, 0x0, 0x0, 500, "FPGA P-TILE Temperature" },
-	{ 0x5b4, 0x5b8, 0x5bc, 0x0, 0x0, 500, "FPGA P-TILE2 DTS Temperature" },
-	{ 0x480, 0x0, 0x0, 0x0, 0x0, 500, "FPGA FABRIC Max Temperature" },
-	{ 0x484, 0x488, 0x48c, 0x0, 0x0, 500, "FPGA FABRIC Digital Temperature#1" },
-	{ 0x490, 0x494, 0x498, 0x0, 0x0, 500, "FPGA FABRIC Digital Temperature#2" },
-	{ 0x49c, 0x4a0, 0x4a4, 0x0, 0x0, 500, "FPGA FABRIC Digital Temperature#3" },
-	{ 0x4a8, 0x4ac, 0x4b0, 0x0, 0x0, 500, "FPGA FABRIC Digital Temperature#4" },
-	{ 0x4b4, 0x4b8, 0x4bc, 0x0, 0x0, 500, "FPGA FABRIC Digital Temperature#5" },
-	{ 0x4d8, 0x4dc, 0x4e0, 0x0, 0x0, 500, "FPGA FABRIC Remote Digital Temperature#3" },
-	{ 0x4e4, 0x4e8, 0x4ec, 0x0, 0x0, 500, "FPGA FABRIC Remote Digital Temperature#4" },
-	{ 0x4fc, 0x500, 0x504, 0x5c0, 0x0, 500, "Board Bottom Temperature" },
-	{ 0x5e8, 0x5ec, 0x5f0, 0x5c0, 0x0, 500, "FPGA Corner (SDM) Temperature [Remote]" },
-	{ 0x5dc, 0x5e0, 0x5e4, 0x5c0, 0x0, 500, "FPGA Core Fabric Temperature [Remote]" },
-	{ 0x5c4, 0x5c8, 0x5cc, 0x5c0, 0x0, 500, "FPGA P-Tile Temperature [Remote]" },
-	{ 0x5d0, 0x5d4, 0x5d8, 0x5c0, 0x0, 500, "FPGA E-Tile Temperature [Remote]" },
-	{ 0x4f0, 0x4f4, 0x4f8, 0x52c, 0x0, 500, "Board Top Temperature" },
-	{ 0x520, 0x524, 0x528, 0x52c, 0x0, 500, "Board Rear Side Temperature" },
-	{ 0x530, 0x534, 0x538, 0x52c, 0x0, 500, "Board Front Side Temperature" },
-	{ 0x508, 0x50c, 0x510, 0x52c, 0x0, 500, "FPGA Ambient Temperature" },
-	{ 0x514, 0x518, 0x51c, 0x52c, 0x0, 500, "FPGA PTILE2 External Temperature" },
-	{ 0x53c, 0x540, 0x544, 0x0, 0x0, 500, "QSFP1 Temperature" },
-	{ 0x548, 0x54c, 0x550, 0x0, 0x0, 500, "QSFP2 Temperature" },
-	{ 0x728, 0x72c, 0x730, 0x0, 0x0, 500, "Virt FPGA Temperature" },
-	{ 0x758, 0x750, 0x754, 0x0, 0x0, 15, "SOC Package Temperature" },
+	{ 0x440, 0x0, 0x0, 0x0, 0x0, 500, "FPGA R-TILE Max Temperature" },
+	{ 0x444, 0x448, 0x44c, 0x0, 0x0, 500, "FPGA R-TILE Temperature #1" },
+	{ 0x450, 0x454, 0x458, 0x0, 0x0, 500, "FPGA R-TILE Temperature #2" },
+	{ 0x45c, 0x460, 0x464, 0x0, 0x0, 500, "FPGA R-TILE Temperature #3" },
+	{ 0x468, 0x46c, 0x470, 0x0, 0x0, 500, "FPGA R-TILE Temperature #4" },
+	{ 0x474, 0x478, 0x47C, 0x0, 0x0, 500, "FPGA R-TILE Temperature #5" },
+	{ 0x480, 0x484, 0x488, 0x0, 0x0, 500, "FPGA R-TILE Temperature #6" },
+	{ 0x48C, 0x0, 0x0, 0x0, 0x0, 500, "FPGA F-TILE Max Temperature" },
+	{ 0x490, 0x494, 0x498, 0x0, 0x0, 500, "FPGA F-TILE Temperature #1" },
+	{ 0x49C, 0x4A0, 0x4A4, 0x0, 0x0, 500, "FPGA F-TILE Temperature #2" },
+	{ 0x4A8, 0x4AC, 0x4B0, 0x0, 0x0, 500, "FPGA F-TILE Temperature #3" },
+	{ 0x4B4, 0x4B8, 0x4BC, 0x0, 0x0, 500, "FPGA F-TILE Temperature #4" },
+	{ 0x4C0, 0x4C4, 0x4C8, 0x0, 0x0, 500, "FPGA F-TILE Temperature #5" },
+	{ 0x4CC, 0x0, 0x0, 0x0, 0x0, 500, "FPGA FABRIC Max Temperature" },
+	{ 0x4D0, 0x4D4, 0x4D8, 0x0, 0x0, 500, "FPGA FABRIC Digital Temperature#1" },
+	{ 0x4DC, 0x4E0, 0x4E4, 0x0, 0x0, 500, "FPGA FABRIC Digital Temperature#2" },
+	{ 0x4E8, 0x4EC, 0x4F0, 0x0, 0x0, 500, "FPGA FABRIC Digital Temperature#3" },
+	{ 0x4F4, 0x4F8, 0x4FC, 0x0, 0x0, 500, "FPGA FABRIC Digital Temperature#4" },
+	{ 0x500, 0x504, 0x508, 0x0, 0x0, 500, "FPGA FABRIC Digital Temperature#5" },
+	{ 0x50C, 0x510, 0x514, 0x0, 0x0, 500, "FPGA FABRIC Remote Digital Temperature#1" },
+	{ 0x518, 0x51C, 0x520, 0x0, 0x0, 500, "FPGA FABRIC Remote Digital Temperature#2" },
+	{ 0x524, 0x528, 0x52C, 0x0, 0x0, 500, "FPGA FABRIC Remote Digital Temperature#3" },
+	{ 0x530, 0x534, 0x538, 0x0, 0x0, 500, "FPGA FABRIC Remote Digital Temperature#4" },
+	{ 0x588, 0x58C, 0x590, 0x0, 0x0, 500, "FPGA Core A (SDM) Temperature [Remote]" },
+	{ 0x594, 0x598, 0x59C, 0x0, 0x0, 500, "FPGA Core C Temperature [Remote]" },
+	{ 0x5A0, 0x5A4, 0x5A8, 0x0, 0x0, 500, "FPGA F-Tile Temperature [Remote]" },
+	{ 0x5AC, 0x5B0, 0x5B4, 0x0, 0x0, 500, "Board Temperature #1" },
+	{ 0x5B8, 0x5BC, 0x5C0, 0x0, 0x0, 500, "QSFP1 Temperature" },
+	{ 0x5C4, 0x5C8, 0x5CC, 0x0, 0x0, 500, "QSFP2 Temperature" },
+	{ 0x5D0, 0x5D4, 0x5D8, 0x0, 0x0, 500, "FPGA R-Tile 14C Temperature [Remote]" },
+	{ 0x5DC, 0x5E0, 0x5E4, 0x0, 0x0, 500, "FPGA R-Tile 15C Temperature [Remote]" },
+	{ 0x5E8, 0x5EC, 0x5F0, 0x0, 0x0, 500, "FPGA R-Tile 15A Temperature [Remote]" },
+	{ 0x5F4, 0x5F8, 0x5FC, 0x0, 0x0, 500, "Board Temperature #2" },
+	{ 0x600, 0x0, 0x0, 0x0, 0x0, 500, "FPGA VCC_HSSI_GXR VR Temperature" },
+	{ 0x60C, 0x0, 0x0, 0x0, 0x0, 500, "FPGA VCCR_CORE VR Temperature" },
+	{ 0x618, 0x0, 0x0, 0x0, 0x0, 500, "FPGA VCC_HSSI_GXF Temperature" },
+	{ 0x728, 0x72C, 0x730, 0x0, 0x0, 500, "FPGA Virtual Sensor Temperature" },
 };
 
 static const struct m10bmc_sdata cmcbmc_in_tbl[] = {
-	{ 0x5f4, 0x0, 0x0, 0x0, 0x0, 1, "Inlet 12V PCIe Rail Voltage" },
-	{ 0x60c, 0x0, 0x0, 0x0, 0x0, 1, "Inlet 12V Aux Rail Voltage" },
-	{ 0x624, 0x0, 0x0, 0x0, 0x0, 1, "Inlet 3V3 PCIe Rail Voltage" },
-	{ 0x6b4, 0x0, 0x0, 0x0, 0x0, 1, "QSFP 3V3 Rail Voltage" },
-	{ 0x6c4, 0x0, 0x0, 0x0, 0x0, 1, "QSFP (Primary) Supply Rail Voltage" },
-	{ 0x6c8, 0x0, 0x0, 0x0, 0x0, 1, "QSFP (Secondary) Supply Rail Voltage" },
+	{ 0x624, 0x0, 0x0, 0x0, 0x0, 1, "FPGA VCC_HSSI_GXR Rail Voltage" },
+	{ 0x63c, 0x0, 0x0, 0x0, 0x0, 1, "FPGA VCCR_CORE Rail Voltage" },
+	{ 0x654, 0x0, 0x0, 0x0, 0x0, 1, "FPGA VCC_HSSI_GXF Rail Voltage" },
 };
 
 static const struct m10bmc_sdata cmcbmc_curr_tbl[] = {
-	{ 0x600, 0x604, 0x608, 0x0, 0x0, 1, "Inlet 12V PCIe Rail Current" },
-	{ 0x618, 0x61c, 0x620, 0x0, 0x0, 1, "Inlet 12V Aux Rail Current" },
-	{ 0x630, 0x634, 0x638, 0x0, 0x0, 1, "Inlet 3V3 PCIe Rail Current" },
-	{ 0x6b8, 0x6bc, 0x6c0, 0x0, 0x0, 1, "QSFP 3V3 Rail Current" },
-};
-
-static const struct m10bmc_sdata cmcbmc_power_tbl[] = {
-	{ 0x724, 0x0, 0x0, 0x0, 0x0, 1, "Board Power" },
-	{ 0x788, 0x0, 0x0, 0x0, 0x0, 1, "SOC Package Power" },
-	{ 0x694, 0x0, 0x0, 0x0, 0x0, 1, "FPGA Package Power" },
+	{ 0x630, 0x0, 0x0, 0x0, 0x0, 1, "FPGA VCC_HSSI_GXR Voltage Rail Current" },
+	{ 0x648, 0x0, 0x0, 0x0, 0x0, 1, "FPGA VCCR_CORE Voltage Rail Current" },
+	{ 0x660, 0x0, 0x0, 0x0, 0x0, 1, "FPGA VCC_HSSI_GXF Voltage Rail Current" },
 };
 
 static const struct hwmon_channel_info *cmcbmc_hinfo[] = {
 	HWMON_CHANNEL_INFO(temp,
-			   HWMON_T_INPUT | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-			   HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MAX_HYST |
-			   HWMON_T_CRIT | HWMON_T_CRIT_HYST | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_LABEL),
-	HWMON_CHANNEL_INFO(in,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL,
-			   HWMON_I_INPUT | HWMON_I_LABEL),
-	HWMON_CHANNEL_INFO(curr,
-			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
-			   HWMON_C_LABEL,
-			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
-			   HWMON_C_LABEL,
-			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
-			   HWMON_C_LABEL,
-			   HWMON_C_INPUT | HWMON_C_MAX | HWMON_C_CRIT |
-			   HWMON_C_LABEL),
-	HWMON_CHANNEL_INFO(power,
-			   HWMON_P_INPUT | HWMON_P_LABEL,
-			   HWMON_P_INPUT | HWMON_P_LABEL,
-			   HWMON_P_INPUT | HWMON_P_LABEL),
-	NULL
+			HWMON_T_INPUT | HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+			HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_LABEL,
+			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
+				HWMON_T_LABEL),
+			HWMON_CHANNEL_INFO(in,
+					HWMON_I_INPUT | HWMON_I_LABEL,
+					HWMON_I_INPUT | HWMON_I_LABEL,
+					HWMON_I_INPUT | HWMON_I_LABEL),
+			HWMON_CHANNEL_INFO(curr,
+					HWMON_C_INPUT | HWMON_C_LABEL,
+					HWMON_C_INPUT | HWMON_C_LABEL,
+					HWMON_C_INPUT | HWMON_C_LABEL),
+			NULL
 };
 static const struct m10bmc_hwmon_board_data cmcbmc_hwmon_bdata = {
 	.tables = {
 		[hwmon_temp] = cmcbmc_temp_tbl,
 		[hwmon_in] = cmcbmc_in_tbl,
 		[hwmon_curr] = cmcbmc_curr_tbl,
-		[hwmon_power] = cmcbmc_power_tbl,
 	},
 
 	.hinfo = cmcbmc_hinfo,
