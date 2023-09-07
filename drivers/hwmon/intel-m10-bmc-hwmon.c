@@ -849,8 +849,6 @@ static const struct m10bmc_sdata cmcbmc_temp_tbl[] = {
 	{ 0x594, 0x598, 0x59C, 0x0, 0x0, 500, "FPGA Core C Temperature [Remote]" },
 	{ 0x5A0, 0x5A4, 0x5A8, 0x0, 0x0, 500, "FPGA F-Tile Temperature [Remote]" },
 	{ 0x5AC, 0x5B0, 0x5B4, 0x0, 0x0, 500, "Board Temperature #1" },
-	{ 0x5B8, 0x5BC, 0x5C0, 0x0, 0x0, 500, "QSFP1 Temperature" },
-	{ 0x5C4, 0x5C8, 0x5CC, 0x0, 0x0, 500, "QSFP2 Temperature" },
 	{ 0x5D0, 0x5D4, 0x5D8, 0x0, 0x0, 500, "FPGA R-Tile 14C Temperature [Remote]" },
 	{ 0x5DC, 0x5E0, 0x5E4, 0x0, 0x0, 500, "FPGA R-Tile 15C Temperature [Remote]" },
 	{ 0x5E8, 0x5EC, 0x5F0, 0x0, 0x0, 500, "FPGA R-Tile 15A Temperature [Remote]" },
@@ -900,10 +898,6 @@ static const struct hwmon_channel_info *cmcbmc_hinfo[] = {
 			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
 				HWMON_T_LABEL,
 			HWMON_T_INPUT | HWMON_T_LABEL,
-			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-				HWMON_T_LABEL,
-			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
-				HWMON_T_LABEL,
 			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
 				HWMON_T_LABEL,
 			HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
