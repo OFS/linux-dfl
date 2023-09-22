@@ -32,6 +32,7 @@
 #define DFL_PORT_BASE 0x40
 #define DFL_FME_BASE 0x80
 #define DFL_CXL_CACHE_BASE 0xA0
+#define DFL_PCI_SVA_BASE 0xf8
 
 /* Common IOCTLs for both FME and AFU file descriptor */
 
@@ -285,6 +286,23 @@ struct dfl_fpga_fme_port_pr {
 					     DFL_FME_BASE + 4,	\
 					     struct dfl_fpga_irq_set)
 
+/**
+ * DFL_PCI_SVA_BIND_DEV - _IO(DFL_FPGA_MAGIC, DFL_PCI_SVA_BASE + 0)
+ *
+ * Ensure that a PASID is present in the user process and enable the
+ * PASID on the IOMMU domain of the device associated with the file handle.
+ * Returns the PASID on success, -errno on failure.
+ */
+#define DFL_PCI_SVA_BIND_DEV		_IO(DFL_FPGA_MAGIC,	\
+					     DFL_PCI_SVA_BASE + 0)
+
+/**
+ * DFL_PCI_SVA_UNBIND_DEV - _IO(DFL_FPGA_MAGIC,	DFL_PCI_SVA_BASE + 1)
+ *
+ * Unbind the current PASID from the device.
+ */
+#define DFL_PCI_SVA_UNBIND_DEV		_IO(DFL_FPGA_MAGIC,	\
+					    DFL_PCI_SVA_BASE + 1)
  /**
   * DFL_CXL_CACHE_GET_REGION_INFO - _IOWR(DFL_FPGA_MAGIC, DFL_CXL_CACHE_BASE + 0,
   *                                      struct dfl_cxl_cache_region_info)

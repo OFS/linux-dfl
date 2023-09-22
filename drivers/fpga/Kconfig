@@ -237,6 +237,13 @@ config FPGA_DFL_PCI
 
 	  To compile this as a module, choose M here.
 
+config FPGA_DFL_PCI_SVA
+	tristate "FPGA DFL PCIe Shared Virtual Addressing Device Driver"
+	depends on PCI && FPGA_DFL && IOMMU_SVA
+	help
+	  Select this option to enable PASID and IOMMU binding of DFL-based
+	  devices that support shared virtual memory.
+
 config FPGA_DFL_HSSI
 	tristate "FPGA DFL HSSI Driver"
 	depends on FPGA_DFL
