@@ -277,6 +277,17 @@ config FPGA_M10_BMC_SEC_UPDATE
 	  (BMC) and provides support for secure updates for the BMC image,
 	  the FPGA image, the Root Entry Hashes, etc.
 
+config FPGA_DFL_CXL_CACHE
+	tristate "Intel CXL cache driver"
+	depends on DRM && FPGA_DFL
+	help
+	  This is the driver for CXL cache Accelerated Function Unit
+	  (AFU) which configures the IP and provides DMA buffer management
+	  to user space.
+
+	  To compile this driver as a module, chose M here: the
+	  module will be called dfl_cxl_cache.
+
 config FPGA_MGR_MICROCHIP_SPI
 	tristate "Microchip Polarfire SPI FPGA manager"
 	depends on SPI
