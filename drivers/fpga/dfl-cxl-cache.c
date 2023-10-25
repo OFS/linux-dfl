@@ -308,6 +308,8 @@ static long cxl_cache_ioctl_numa_buffer_map(struct dfl_cxl_cache *cxl_cache, voi
 		goto out_unpin_pages;
 	}
 
+	clflush_cache_range(page_address(region->pages[0]), region->length);
+
 	region->phys = page_to_phys(region->pages[0]);
 
 	for (i = 0; i < DFL_ARRAY_MAX_SIZE; i++) {
