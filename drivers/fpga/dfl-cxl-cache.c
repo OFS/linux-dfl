@@ -528,7 +528,7 @@ static int dfl_cxl_cache_probe(struct dfl_device *ddev)
 		if (IS_ERR(dfl_cxl_cache_class)) {
 			ret = PTR_ERR(dfl_cxl_cache_class);
 			dfl_cxl_cache_class = NULL;
-			dev_err_probe(&ddev->dev, "class_create failed: %d\n", ret);
+			dev_err_probe(&ddev->dev, ret, "class_create failed\n");
 			goto out_unlock;
 		}
 	}
@@ -538,7 +538,7 @@ static int dfl_cxl_cache_probe(struct dfl_device *ddev)
 					  MINORMASK,
 					  DFL_CXL_CACHE_DRIVER_NAME);
 		if (ret) {
-			dev_err_probe(&ddev->dev, "alloc_chrdev_region failed: %d\n", ret);
+			dev_err_probe(&ddev->dev, ret, "alloc_chrdev_region failed\n");
 			dfl_cxl_cache_devt = MKDEV(0, 0);
 			goto out_unlock;
 		}
@@ -547,7 +547,7 @@ static int dfl_cxl_cache_probe(struct dfl_device *ddev)
 	mmio_base = devm_ioremap_resource(&ddev->dev, &ddev->mmio_res);
 	if (IS_ERR(mmio_base)) {
 		ret = PTR_ERR(mmio_base);
-		dev_err_probe(&ddev->dev, "devm_ioremap_resource failed: %d\n", ret);
+		dev_err_probe(&ddev->dev, ret, "devm_ioremap_resource failed\n");
 		goto out_unlock;
 	}
 
@@ -559,7 +559,7 @@ static int dfl_cxl_cache_probe(struct dfl_device *ddev)
 
 	ret = cxl_cache_chardev_init(cxl_cache, ddev, mmio_base);
 	if (ret)
-		dev_err_probe(&ddev->dev, "cxl_cache_chardev_init failed: %d\n", ret);
+		dev_err_probe(&ddev->dev, ret, "cxl_cache_chardev_init failed\n");
 
 out_unlock:
 	mutex_unlock(&dfl_cxl_cache_class_lock);
