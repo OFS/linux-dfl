@@ -15,6 +15,7 @@
  *   Ananda Ravuri <ananda.ravuri@intel.com>
  */
 
+#include <drm/drm_cache.h>
 #include <linux/bitfield.h>
 #include <linux/cdev.h>
 #include <linux/dfl.h>
@@ -308,7 +309,7 @@ static long cxl_cache_ioctl_numa_buffer_map(struct dfl_cxl_cache *cxl_cache, voi
 		goto out_unpin_pages;
 	}
 
-	clflush_cache_range(page_address(region->pages[0]), region->length);
+	drm_clflush_virt_range(page_address(region->pages[0]), region->length);
 
 	region->phys = page_to_phys(region->pages[0]);
 
