@@ -321,9 +321,14 @@ static int find_dfls_by_default(struct pci_dev *pcidev,
 		len = pci_resource_len(pcidev, 0);
 
 		dfl_fpga_enum_info_add_dfl(info, start, len);
+	} else if (dfl_feature_is_private(base)) {
+		start = pci_resource_start(pcidev, 0);
+		len = pci_resource_len(pcidev, 0);
+
+		dfl_fpga_enum_info_add_dfl(info, start, len);
 	} else {
 		v = readq(base + DFH);
-		if (FIELD_GET(DFH_TYPE, v) != DFH_TYPE_AFU) {
+		if (FIELD_GET(DFH_TYPE, v) != DFH_TYPE_AFU || FIELD_GET(DFH_TYPE, v) != DFH_TYPE_PRIVATE) {
 			dev_info(&pcidev->dev, "Unknown feature type 0x%llx id 0x%llx\n",
 				 FIELD_GET(DFH_TYPE, v), FIELD_GET(DFH_ID, v));
 			ret = -ENODEV;
