@@ -317,6 +317,11 @@ static int find_dfls_by_default(struct pci_dev *pcidev,
 		len = pci_resource_len(pcidev, 0);
 
 		dfl_fpga_enum_info_add_dfl(info, start, len);
+	} else if (dfl_feature_is_private(base)) {
+		start = pci_resource_start(pcidev, 0);
+		len = pci_resource_len(pcidev, 0);
+
+		dfl_fpga_enum_info_add_dfl(info, start, len);
 	} else {
 		v = readq(base + DFH);
 		if (FIELD_GET(DFH_TYPE, v) != DFH_TYPE_AFU) {
