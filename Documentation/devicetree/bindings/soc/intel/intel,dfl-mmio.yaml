@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: "http://devicetree.org/schemas/soc/intel/intel,dfl-mmio.yaml#"
+$schema: "http://devicetree.org/meta-schemas/core.yaml#"
+title: Device Feature List (DFL) for MMIO
+
+maintainers:
+  - Basheer Ahmed Muddebihal <basheer.ahmed.muddebihal@linux.intel.com>
+
+description: |
+  Device Feature List defines a linked list of feature headers within the device
+  MMIO space to provide an extensible way of adding features. Please see the link
+  for more information https://docs.kernel.org/fpga/dfl.html.
+
+properties:
+  compatible:
+    const: intel,dfl-mmio
+
+  reg:
+    maxItems: 1
+    description:
+      The 'reg' property within the node serves to define the memory-mapped
+      address range for the DFL. The first value in the 'reg' property specifies
+      the starting address of the DFL, and the second value represents the
+      length of the address range from start address of the DFL.
+
+  interrupt-parent:
+    maxItems: 1
+    description:
+      This property establishes a reference to the Interrupt Controller Node,
+      which manages interrupts for the device.
+
+  interrupt-user-start:
+    maxItems: 1
+    description:
+      This property defines the initial user interrupts available on the specified
+      controller. GIC are reserved for local purposes
+
+  fpga-interrupt-start:
+    maxItems: 1
+    descritpion:
+      This property indicates the starting interrupt number within the GIC where
+      FPGA-specific interrupts are mapped.
+
+  fpga-interrupt-lines:
+    maxItems: 1
+    descritpions:
+      This property specifies the total count of Interrupt Requests (IRQs)
+      originating from the FPGA and routed to the GIC.
+
+required:
+  - compatible
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+    dfl0: dfl@F9000000 {
+        compatible = "intel,dfl-mmio";
+        reg = <0xF9000000  0x00002000>;
+        interrupt-parent = <&intc>;
+        interrupt-user-start = <32>;
+        fpga-interrupt-start = <49>;
+        fpga-interrupt-lines = <64>;
+    };
