@@ -1476,7 +1476,8 @@ static int parse_feature_private(struct build_feature_devs_info *binfo,
 		return -EINVAL;
 	}
 
-	binfo->type = PRIV_FEAT_ID;
+	if (dfh_ver == 1)
+		binfo->type = PRIV_FEAT_ID;
 
 	return create_feature_instance(binfo, ofst, 0, 0);
 }
