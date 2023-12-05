@@ -24,6 +24,7 @@
 #include <linux/highmem.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
+#include <linux/mmap_lock.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
@@ -33,6 +34,7 @@
 #define FME_FEATURE_ID_CXL_CACHE	0x25
 
 struct dfl_cxl_cache_buffer_region {
+	u32 flags;
 	u64 user_addr;
 	u64 length;
 	struct page **pages;
@@ -137,12 +139,14 @@ static int cxl_cache_dma_pin_pages(struct dfl_cxl_cache *cxl_cache,
 				   struct dfl_cxl_cache_buffer_region *region)
 {
 	int ret, pinned;
-	const unsigned int flags = FOLL_LONGTERM | FOLL_WRITE;
+	unsigned int flags = FOLL_LONGTERM;
 	const int npages = PFN_DOWN(region->length);
 
 	ret = account_locked_vm(current->mm, npages, true);
-	if (ret)
+	if (ret) {
+		dev_err(cxl_cache->dev, "account_locked_vm() failed: %d\n", ret);
 		return ret;
+	}
 
 	region->pages = kzalloc(npages * sizeof(struct page *), GFP_KERNEL);
 	if (!region->pages) {
@@ -150,12 +154,17 @@ static int cxl_cache_dma_pin_pages(struct dfl_cxl_cache *cxl_cache,
 		goto unlock_vm;
 	}
 
+	if (region->flags & DFL_CXL_BUFFER_MAP_WRITABLE)
+		flags |= FOLL_WRITE;
+
 	pinned = pin_user_pages_fast(region->user_addr, npages, flags, region->pages);
 	if (pinned < 0) {
 		ret = pinned;
+		dev_err(cxl_cache->dev, "pin_user_pages_fast() failed: %d\n", ret);
 		goto free_pages;
 	} else if (pinned != npages) {
 		ret = -EFAULT;
+		dev_err(cxl_cache->dev, "pin_user_pages_fast() failed: %d\n", pinned);
 		goto unpin_pages;
 	}
 	dev_dbg(cxl_cache->dev, "%d pages pinned\n", pinned);
@@ -248,6 +257,77 @@ static int cxl_cache_dma_region_add(struct dfl_cxl_cache *cxl_cache,
 	return 0;
 }
 
+static void fixup_ptes(struct mm_struct *mm, unsigned long start, unsigned long end)
+{
+	unsigned long addr = start;
+	pgd_t *pgd;
+	p4d_t *p4d;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *pte;
+
+	while (addr < end) {
+		pgd = pgd_offset(mm, addr);
+		if (pgd_bad(*pgd) || pgd_none(*pgd)) {
+			addr += PAGE_SIZE;
+			continue;
+		}
+
+		p4d = p4d_offset(pgd, addr);
+		if (p4d_bad(*p4d) || p4d_none(*p4d)) {
+			addr += PAGE_SIZE;
+			continue;
+		}
+
+		pud = pud_offset(p4d, addr);
+		if (pud_bad(*pud) || pud_none(*pud)) {
+			addr += PAGE_SIZE;
+			continue;
+		}
+
+		pmd = pmd_offset(pud, addr);
+		if (pmd_bad(*pmd) || pmd_none(*pmd)) {
+			addr += PAGE_SIZE;
+			continue;
+		}
+
+		pte = pte_offset_kernel(pmd, addr);
+		if (!pte_none(*pte) && pte_present(*pte))
+			*pte = pte_wrprotect(*pte);
+
+		addr += PAGE_SIZE;
+	}
+}
+
+static long cxl_cache_set_region_read_only(struct dfl_cxl_cache *cxl_cache,
+					   struct dfl_cxl_cache_buffer_region *region)
+{
+	struct vm_area_struct *vma;
+	long ret = 0;
+
+	vma = vma_lookup(current->mm, region->user_addr);
+	if (IS_ERR(vma)) {
+		ret = PTR_ERR(vma);
+		dev_err(cxl_cache->dev, "vma_lookup() failed: %ld\n", ret);
+		return ret;
+	}
+
+	mmap_write_lock(current->mm);
+
+	/* Mark the pages as non-cached and write-protected. */
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+	vm_flags_clear(vma, VM_WRITE);
+
+	fixup_ptes(current->mm, vma->vm_start, vma->vm_end);
+
+	mmap_write_unlock(current->mm);
+
+	/* Flush all remaining cache entries. */
+	drm_clflush_virt_range(page_address(region->pages[0]), region->length);
+
+	return ret;
+}
+
 static long cxl_cache_ioctl_numa_buffer_map(struct dfl_cxl_cache *cxl_cache, void __user *arg)
 {
 	int i = 0;
@@ -283,11 +363,12 @@ static long cxl_cache_ioctl_numa_buffer_map(struct dfl_cxl_cache *cxl_cache, voi
 	if (!region)
 		return -ENOMEM;
 
+	region->flags = dma_map.flags;
 	region->user_addr = dma_map.user_addr;
 	region->length = dma_map.length;
 
-	dev_dbg(cxl_cache->dev, "user_addr: %llx length: %lld\n",
-		region->user_addr, region->length);
+	dev_dbg(cxl_cache->dev, "flags: %u user_addr: %llx length: %lld\n",
+		region->flags, region->user_addr, region->length);
 
 	/* Pin the user memory region */
 	ret = cxl_cache_dma_pin_pages(cxl_cache, region);
@@ -303,14 +384,17 @@ static long cxl_cache_ioctl_numa_buffer_map(struct dfl_cxl_cache *cxl_cache, voi
 		goto out_unpin_pages;
 	}
 
-	ret = cxl_cache_dma_region_add(cxl_cache, region);
+	if (!(region->flags & DFL_CXL_BUFFER_MAP_WRITABLE)) {
+		ret = cxl_cache_set_region_read_only(cxl_cache, region);
+		if (ret)
+			goto out_unpin_pages;
+	}
 
+	ret = cxl_cache_dma_region_add(cxl_cache, region);
 	if (ret) {
 		dev_err(cxl_cache->dev, "failed to add dma region\n");
 		goto out_unpin_pages;
 	}
-
-	drm_clflush_virt_range(page_address(region->pages[0]), region->length);
 
 	region->phys = page_to_phys(region->pages[0]);
 
