@@ -420,7 +420,20 @@ static const struct attribute_group port_hdr_group = {
 static int port_hdr_init(struct platform_device *pdev,
 			 struct dfl_feature *feature)
 {
-	port_reset(pdev);
+	struct dfl_feature_dev_data *fdata;
+	void __iomem *base;
+	u8 rev;
+
+	fdata = to_dfl_feature_dev_data(&pdev->dev);
+
+	base = dfl_get_feature_ioaddr_by_id(fdata, PORT_FEATURE_ID_HEADER);
+
+	rev = dfl_feature_revision(base);
+
+	if (rev < 2)
+		port_reset(pdev);
+	else if (rev > 2)
+		dev_info(&pdev->dev, "unexpected port feature revision, %u\n", rev);
 
 	return 0;
 }
