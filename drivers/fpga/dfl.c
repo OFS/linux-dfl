@@ -68,7 +68,7 @@ static struct dfl_dev_info dfl_devs[] = {
 	{.name = DFL_FPGA_FEATURE_DEV_PORT, .dfh_id = DFH_ID_FIU_PORT,
 	 .devt_type = DFL_FPGA_DEVT_PORT},
 	{.name = DFL_FPGA_FEATURE_DEV_PRIV_FEAT, .dfh_id = DFH_ID_FIU_PRIV_FEAT,
-	 .devt_type = DFL_FPGA_DEVT_PORT},
+	 .devt_type = DFL_FPGA_DEVT_PRIV_FEAT},
 };
 
 /**
