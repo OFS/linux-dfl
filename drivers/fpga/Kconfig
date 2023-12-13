@@ -203,22 +203,22 @@ config FPGA_DFL_NIOS_INTEL_PAC_N3000
 	tristate "FPGA DFL NIOS Driver for Intel PAC N3000"
 	depends on FPGA_DFL
 	select REGMAP
-        select UIO_DFL
-        select MFD_INTEL_M10_BMC_CORE
-        select MFD_INTEL_M10_BMC_SPI
-        select SENSORS_INTEL_M10_BMC_HWMON
-        select SPI_ALTERA
-        select FPGA_DFL_FME
-        select FPGA_DFL_FME_MGR
-        select FPGA_DFL_FME_REGION
-        select FPGA_DFL_FME_BRIDGE
-        select FPGA_DFL_AFU
-        select FPGA_DFL_PCI
-        select ALTERA_FREEZE_BRIDGE
-        select FPGA_M10_BMC_SEC_UPDATE
-        select ALTERA_PR_IP_CORE
-        select FPGA_MGR_ALTERA_CVP
-        select FPGA_MGR_ALTERA_PS_SPI
+	select UIO_DFL
+	select MFD_INTEL_M10_BMC_CORE
+	select MFD_INTEL_M10_BMC_SPI
+	select SENSORS_INTEL_M10_BMC_HWMON
+	select SPI_ALTERA
+	select FPGA_DFL_FME
+	select FPGA_DFL_FME_MGR
+	select FPGA_DFL_FME_REGION
+	select FPGA_DFL_FME_BRIDGE
+	select FPGA_DFL_AFU
+	select FPGA_DFL_PCI
+	select ALTERA_FREEZE_BRIDGE
+	select FPGA_M10_BMC_SEC_UPDATE
+	select ALTERA_PR_IP_CORE
+	select FPGA_MGR_ALTERA_CVP
+	select FPGA_MGR_ALTERA_PS_SPI
 	help
 	  This is the driver for the N3000 Nios private feature on Intel
 	  PAC (Programmable Acceleration Card) N3000. It communicates
