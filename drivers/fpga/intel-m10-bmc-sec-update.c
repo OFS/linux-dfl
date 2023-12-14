@@ -1590,6 +1590,13 @@ static const struct m10bmc_sec_ops m10sec_n6000_ops = {
 	.sec_visible = true,
 };
 
+static const struct m10bmc_sec_ops m10sec_cmc_ops = {
+	.rsu_status = m10bmc_sec_n6000_rsu_status,
+	.image_load = n6000_image_load_hndlrs,
+	.poc = &pmci_power_on_image,
+	.sec_visible = false,
+};
+
 #define SEC_UPDATE_LEN_MAX 32
 static int m10bmc_sec_probe(struct platform_device *pdev)
 {
@@ -1674,6 +1681,10 @@ static const struct platform_device_id intel_m10bmc_sec_ids[] = {
 	{
 		.name = "n6000bmc-sec-update",
 		.driver_data = (kernel_ulong_t)&m10sec_n6000_ops,
+	},
+	{
+		.name = "cmcbmc-sec-update",
+		.driver_data = (kernel_ulong_t)&m10sec_cmc_ops,
 	},
 	{ }
 };

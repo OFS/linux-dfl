@@ -263,7 +263,7 @@ static struct mfd_cell m10bmc_pmci_c6100_bmc_subdevs[] = {
 
 static struct mfd_cell m10bmc_pmci_cmc_bmc_subdevs[] = {
 	{ .name = "cmcbmc-hwmon" },
-	{ .name = "n6000bmc-sec-update" },
+	{ .name = "cmcbmc-sec-update" },
 	{ .name = "cmcbmc-log" },
 };
 
