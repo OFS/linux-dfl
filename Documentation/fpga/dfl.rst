@@ -280,6 +280,40 @@ used for accelerator-specific control registers.
 User-space applications can acquire exclusive access to an AFU attached to a
 port by using open() on the port device node and release it using close().
 
+AFU MMIO space must begin with a feature list, either version 0 or 1. The GUID
+at the head of an AFU feature list defines the GUID with which the AFU is
+discovered. Within the first DFH:
+
+- The feature type is 1 (AFU)
+- Revision may be an AFU-private version number
+- ID is normally 0
+
+AFUs that require connections through multiple PCIe functions define a
+parent/child relationship. A parent AFU must use a version 1 feature at
+the head of its feature list. Children are enumerated by their GUIDs as
+parameters in the parent's version 1 header:
+
+- The parameter ID is 2, version 0 (see
+  https://github.com/OFS/dfl-feature-id/blob/main/dfl-param-ids.rst)
+- The parameter's payload is a list of child GUID_L and GUID_H pairs
+- The parameter's next field (payload size in 8 byte words) indicates
+  the number of children: two 8 byte words for each child
+
+Child AFUs may have either version 0 or version 1 headers:
+
+- The feature type is 1 (AFU)
+- ID is normally 1
+- The GUID must match a GUID from the parent's child list parameter
+
+Unlike normal AFUs, which may be replicated in hardware and expose the
+same GUID multiple times, child GUIDs must typically be unique. A given
+parent AFU normally depends on a specific instance of an associated child.
+While an AFU's children are often located on the same FPGA, it is not
+a requirement. With multiple FPGAs in a system, children will be
+discovered with normal AFU GUID searches and may be found anywhere.
+Attempting to open a parent AFU will fail if the children can not be
+found.
+
 The following functions are exposed through ioctls:
 
 - Get driver API version (DFL_FPGA_GET_API_VERSION)
@@ -641,7 +675,7 @@ could be a reference.
 
 Please refer to below link to existing feature id table and guide for new feature
 ids application.
-https://github.com/OPAE/dfl-feature-id
+https://github.com/OFS/dfl-feature-id
 
 
 Location of DFLs on a PCI Device
