@@ -184,6 +184,22 @@
 #define M10BMC_FLASH_INT_US			1
 #define M10BMC_FLASH_TIMEOUT_US			10000
 
+/* PKVL related registers, in system register region */
+#define PKVL_LINK_STATUS		0x164
+
+/**
+ * struct intel_m10bmc_retimer_pdata - subdev retimer platform data
+ *
+ * @retimer_master: the NIC device which connects to the retimers on m10bmc
+ */
+struct intel_m10bmc_retimer_pdata {
+	struct device *retimer_master;
+};
+
+struct intel_m10bmc_platdata {
+	struct intel_m10bmc_retimer_pdata *retimer;
+};
+
 /**
  * struct m10bmc_csr_map - Intel MAX 10 BMC CSR register map
  */

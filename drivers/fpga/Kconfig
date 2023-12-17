@@ -216,9 +216,11 @@ config FPGA_DFL_NIOS_INTEL_PAC_N3000
 	select FPGA_DFL_PCI
 	select ALTERA_FREEZE_BRIDGE
 	select FPGA_M10_BMC_SEC_UPDATE
+	select FPGA_M10_BMC_RETIMER
 	select ALTERA_PR_IP_CORE
 	select FPGA_MGR_ALTERA_CVP
 	select FPGA_MGR_ALTERA_PS_SPI
+
 	help
 	  This is the driver for the N3000 Nios private feature on Intel
 	  PAC (Programmable Acceleration Card) N3000. It communicates
@@ -272,6 +274,18 @@ config FPGA_M10_BMC_SEC_UPDATE
 	  This is a subdriver of the Intel MAX10 board management controller
 	  (BMC) and provides support for secure updates for the BMC image,
 	  the FPGA image, the Root Entry Hashes, etc.
+
+config FPGA_M10_BMC_RETIMER
+	tristate "Intel(R) MAX 10 BMC ethernet retimer support"
+	depends on MFD_INTEL_M10_BMC_CORE
+	select PHYLIB
+        help
+          This driver supports the ethernet retimer (Parkvale) on
+	  Intel(R) MAX 10 BMC, which is used by Intel PAC N3000 FPGA based
+	  Smart NIC.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called intel-m10-bmc-retimer.
 
 config FPGA_MGR_MICROCHIP_SPI
 	tristate "Microchip Polarfire SPI FPGA manager"

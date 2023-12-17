@@ -27,6 +27,8 @@ obj-$(CONFIG_ALTERA_PR_IP_CORE_PLAT)	+= altera-pr-ip-core-plat.o
 
 # FPGA Secure Update Drivers
 obj-$(CONFIG_FPGA_M10_BMC_SEC_UPDATE)	+= intel-m10-bmc-sec-update.o
+# FPGA Retimer Drivers
+obj-$(CONFIG_FPGA_M10_BMC_RETIMER)	+= intel-m10-bmc-retimer.o
 
 # FPGA Bridge Drivers
 obj-$(CONFIG_FPGA_BRIDGE)		+= fpga-bridge.o
