@@ -15,39 +15,42 @@
  *   Ananda Ravuri <ananda.ravuri@intel.com>
  */
 
-#include <drm/drm_cache.h>
 #include <linux/bitfield.h>
 #include <linux/cdev.h>
+#include <linux/container_of.h>
 #include <linux/dfl.h>
 #include <linux/errno.h>
 #include <linux/fpga-dfl.h>
 #include <linux/highmem.h>
 #include <linux/io.h>
-#include <linux/kernel.h>
 #include <linux/mmap_lock.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
+#include <linux/pgtable.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/types.h>
+
+#include <drm/drm_cache.h>
 
 #define DFL_CXL_CACHE_DRIVER_NAME	"dfl-cxl-cache"
 #define FME_FEATURE_ID_CXL_CACHE	0x25
 
 struct dfl_cxl_cache_buffer_region {
+	struct rb_node node;
 	u32 flags;
 	u64 user_addr;
 	u64 length;
 	struct page **pages;
 	phys_addr_t phys;
-	__u64 offset[DFL_ARRAY_MAX_SIZE];
-	struct rb_node node;
+	u64 offset[DFL_ARRAY_MAX_SIZE];
 };
 
 struct dfl_cxl_cache {
+	struct cdev cdev;
 	struct dfl_device *ddev;
 	int id;
 	struct device *dev;
-	struct cdev cdev;
 	atomic_t opened;
 	void __iomem *mmio_base;
 	int mmio_size;
@@ -84,7 +87,6 @@ static long cxl_cache_ioctl_get_region_info(struct dfl_cxl_cache *cxl_cache, voi
 	unsigned long minsz;
 
 	minsz = offsetofend(struct dfl_cxl_cache_region_info, offset);
-
 	if (copy_from_user(&rinfo, arg, minsz))
 		return -EFAULT;
 
@@ -112,17 +114,8 @@ static void cxl_cache_unpin_pages(struct device *dev, struct page ***pages, unsi
 	kfree(*pages);
 	*pages = NULL;
 	account_locked_vm(current->mm, npages, false);
-
-	dev_dbg(dev, "%ld pages unpinned\n", npages);
 }
 
-/**
- * cxl_cache_dsm_check_continuous_pages - check if pages are continuous
- * @region: dma memory region
- *
- * Return true if pages of given dma memory region have continuous physical
- * address, otherwise return false.
- */
 static bool cxl_cache_check_continuous_pages(struct page **pages, unsigned long length)
 {
 	int i;
@@ -148,7 +141,7 @@ static int cxl_cache_dma_pin_pages(struct dfl_cxl_cache *cxl_cache,
 		return ret;
 	}
 
-	region->pages = kzalloc(npages * sizeof(struct page *), GFP_KERNEL);
+	region->pages = kcalloc(npages, sizeof(struct page *), GFP_KERNEL);
 	if (!region->pages) {
 		ret = -ENOMEM;
 		goto unlock_vm;
@@ -158,22 +151,13 @@ static int cxl_cache_dma_pin_pages(struct dfl_cxl_cache *cxl_cache,
 		flags |= FOLL_WRITE;
 
 	pinned = pin_user_pages_fast(region->user_addr, npages, flags, region->pages);
-	if (pinned < 0) {
-		ret = pinned;
-		dev_err(cxl_cache->dev, "pin_user_pages_fast() failed: %d\n", ret);
-		goto free_pages;
-	} else if (pinned != npages) {
-		ret = -EFAULT;
-		dev_err(cxl_cache->dev, "pin_user_pages_fast() failed: %d\n", pinned);
-		goto unpin_pages;
-	}
-	dev_dbg(cxl_cache->dev, "%d pages pinned\n", pinned);
+	if (pinned == npages)
+		return 0;
 
-	return 0;
+	ret = -EFAULT;
+	if (pinned > 0)
+		unpin_user_pages(region->pages, pinned);
 
-unpin_pages:
-	unpin_user_pages(region->pages, pinned);
-free_pages:
 	kfree(region->pages);
 unlock_vm:
 	account_locked_vm(current->mm, npages, false);
@@ -183,7 +167,6 @@ unlock_vm:
 static void cxl_cache_dma_region_remove(struct dfl_cxl_cache *cxl_cache,
 					struct dfl_cxl_cache_buffer_region *region)
 {
-	dev_dbg(cxl_cache->dev, "del region (user_addr = %llx)\n", region->user_addr);
 	rb_erase(&region->node, &cxl_cache->dma_regions);
 }
 
@@ -197,8 +180,8 @@ static bool dma_region_check_user_addr(struct dfl_cxl_cache_buffer_region *regio
 		(region->length + region->user_addr >= user_addr + size);
 }
 
-struct dfl_cxl_cache_buffer_region*
-	cxl_cache_dma_region_find(struct dfl_cxl_cache *cxl_cache, u64 user_addr, u64 size)
+static struct dfl_cxl_cache_buffer_region*
+cxl_cache_dma_region_find(struct dfl_cxl_cache *cxl_cache, u64 user_addr, u64 size)
 {
 	struct rb_node *node = cxl_cache->dma_regions.rb_node;
 
@@ -207,11 +190,8 @@ struct dfl_cxl_cache_buffer_region*
 
 		region = container_of(node, struct dfl_cxl_cache_buffer_region, node);
 
-		if (dma_region_check_user_addr(region, user_addr, size)) {
-			dev_dbg(cxl_cache->dev, "find region (user_addr = %llx)\n",
-				region->user_addr);
+		if (dma_region_check_user_addr(region, user_addr, size))
 			return region;
-		}
 
 		if (user_addr < region->user_addr)
 			node = node->rb_left;
@@ -221,8 +201,6 @@ struct dfl_cxl_cache_buffer_region*
 			break;
 	}
 
-	dev_dbg(cxl_cache->dev, "region with user_addr %llx and size %llx is not found\n",
-		user_addr, size);
 	return NULL;
 }
 
@@ -231,7 +209,6 @@ static int cxl_cache_dma_region_add(struct dfl_cxl_cache *cxl_cache,
 {
 	struct rb_node **new, *parent = NULL;
 
-	dev_dbg(cxl_cache->dev, "add region (user_addr = %llx)\n", region->user_addr);
 	new = &cxl_cache->dma_regions.rb_node;
 
 	while (*new) {
@@ -259,43 +236,33 @@ static int cxl_cache_dma_region_add(struct dfl_cxl_cache *cxl_cache,
 
 static void fixup_ptes(struct mm_struct *mm, unsigned long start, unsigned long end)
 {
-	unsigned long addr = start;
+	unsigned long addr;
 	pgd_t *pgd;
 	p4d_t *p4d;
 	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 
-	while (addr < end) {
+	for (addr = start; addr < end; addr += PAGE_SIZE) {
 		pgd = pgd_offset(mm, addr);
-		if (pgd_bad(*pgd) || pgd_none(*pgd)) {
-			addr += PAGE_SIZE;
+		if (pgd_bad(*pgd) || pgd_none(*pgd))
 			continue;
-		}
 
 		p4d = p4d_offset(pgd, addr);
-		if (p4d_bad(*p4d) || p4d_none(*p4d)) {
-			addr += PAGE_SIZE;
+		if (p4d_bad(*p4d) || p4d_none(*p4d))
 			continue;
-		}
 
 		pud = pud_offset(p4d, addr);
-		if (pud_bad(*pud) || pud_none(*pud)) {
-			addr += PAGE_SIZE;
+		if (pud_bad(*pud) || pud_none(*pud))
 			continue;
-		}
 
 		pmd = pmd_offset(pud, addr);
-		if (pmd_bad(*pmd) || pmd_none(*pmd)) {
-			addr += PAGE_SIZE;
+		if (pmd_bad(*pmd) || pmd_none(*pmd))
 			continue;
-		}
 
 		pte = pte_offset_map(pmd, addr);
 		if (!pte_none(*pte) && pte_present(*pte))
 			*pte = pte_wrprotect(*pte);
-
-		addr += PAGE_SIZE;
 	}
 }
 
@@ -367,9 +334,6 @@ static long cxl_cache_ioctl_numa_buffer_map(struct dfl_cxl_cache *cxl_cache, voi
 	region->user_addr = dma_map.user_addr;
 	region->length = dma_map.length;
 
-	dev_dbg(cxl_cache->dev, "flags: %u user_addr: %llx length: %lld\n",
-		region->flags, region->user_addr, region->length);
-
 	/* Pin the user memory region */
 	ret = cxl_cache_dma_pin_pages(cxl_cache, region);
 	if (ret) {
@@ -399,11 +363,10 @@ static long cxl_cache_ioctl_numa_buffer_map(struct dfl_cxl_cache *cxl_cache, voi
 	region->phys = page_to_phys(region->pages[0]);
 
 	for (i = 0; i < DFL_ARRAY_MAX_SIZE; i++) {
-		if (dma_map.csr_array[i] != 0  && dma_map.csr_array[i] < cxl_cache->rinfo.size)
+		if (dma_map.csr_array[i] && dma_map.csr_array[i] < cxl_cache->rinfo.size)
 			writeq(region->phys, cxl_cache->mmio_base + dma_map.csr_array[i]);
 	}
 
-	dev_dbg(cxl_cache->dev, "phys address:%lld\n", region->phys);
 	return 0;
 
 out_unpin_pages:
@@ -431,9 +394,6 @@ static long cxl_cache_ioctl_numa_buffer_unmap(struct dfl_cxl_cache *cxl_cache, v
 		return -EINVAL;
 	}
 
-	dev_dbg(cxl_cache->dev, "user_addr: %llx length: %lld",
-		dma_unmap.user_addr, dma_unmap.length);
-
 	region = cxl_cache_dma_region_find(cxl_cache, dma_unmap.user_addr, dma_unmap.length);
 	if (!region) {
 		dev_err(cxl_cache->dev, "fails to find buffer\n");
@@ -444,7 +404,7 @@ static long cxl_cache_ioctl_numa_buffer_unmap(struct dfl_cxl_cache *cxl_cache, v
 	cxl_cache_unpin_pages(cxl_cache->dev, &region->pages, region->length);
 
 	for (i = 0; i < DFL_ARRAY_MAX_SIZE; i++) {
-		if (dma_unmap.csr_array[i] != 0 && dma_unmap.csr_array[i] < cxl_cache->rinfo.size)
+		if (dma_unmap.csr_array[i] && dma_unmap.csr_array[i] < cxl_cache->rinfo.size)
 			writeq(0, cxl_cache->mmio_base + dma_unmap.csr_array[i]);
 	}
 
@@ -467,9 +427,9 @@ static long dfl_cxl_cache_ioctl(struct file *filp, unsigned int cmd, unsigned lo
 		return cxl_cache_ioctl_numa_buffer_map(cxl_cache, (void __user *)arg);
 	case DFL_CXL_CACHE_NUMA_BUFFER_UNMAP:
 		return cxl_cache_ioctl_numa_buffer_unmap(cxl_cache, (void __user *)arg);
+	default:
+		return -EINVAL;
 	}
-
-	return -EINVAL;
 }
 
 static const struct vm_operations_struct cxl_cache_vma_ops = {
@@ -509,7 +469,7 @@ static int dfl_cxl_cache_mmap(struct file *filp, struct vm_area_struct *vma)
 			       size, vma->vm_page_prot);
 }
 
-void cxl_cache_dma_region_destroy(struct dfl_cxl_cache *cxl_cache)
+static void cxl_cache_dma_region_destroy(struct dfl_cxl_cache *cxl_cache)
 {
 	struct rb_node *node = rb_first(&cxl_cache->dma_regions);
 	struct dfl_cxl_cache_buffer_region *region;
@@ -517,7 +477,6 @@ void cxl_cache_dma_region_destroy(struct dfl_cxl_cache *cxl_cache)
 	while (node) {
 		region = container_of(node, struct dfl_cxl_cache_buffer_region, node);
 
-		dev_dbg(cxl_cache->dev, "del region (user_addr = %llx)\n", region->user_addr);
 		rb_erase(node, &cxl_cache->dma_regions);
 
 		if (region->pages)
@@ -590,8 +549,6 @@ static int cxl_cache_chardev_init(struct dfl_cxl_cache *cxl_cache,
 	}
 	cxl_cache->dev->release = cxl_cache_dev_release;
 
-	dev_dbg(cxl_cache->dev, "added cxl_cache device: %s\n", dev_name(cxl_cache->dev));
-
 	cdev_init(&cxl_cache->cdev, &dfl_cxl_cache_fops);
 	cxl_cache->cdev.owner = THIS_MODULE;
 	cxl_cache->cdev.ops = &dfl_cxl_cache_fops;
@@ -635,7 +592,6 @@ static int dfl_cxl_cache_probe(struct dfl_device *ddev)
 	mmio_base = devm_ioremap_resource(&ddev->dev, &ddev->mmio_res);
 	if (IS_ERR(mmio_base)) {
 		ret = PTR_ERR(mmio_base);
-		dev_err_probe(&ddev->dev, ret, "devm_ioremap_resource failed\n");
 		goto out_unlock;
 	}
 
@@ -662,7 +618,7 @@ static void dfl_cxl_cache_remove(struct dfl_device *ddev)
 	mutex_lock(&dfl_cxl_cache_class_lock);
 	cxl_cache_chardev_uinit(cxl_cache);
 
-	if (--dfl_cxl_cache_devices <= 0) {
+	if (dfl_cxl_cache_devices-- == 0) {
 		if (dfl_cxl_cache_class) {
 			class_destroy(dfl_cxl_cache_class);
 			dfl_cxl_cache_class = NULL;
