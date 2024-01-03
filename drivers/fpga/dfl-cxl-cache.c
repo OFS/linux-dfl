@@ -17,6 +17,7 @@
 
 #include <linux/bitfield.h>
 #include <linux/cdev.h>
+#include <linux/cleanup.h>
 #include <linux/container_of.h>
 #include <linux/dfl.h>
 #include <linux/errno.h>
@@ -566,7 +567,7 @@ static int dfl_cxl_cache_probe(struct dfl_device *ddev)
 	void __iomem *mmio_base;
 	struct dfl_cxl_cache *cxl_cache;
 
-	mutex_lock(&dfl_cxl_cache_class_lock);
+	guard(mutex)(&dfl_cxl_cache_class_lock);
 
 	if (!dfl_cxl_cache_class) {
 		dfl_cxl_cache_class = class_create(DFL_CXL_CACHE_DRIVER_NAME);
@@ -574,7 +575,7 @@ static int dfl_cxl_cache_probe(struct dfl_device *ddev)
 			ret = PTR_ERR(dfl_cxl_cache_class);
 			dfl_cxl_cache_class = NULL;
 			dev_err_probe(&ddev->dev, ret, "class_create failed\n");
-			goto out_unlock;
+			return ret;
 		}
 	}
 
@@ -585,28 +586,21 @@ static int dfl_cxl_cache_probe(struct dfl_device *ddev)
 		if (ret) {
 			dev_err_probe(&ddev->dev, ret, "alloc_chrdev_region failed\n");
 			dfl_cxl_cache_devt = MKDEV(0, 0);
-			goto out_unlock;
+			return ret;
 		}
 	}
 
 	mmio_base = devm_ioremap_resource(&ddev->dev, &ddev->mmio_res);
-	if (IS_ERR(mmio_base)) {
-		ret = PTR_ERR(mmio_base);
-		goto out_unlock;
-	}
+	if (IS_ERR(mmio_base))
+		return PTR_ERR(mmio_base);
 
 	cxl_cache = devm_kzalloc(&ddev->dev, sizeof(*cxl_cache), GFP_KERNEL);
-	if (!cxl_cache) {
-		ret = -ENOMEM;
-		goto out_unlock;
-	}
+	if (!cxl_cache)
+		return -ENOMEM;
 
 	ret = cxl_cache_chardev_init(cxl_cache, ddev, mmio_base);
 	if (ret)
 		dev_err_probe(&ddev->dev, ret, "cxl_cache_chardev_init failed\n");
-
-out_unlock:
-	mutex_unlock(&dfl_cxl_cache_class_lock);
 
 	return ret;
 }
@@ -615,7 +609,7 @@ static void dfl_cxl_cache_remove(struct dfl_device *ddev)
 {
 	struct dfl_cxl_cache *cxl_cache = dev_get_drvdata(&ddev->dev);
 
-	mutex_lock(&dfl_cxl_cache_class_lock);
+	guard(mutex)(&dfl_cxl_cache_class_lock);
 	cxl_cache_chardev_uinit(cxl_cache);
 
 	if (dfl_cxl_cache_devices-- == 0) {
@@ -629,8 +623,6 @@ static void dfl_cxl_cache_remove(struct dfl_device *ddev)
 			dfl_cxl_cache_devt = MKDEV(0, 0);
 		}
 	}
-
-	mutex_unlock(&dfl_cxl_cache_class_lock);
 }
 
 static const struct dfl_device_id dfl_cxl_cache_ids[] = {
