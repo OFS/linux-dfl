@@ -1,0 +1,26 @@
+name: Scan kernel with Coverity
+
+on:
+  push:
+    branches:
+       - 'fpga-ofs-dev'
+       - 'fpga-ofs-dev-*-lts'
+    paths:
+      - '**'
+      - '!.github/**'
+      - '.github/workflows/coverity.yml'
+
+  pull_request:
+    branches:
+       - 'fpga-ofs-dev'
+       - 'fpga-ofs-dev-*-lts'
+    paths:
+      - '.github/workflows/coverity.yml'
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    # https://docs.github.com/en/actions/using-workflows/reusing-workflows
+    uses: intel-innersource/applications.fpga.opae.linux-dfl/.github/workflows/coverity.yml@main
+    secrets: inherit
