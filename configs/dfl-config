@@ -61,6 +61,7 @@ CONFIG_PTP_DFL_TOD=m
 
 # CXL cache support
 
+CONFIG_DRM=m
 CONFIG_FPGA_DFL_CXL_CACHE=m
 
 # Test configs - not required for production environments

@@ -296,7 +296,7 @@ config FPGA_M10_BMC_SEC_UPDATE
 
 config FPGA_DFL_CXL_CACHE
 	tristate "Intel CXL cache driver"
-	depends on FPGA_DFL
+	depends on DRM && FPGA_DFL
 	help
 	  This is the driver for CXL cache Accelerated Function Unit
 	  (AFU) which provides interfaces to MMIO region and dma buffers.
