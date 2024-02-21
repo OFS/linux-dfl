@@ -843,7 +843,7 @@ bool dcn20_set_output_transfer_func(struct dc *dc, struct pipe_ctx *pipe_ctx,
 			params = &stream->out_transfer_func->pwl;
 		else if (pipe_ctx->stream->out_transfer_func->type ==
 			TF_TYPE_DISTRIBUTED_POINTS &&
-			cm_helper_translate_curve_to_hw_format(
+			cm_helper_translate_curve_to_hw_format(dc->ctx,
 			stream->out_transfer_func,
 			&mpc->blender_params, false))
 			params = &mpc->blender_params;
@@ -872,7 +872,7 @@ bool dcn20_set_blend_lut(
 		if (plane_state->blend_tf->type == TF_TYPE_HWPWL)
 			blend_lut = &plane_state->blend_tf->pwl;
 		else if (plane_state->blend_tf->type == TF_TYPE_DISTRIBUTED_POINTS) {
-			cm_helper_translate_curve_to_hw_format(
+			cm_helper_translate_curve_to_hw_format(plane_state->ctx,
 					plane_state->blend_tf,
 					&dpp_base->regamma_params, false);
 			blend_lut = &dpp_base->regamma_params;
@@ -894,7 +894,7 @@ bool dcn20_set_shaper_3dlut(
 		if (plane_state->in_shaper_func->type == TF_TYPE_HWPWL)
 			shaper_lut = &plane_state->in_shaper_func->pwl;
 		else if (plane_state->in_shaper_func->type == TF_TYPE_DISTRIBUTED_POINTS) {
-			cm_helper_translate_curve_to_hw_format(
+			cm_helper_translate_curve_to_hw_format(plane_state->ctx,
 					plane_state->in_shaper_func,
 					&dpp_base->shaper_params, true);
 			shaper_lut = &dpp_base->shaper_params;
@@ -1515,17 +1515,6 @@ static void dcn20_update_dchubp_dpp(
 			|| plane_state->update_flags.bits.global_alpha_change
 			|| plane_state->update_flags.bits.per_pixel_alpha_change) {
 		// MPCC inst is equal to pipe index in practice
-		int mpcc_inst = hubp->inst;
-		int opp_inst;
-		int opp_count = dc->res_pool->pipe_count;
-
-		for (opp_inst = 0; opp_inst < opp_count; opp_inst++) {
-			if (dc->res_pool->opps[opp_inst]->mpcc_disconnect_pending[mpcc_inst]) {
-				dc->res_pool->mpc->funcs->wait_for_idle(dc->res_pool->mpc, mpcc_inst);
-				dc->res_pool->opps[opp_inst]->mpcc_disconnect_pending[mpcc_inst] = false;
-				break;
-			}
-		}
 		hws->funcs.update_mpcc(dc, pipe_ctx);
 	}
 
@@ -2036,7 +2025,7 @@ void dcn20_optimize_bandwidth(
 			dc->clk_mgr,
 			context,
 			true);
-	if (dc_extended_blank_supported(dc) && context->bw_ctx.bw.dcn.clk.zstate_support == DCN_ZSTATE_SUPPORT_ALLOW) {
+	if (context->bw_ctx.bw.dcn.clk.zstate_support == DCN_ZSTATE_SUPPORT_ALLOW) {
 		for (i = 0; i < dc->res_pool->pipe_count; ++i) {
 			struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 
@@ -2044,7 +2033,7 @@ void dcn20_optimize_bandwidth(
 				&& pipe_ctx->stream->adjust.v_total_min == pipe_ctx->stream->adjust.v_total_max
 				&& pipe_ctx->stream->adjust.v_total_max > pipe_ctx->stream->timing.v_total)
 					pipe_ctx->plane_res.hubp->funcs->program_extended_blank(pipe_ctx->plane_res.hubp,
-						pipe_ctx->dlg_regs.optimized_min_dst_y_next_start);
+						pipe_ctx->dlg_regs.min_dst_y_next_start);
 		}
 	}
 }
