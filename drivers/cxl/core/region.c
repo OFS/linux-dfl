@@ -397,7 +397,7 @@ static ssize_t interleave_ways_store(struct device *dev,
 		return rc;
 
 	/*
-	 * Even for x3, x9, and x12 interleaves the region interleave must be a
+	 * Even for x3, x6, and x12 interleaves the region interleave must be a
 	 * power of 2 multiple of the host bridge interleave.
 	 */
 	if (!is_power_of_2(val / cxld->interleave_ways) ||
@@ -525,7 +525,7 @@ static int alloc_hpa(struct cxl_region *cxlr, resource_size_t size)
 	struct cxl_root_decoder *cxlrd = to_cxl_root_decoder(cxlr->dev.parent);
 	struct cxl_region_params *p = &cxlr->params;
 	struct resource *res;
-	u32 remainder = 0;
+	u64 remainder = 0;
 
 	lockdep_assert_held_write(&cxl_region_rwsem);
 
@@ -545,7 +545,7 @@ static int alloc_hpa(struct cxl_region *cxlr, resource_size_t size)
 	    (cxlr->mode == CXL_DECODER_PMEM && uuid_is_null(&p->uuid)))
 		return -ENXIO;
 
-	div_u64_rem(size, SZ_256M * p->interleave_ways, &remainder);
+	div64_u64_rem(size, (u64)SZ_256M * p->interleave_ways, &remainder);
 	if (remainder)
 		return -EINVAL;
 
@@ -1127,7 +1127,14 @@ static int cxl_port_setup_targets(struct cxl_port *port,
 	}
 
 	if (is_cxl_root(parent_port)) {
-		parent_ig = cxlrd->cxlsd.cxld.interleave_granularity;
+		/*
+		 * Root decoder IG is always set to value in CFMWS which
+		 * may be different than this region's IG.  We can use the
+		 * region's IG here since interleave_granularity_store()
+		 * does not allow interleaved host-bridges with
+		 * root IG != region IG.
+		 */
+		parent_ig = p->interleave_granularity;
 		parent_iw = cxlrd->cxlsd.cxld.interleave_ways;
 		/*
 		 * For purposes of address bit routing, use power-of-2 math for
@@ -1675,6 +1682,12 @@ static int cxl_region_attach(struct cxl_region *cxlr,
 		return -ENXIO;
 	}
 
+	if (p->nr_targets >= p->interleave_ways) {
+		dev_dbg(&cxlr->dev, "region already has %d endpoints\n",
+			p->nr_targets);
+		return -EINVAL;
+	}
+
 	ep_port = cxled_to_port(cxled);
 	root_port = cxlrd_to_port(cxlrd);
 	dport = cxl_find_dport_by_dev(root_port, ep_port->host_bridge);
@@ -1767,7 +1780,7 @@ static int cxl_region_attach(struct cxl_region *cxlr,
 	if (p->nr_targets == p->interleave_ways) {
 		rc = cxl_region_setup_targets(cxlr);
 		if (rc)
-			goto err_decrement;
+			return rc;
 		p->state = CXL_CONFIG_ACTIVE;
 	}
 
@@ -1799,12 +1812,6 @@ static int cxl_region_attach(struct cxl_region *cxlr,
 	}
 
 	return 0;
-
-err_decrement:
-	p->nr_targets--;
-	cxled->pos = -1;
-	p->targets[pos] = NULL;
-	return rc;
 }
 
 static int cxl_region_detach(struct cxl_endpoint_decoder *cxled)
@@ -2460,10 +2467,6 @@ int cxl_get_poison_by_endpoint(struct cxl_port *port)
 	struct cxl_poison_context ctx;
 	int rc = 0;
 
-	rc = down_read_interruptible(&cxl_region_rwsem);
-	if (rc)
-		return rc;
-
 	ctx = (struct cxl_poison_context) {
 		.port = port
 	};
@@ -2473,7 +2476,6 @@ int cxl_get_poison_by_endpoint(struct cxl_port *port)
 		rc = cxl_get_poison_unmapped(to_cxl_memdev(port->uport_dev),
 					     &ctx);
 
-	up_read(&cxl_region_rwsem);
 	return rc;
 }
 
