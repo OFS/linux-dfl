@@ -136,6 +136,9 @@ static int uio_dfl_probe(struct dfl_device *ddev)
 #define FME_FEATURE_ID_PCI_SUBSYS	0x20
 #define FME_FEATURE_ID_VENDOR_SPECIFIC	0x23
 #define PORT_FEATURE_ID_IOPLL_USRCLK	0x14
+#define PORT_GUID_IOPLL_USRCLK \
+        GUID_INIT(0x45ac5052, 0xc481, 0x4125, 0x82, 0x38, \
+                        0x0b, 0x8f, 0xf6, 0xc2, 0xf9, 0x43)
 
 static const struct dfl_device_id uio_dfl_ids[] = {
 	{ FME_ID, FME_FEATURE_ID_ETH_GROUP },
@@ -143,6 +146,7 @@ static const struct dfl_device_id uio_dfl_ids[] = {
 	{ FME_ID, FME_FEATURE_ID_PCI_SUBSYS },
 	{ FME_ID, FME_FEATURE_ID_VENDOR_SPECIFIC },
 	{ PORT_ID, PORT_FEATURE_ID_IOPLL_USRCLK },
+        { .guid = PORT_GUID_IOPLL_USRCLK },
 	{ }
 };
 MODULE_DEVICE_TABLE(dfl, uio_dfl_ids);
