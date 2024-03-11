@@ -512,7 +512,6 @@ static void cxl_cache_dev_release(struct device *dev)
 
 static void cxl_cache_chardev_uinit(struct dfl_cxl_cache *cxl_cache)
 {
-	dev_set_drvdata(&cxl_cache->ddev->dev, NULL);
 	device_destroy(dfl_cxl_cache_class,
 		       MKDEV(MAJOR(dfl_cxl_cache_devt), cxl_cache->id));
 }

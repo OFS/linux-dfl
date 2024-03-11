@@ -9,8 +9,6 @@
  *   Zhang Yi <yi.z.zhang@intel.com>
  *   Wu Hao <hao.wu@intel.com>
  *   Xiao Guangrong <guangrong.xiao@linux.intel.com>
- *   Tim Whisonant <tim.whisonant@intel.com>
- *   Ananda Ravuri <ananda.ravuri@intel.com>
  */
 
 #ifndef _UAPI_LINUX_FPGA_DFL_H
@@ -330,9 +328,9 @@ struct dfl_fpga_fme_port_pr {
 struct dfl_cxl_cache_region_info {
 	__u32 argsz;
 	__u32 flags;
-#define DFL_CXL_CACHE_REGION_READ	BIT(0)
-#define DFL_CXL_CACHE_REGION_WRITE	BIT(1)
-#define DFL_CXL_CACHE_REGION_MMAP	BIT(2)
+#define DFL_CXL_CACHE_REGION_READ	_BITUL(0)
+#define DFL_CXL_CACHE_REGION_WRITE	_BITUL(1)
+#define DFL_CXL_CACHE_REGION_MMAP	_BITUL(2)
 	__u64 size;
 	__u64 offset;
 };

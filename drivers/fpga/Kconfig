@@ -299,7 +299,11 @@ config FPGA_DFL_CXL_CACHE
 	depends on DRM && FPGA_DFL
 	help
 	  This is the driver for CXL cache Accelerated Function Unit
-	  (AFU) which provides interfaces to MMIO region and dma buffers.
+	  (AFU) which configures the IP and provides DMA buffer management
+	  to user space.
+
+	  To compile this driver as a module, chose M here: the
+	  module will be called dfl_cxl_cache.
 
 config FPGA_MGR_MICROCHIP_SPI
 	tristate "Microchip Polarfire SPI FPGA manager"
