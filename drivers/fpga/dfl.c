@@ -12,6 +12,7 @@
  */
 #include <linux/dfl.h>
 #include <linux/fpga-dfl.h>
+#include <linux/minmax.h>
 #include <linux/module.h>
 #include <linux/overflow.h>
 #include <linux/uaccess.h>
@@ -1210,18 +1211,6 @@ static int dfh_get_param_size(void __iomem *dfh_base, resource_size_t max)
 	return -ENOENT;
 }
 
-static bool dfl_csr_blk_is_outside_mmio(resource_size_t csr_start,
-					resource_size_t csr_end,
-					resource_size_t mmio_start,
-					resource_size_t mmio_end)
-{
-	/*
-	 * CSR start and end is within MMIO space for relative address
-	 */
-	return  !(csr_start >= mmio_start && csr_start <= mmio_end &&
-		csr_end >= mmio_start && csr_end <= mmio_end);
-}
-
 /*
  * when create sub feature instances, for private features, it doesn't need
  * to provide resource size and feature id as they could be read from DFH
@@ -1233,10 +1222,8 @@ static int
 create_feature_instance(struct build_feature_devs_info *binfo,
 			resource_size_t ofst, resource_size_t size, u16 fid)
 {
+	resource_size_t start, end, csr_size;
 	struct dfl_feature_info *finfo;
-	resource_size_t start, end;
-	resource_size_t csr_size;
-	resource_size_t mmio_end;
 	int dfh_psize = 0;
 	u64 guid_l, guid_h;
 	u8 revision = 0;
@@ -1298,13 +1285,17 @@ create_feature_instance(struct build_feature_devs_info *binfo,
 		v = readq(binfo->ioaddr + ofst + DFHv1_CSR_SIZE_GRP);
 		csr_size = FIELD_GET(DFHv1_CSR_SIZE_GRP_SIZE, v);
 		end = csr_size ? (start + csr_size - 1) : start;
-		mmio_end =  binfo->len ? (binfo->start + binfo->len - 1) : binfo->start;
 
-		if (rel_addr && dfl_csr_blk_is_outside_mmio(start, end, binfo->start, mmio_end)) {
+		/*
+		 * CSR start and end must be within MMIO space for relative address.
+		 */
+		if (rel_addr && !(in_range(start, binfo->start, binfo->len) &&
+				  in_range(end, binfo->start, binfo->len))) {
 			kfree(finfo);
 			dev_warn(binfo->dev,
-				 "Out of MMIO, CSR[St=%pa,End=%pa] MMIO[St=%pa,End=%pa]\n",
-				 &start, &end, &binfo->start, &mmio_end);
+				 "CSR[start=%pa,size=%pa] is out of MMIO[start=%pa,size=%pa] range\n",
+				 &start, &csr_size, &binfo->start, &binfo->len);
+                        /* Ignore invalid DFH so DFL enumeration may continue. */
 			return 0;
 		}
 
