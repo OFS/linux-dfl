@@ -156,8 +156,8 @@ free_exit:
 
 /**
  * dfl_fme_create_mgr - create fpga mgr platform device as child device
+ * @fdata: fme feature dev data
  * @feature: sub feature info
- * @pdata: fme platform_device's pdata
  *
  * Return: mgr platform device if successful, and error code otherwise.
  */
@@ -201,7 +201,7 @@ create_mgr_err:
 
 /**
  * dfl_fme_destroy_mgr - destroy fpga mgr platform device
- * @pdata: fme platform device's pdata
+ * @fdata: fme feature dev data
  */
 static void dfl_fme_destroy_mgr(struct dfl_feature_dev_data *fdata)
 {
