@@ -663,7 +663,7 @@ static int afu_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static long afu_ioctl_check_extension(struct dfl_feature_platform_data *pdata,
+static long afu_ioctl_check_extension(struct dfl_feature_dev_data *fdata,
 				      unsigned long arg)
 {
 	/* No extension support for now */
@@ -671,9 +671,8 @@ static long afu_ioctl_check_extension(struct dfl_feature_platform_data *pdata,
 }
 
 static long
-afu_ioctl_get_info(struct dfl_feature_platform_data *pdata, void __user *arg)
+afu_ioctl_get_info(struct dfl_feature_dev_data *fdata, void __user *arg)
 {
-	struct dfl_feature_dev_data *fdata = pdata->fdata;
 	struct dfl_fpga_port_info info;
 	struct dfl_afu *afu;
 	unsigned long minsz;
@@ -699,7 +698,7 @@ afu_ioctl_get_info(struct dfl_feature_platform_data *pdata, void __user *arg)
 	return 0;
 }
 
-static long afu_ioctl_get_region_info(struct dfl_feature_platform_data *pdata,
+static long afu_ioctl_get_region_info(struct dfl_feature_dev_data *fdata,
 				      void __user *arg)
 {
 	struct dfl_fpga_port_region_info rinfo;
@@ -715,7 +714,7 @@ static long afu_ioctl_get_region_info(struct dfl_feature_platform_data *pdata,
 	if (rinfo.argsz < minsz || rinfo.padding)
 		return -EINVAL;
 
-	ret = afu_mmio_region_get_by_index(pdata->fdata, rinfo.index, &region);
+	ret = afu_mmio_region_get_by_index(fdata, rinfo.index, &region);
 	if (ret)
 		return ret;
 
@@ -730,10 +729,9 @@ static long afu_ioctl_get_region_info(struct dfl_feature_platform_data *pdata,
 }
 
 static long
-afu_ioctl_dma_map(struct dfl_feature_platform_data *pdata, void __user *arg)
+afu_ioctl_dma_map(struct dfl_feature_dev_data *fdata, void __user *arg)
 {
 	u32 dma_mask = DFL_DMA_MAP_FLAG_READ | DFL_DMA_MAP_FLAG_WRITE;
-	struct dfl_feature_dev_data *fdata = pdata->fdata;
 	struct dfl_fpga_port_dma_map map;
 	unsigned long minsz;
 	long ret;
@@ -763,7 +761,7 @@ afu_ioctl_dma_map(struct dfl_feature_platform_data *pdata, void __user *arg)
 }
 
 static long
-afu_ioctl_dma_unmap(struct dfl_feature_platform_data *pdata, void __user *arg)
+afu_ioctl_dma_unmap(struct dfl_feature_dev_data *fdata, void __user *arg)
 {
 	struct dfl_fpga_port_dma_unmap unmap;
 	unsigned long minsz;
@@ -776,33 +774,33 @@ afu_ioctl_dma_unmap(struct dfl_feature_platform_data *pdata, void __user *arg)
 	if (unmap.argsz < minsz || unmap.flags)
 		return -EINVAL;
 
-	return afu_dma_unmap_region(pdata->fdata, unmap.iova);
+	return afu_dma_unmap_region(fdata, unmap.iova);
 }
 
 static long afu_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct platform_device *pdev = filp->private_data;
-	struct dfl_feature_platform_data *pdata;
+	struct dfl_feature_dev_data *fdata;
 	struct dfl_feature *f;
 	long ret;
 
 	dev_dbg(&pdev->dev, "%s cmd 0x%x\n", __func__, cmd);
 
-	pdata = dev_get_platdata(&pdev->dev);
+	fdata = to_dfl_feature_dev_data(&pdev->dev);
 
 	switch (cmd) {
 	case DFL_FPGA_GET_API_VERSION:
 		return DFL_FPGA_API_VERSION;
 	case DFL_FPGA_CHECK_EXTENSION:
-		return afu_ioctl_check_extension(pdata, arg);
+		return afu_ioctl_check_extension(fdata, arg);
 	case DFL_FPGA_PORT_GET_INFO:
-		return afu_ioctl_get_info(pdata, (void __user *)arg);
+		return afu_ioctl_get_info(fdata, (void __user *)arg);
 	case DFL_FPGA_PORT_GET_REGION_INFO:
-		return afu_ioctl_get_region_info(pdata, (void __user *)arg);
+		return afu_ioctl_get_region_info(fdata, (void __user *)arg);
 	case DFL_FPGA_PORT_DMA_MAP:
-		return afu_ioctl_dma_map(pdata, (void __user *)arg);
+		return afu_ioctl_dma_map(fdata, (void __user *)arg);
 	case DFL_FPGA_PORT_DMA_UNMAP:
-		return afu_ioctl_dma_unmap(pdata, (void __user *)arg);
+		return afu_ioctl_dma_unmap(fdata, (void __user *)arg);
 	default:
 		/*
 		 * Let sub-feature's ioctl function to handle the cmd
@@ -810,7 +808,7 @@ static long afu_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		 * handled in this sub feature, and returns 0 and other
 		 * error code if cmd is handled.
 		 */
-		dfl_fpga_dev_for_each_feature(pdata->fdata, f)
+		dfl_fpga_dev_for_each_feature(fdata, f)
 			if (f->ops && f->ops->ioctl) {
 				ret = f->ops->ioctl(pdev, f, cmd, arg);
 				if (ret != -ENODEV)
