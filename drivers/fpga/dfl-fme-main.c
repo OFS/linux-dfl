@@ -684,8 +684,6 @@ static int fme_dev_init(struct platform_device *pdev)
 	if (!fme)
 		return -ENOMEM;
 
-	fme->pdata = pdata;
-
 	mutex_lock(&fdata->lock);
 	dfl_fpga_fdata_set_private(fdata, fme);
 	mutex_unlock(&fdata->lock);
