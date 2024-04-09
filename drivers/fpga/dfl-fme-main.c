@@ -137,10 +137,10 @@ static const struct attribute_group fme_hdr_group = {
 	.attrs = fme_hdr_attrs,
 };
 
-static long fme_hdr_ioctl_release_port(struct dfl_feature_platform_data *pdata,
+static long fme_hdr_ioctl_release_port(struct dfl_feature_dev_data *fdata,
 				       unsigned long arg)
 {
-	struct dfl_fpga_cdev *cdev = pdata->fdata->dfl_cdev;
+	struct dfl_fpga_cdev *cdev = fdata->dfl_cdev;
 	int port_id;
 
 	if (get_user(port_id, (int __user *)arg))
@@ -149,10 +149,10 @@ static long fme_hdr_ioctl_release_port(struct dfl_feature_platform_data *pdata,
 	return dfl_fpga_cdev_release_port(cdev, port_id);
 }
 
-static long fme_hdr_ioctl_assign_port(struct dfl_feature_platform_data *pdata,
+static long fme_hdr_ioctl_assign_port(struct dfl_feature_dev_data *fdata,
 				      unsigned long arg)
 {
-	struct dfl_fpga_cdev *cdev = pdata->fdata->dfl_cdev;
+	struct dfl_fpga_cdev *cdev = fdata->dfl_cdev;
 	int port_id;
 
 	if (get_user(port_id, (int __user *)arg))
@@ -165,13 +165,13 @@ static long fme_hdr_ioctl(struct platform_device *pdev,
 			  struct dfl_feature *feature,
 			  unsigned int cmd, unsigned long arg)
 {
-	struct dfl_feature_platform_data *pdata = dev_get_platdata(&pdev->dev);
+	struct dfl_feature_dev_data *fdata = to_dfl_feature_dev_data(&pdev->dev);
 
 	switch (cmd) {
 	case DFL_FPGA_FME_PORT_RELEASE:
-		return fme_hdr_ioctl_release_port(pdata, arg);
+		return fme_hdr_ioctl_release_port(fdata, arg);
 	case DFL_FPGA_FME_PORT_ASSIGN:
-		return fme_hdr_ioctl_assign_port(pdata, arg);
+		return fme_hdr_ioctl_assign_port(fdata, arg);
 	}
 
 	return -ENODEV;
@@ -589,7 +589,7 @@ static struct dfl_feature_driver fme_feature_drvs[] = {
 	},
 };
 
-static long fme_ioctl_check_extension(struct dfl_feature_platform_data *pdata,
+static long fme_ioctl_check_extension(struct dfl_feature_dev_data *fdata,
 				      unsigned long arg)
 {
 	/* No extension support for now */
@@ -654,7 +654,7 @@ static long fme_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	case DFL_FPGA_GET_API_VERSION:
 		return DFL_FPGA_API_VERSION;
 	case DFL_FPGA_CHECK_EXTENSION:
-		return fme_ioctl_check_extension(pdata, arg);
+		return fme_ioctl_check_extension(fdata, arg);
 	default:
 		/*
 		 * Let sub-feature's ioctl function to handle the cmd.
