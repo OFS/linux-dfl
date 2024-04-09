@@ -828,8 +828,8 @@ static const struct vm_operations_struct afu_vma_ops = {
 static int afu_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	struct platform_device *pdev = filp->private_data;
-	struct dfl_feature_platform_data *pdata;
 	u64 size = vma->vm_end - vma->vm_start;
+	struct dfl_feature_dev_data *fdata;
 	struct dfl_afu_mmio_region region;
 	u64 offset;
 	int ret;
@@ -837,11 +837,10 @@ static int afu_mmap(struct file *filp, struct vm_area_struct *vma)
 	if (!(vma->vm_flags & VM_SHARED))
 		return -EINVAL;
 
-	pdata = dev_get_platdata(&pdev->dev);
+	fdata = to_dfl_feature_dev_data(&pdev->dev);
 
 	offset = PFN_PHYS(vma->vm_pgoff);
-	ret = afu_mmio_region_get_by_offset(pdata->fdata, offset, size,
-					    &region);
+	ret = afu_mmio_region_get_by_offset(fdata, offset, size, &region);
 	if (ret)
 		return ret;
 
