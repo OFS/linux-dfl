@@ -1777,7 +1777,7 @@ void dfl_fpga_feature_devs_remove(struct dfl_fpga_cdev *cdev)
 EXPORT_SYMBOL_GPL(dfl_fpga_feature_devs_remove);
 
 /**
- * __dfl_fpga_cdev_find_port - find a port under given container device
+ * __dfl_fpga_cdev_find_port_data - find a port under given container device
  *
  * @cdev: container device
  * @data: data passed to match function
