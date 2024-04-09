@@ -351,12 +351,12 @@ struct dfl_feature_dev_data {
 /**
  * struct dfl_feature_platform_data - platform data for feature devices
  *
- * @fdata: dfl enumeration data for the dfl feature device.
  * @cdev: cdev of feature dev.
+ * @fdata: dfl enumeration data for the dfl feature device.
  */
 struct dfl_feature_platform_data {
-	struct dfl_feature_dev_data *fdata;
 	struct cdev cdev;
+	struct dfl_feature_dev_data *fdata;
 };
 
 static inline
