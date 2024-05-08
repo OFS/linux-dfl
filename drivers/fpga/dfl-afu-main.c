@@ -130,10 +130,33 @@ static int __port_reset(struct dfl_feature_dev_data *fdata)
 	return __afu_port_enable(fdata);
 }
 
+static u8 get_port_rev(struct dfl_feature_dev_data *fdata)
+{
+	void __iomem *base;
+
+	base = dfl_get_feature_ioaddr_by_id(fdata, PORT_FEATURE_ID_HEADER);
+
+	if (!base)
+		return ~0;
+
+	return dfl_feature_revision(base);
+}
+
 static int port_reset(struct platform_device *pdev)
 {
 	struct dfl_feature_dev_data *fdata = to_dfl_feature_dev_data(&pdev->dev);
 	int ret;
+	u8 rev;
+
+	rev = get_port_rev(fdata);
+
+	if (rev == 2)
+		return 0;
+
+	if (rev > 2) {
+		dev_info(&pdev->dev, "unexpected port feature revision, %u\n", rev);
+		return 0;
+	}
 
 	mutex_lock(&fdata->lock);
 	ret = __port_reset(fdata);
@@ -420,20 +443,7 @@ static const struct attribute_group port_hdr_group = {
 static int port_hdr_init(struct platform_device *pdev,
 			 struct dfl_feature *feature)
 {
-	struct dfl_feature_dev_data *fdata;
-	void __iomem *base;
-	u8 rev;
-
-	fdata = to_dfl_feature_dev_data(&pdev->dev);
-
-	base = dfl_get_feature_ioaddr_by_id(fdata, PORT_FEATURE_ID_HEADER);
-
-	rev = dfl_feature_revision(base);
-
-	if (rev < 2)
-		port_reset(pdev);
-	else if (rev > 2)
-		dev_info(&pdev->dev, "unexpected port feature revision, %u\n", rev);
+	port_reset(pdev);
 
 	return 0;
 }
@@ -648,7 +658,9 @@ static int afu_release(struct inode *inode, struct file *filp)
 		dfl_fpga_dev_for_each_feature(fdata, feature)
 			dfl_fpga_set_irq_triggers(feature, 0,
 						  feature->nr_irqs, NULL);
-		__port_reset(fdata);
+		if (get_port_rev(fdata) < 2)
+			__port_reset(fdata);
+
 		afu_dma_region_destroy(fdata);
 	}
 	mutex_unlock(&fdata->lock);
