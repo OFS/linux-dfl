@@ -180,7 +180,7 @@ static int qsfp_init(struct qsfp *qsfp)
 	}
 
 	if (cnt >= QSFP_CHK_RDY_CNT) {
-		dev_err(qsfp->dev, "QSFP I2C check ready timeout error");
+		dev_dbg(qsfp->dev, "QSFP I2C check ready timeout error");
 		return -ETIMEDOUT;
 	}
 
@@ -242,9 +242,10 @@ void qsfp_check_hotplug(struct work_struct *work)
 	dev_dbg(qsfp->dev, "qsfp status 0x%llx\n", status);
 
 	if (check_qsfp_plugin(qsfp) && qsfp->init == QSFP_INIT_RESET) {
-		dev_info(qsfp->dev, "detected QSFP plugin\n");
-		if (!qsfp_init(qsfp))
+		if (!qsfp_init(qsfp)) {
 			WRITE_ONCE(qsfp->init, QSFP_INIT_DONE);
+			dev_info(qsfp->dev, "detected QSFP plugin\n");
+		}
 	} else if (!check_qsfp_plugin(qsfp) &&
 		   qsfp->init == QSFP_INIT_DONE) {
 		dev_info(qsfp->dev, "detected QSFP unplugin\n");
