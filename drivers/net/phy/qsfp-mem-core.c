@@ -67,7 +67,7 @@
 #define DELAY_US 1000
 
 #define QSFP_CHECK_TIME 500
-#define QSFP_CHK_RDY_CNT 1000
+#define QSFP_CHK_RDY_CNT 10
 
 #define I2C_QFSP_ADDR       0x50
 
@@ -153,6 +153,7 @@ static int send_qsfp_cmd_page0(struct qsfp *qsfp)
 
 static int qsfp_init(struct qsfp *qsfp)
 {
+	int ret;
 	int cnt;
 
 	/* Reset QSFP Module and QSFP Controller	*/
@@ -171,10 +172,14 @@ static int qsfp_init(struct qsfp *qsfp)
 	/* Check QSFP Module Ready */
 	for (cnt = 0; cnt < QSFP_CHK_RDY_CNT; cnt++) {
 		/* try to send a command to change page 0 */
-		if (!send_qsfp_cmd_page0(qsfp)) {
+		ret = send_qsfp_cmd_page0(qsfp);
+		if (!ret) {
 			dev_info(qsfp->dev, "QSFP module ready after waiting for %dms", cnt);
 			break;
 		}
+
+		if (ret == -ETIMEDOUT)
+			return ret;
 
 		udelay(DELAY_US);
 	}
@@ -231,23 +236,21 @@ void qsfp_check_hotplug(struct work_struct *work)
 {
 	struct delayed_work *dwork;
 	struct qsfp *qsfp;
-	u64 status;
+	int plugged_in;
 
 	dwork = to_delayed_work(work);
 	qsfp = container_of(dwork, struct qsfp, dwork);
 
 	mutex_lock(&qsfp->lock);
 
-	status = readq(qsfp->base + STAT_OFF);
-	dev_dbg(qsfp->dev, "qsfp status 0x%llx\n", status);
+	plugged_in = check_qsfp_plugin(qsfp);
 
-	if (check_qsfp_plugin(qsfp) && qsfp->init == QSFP_INIT_RESET) {
+	if (plugged_in && qsfp->init == QSFP_INIT_RESET) {
 		if (!qsfp_init(qsfp)) {
 			WRITE_ONCE(qsfp->init, QSFP_INIT_DONE);
 			dev_info(qsfp->dev, "detected QSFP plugin\n");
 		}
-	} else if (!check_qsfp_plugin(qsfp) &&
-		   qsfp->init == QSFP_INIT_DONE) {
+	} else if (!plugged_in && qsfp->init == QSFP_INIT_DONE) {
 		dev_info(qsfp->dev, "detected QSFP unplugin\n");
 		WRITE_ONCE(qsfp->init, QSFP_INIT_RESET);
 	}
