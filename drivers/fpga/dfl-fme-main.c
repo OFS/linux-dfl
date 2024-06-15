@@ -412,7 +412,7 @@ static int power_hwmon_read(struct device *dev, enum hwmon_sensor_types type,
 static int power_hwmon_write(struct device *dev, enum hwmon_sensor_types type,
 			     u32 attr, int channel, long val)
 {
-	struct dfl_feature_dev_data *fdata = to_dfl_feature_dev_data(dev);
+	struct dfl_feature_dev_data *fdata = to_dfl_feature_dev_data(dev->parent);
 	struct dfl_feature *feature = dev_get_drvdata(dev);
 	int ret = 0;
 	u64 v;
