@@ -598,15 +598,10 @@ static long fme_ioctl_check_extension(struct dfl_feature_dev_data *fdata,
 
 static int fme_open(struct inode *inode, struct file *filp)
 {
-	struct platform_device *fdev = dfl_fpga_inode_to_feature_dev(inode);
-	struct dfl_feature_platform_data *pdata = dev_get_platdata(&fdev->dev);
-	struct dfl_feature_dev_data *fdata;
+	struct dfl_feature_dev_data *fdata = dfl_fpga_inode_to_feature_dev_data(inode);
+	struct platform_device *fdev = fdata->dev;
 	int ret;
 
-	if (WARN_ON(!pdata))
-		return -ENODEV;
-
-	fdata = pdata->fdata;
 	mutex_lock(&fdata->lock);
 	ret = dfl_feature_dev_use_begin(fdata, filp->f_flags & O_EXCL);
 	if (!ret) {

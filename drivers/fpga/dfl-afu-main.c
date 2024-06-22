@@ -630,11 +630,9 @@ static struct dfl_feature_driver port_feature_drvs[] = {
 
 static int afu_open(struct inode *inode, struct file *filp)
 {
-	struct platform_device *fdev = dfl_fpga_inode_to_feature_dev(inode);
-	struct dfl_feature_dev_data *fdata;
+	struct dfl_feature_dev_data *fdata = dfl_fpga_inode_to_feature_dev_data(inode);
+	struct platform_device *fdev = fdata->dev;
 	int ret;
-
-	fdata = to_dfl_feature_dev_data(&fdev->dev);
 
 	mutex_lock(&fdata->lock);
 	ret = dfl_feature_dev_use_begin(fdata, filp->f_flags & O_EXCL);
