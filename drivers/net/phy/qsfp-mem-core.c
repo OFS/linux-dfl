@@ -204,7 +204,8 @@ int check_qsfp_plugin(struct qsfp *qsfp)
 }
 EXPORT_SYMBOL_GPL(check_qsfp_plugin);
 
-ssize_t qsfp_connected_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t qsfp_connected_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
 {
 	struct qsfp *qsfp = dev_get_drvdata(dev);
 	u32 plugin;
@@ -232,7 +233,7 @@ const struct attribute_group *qsfp_mem_groups[] = {
 };
 EXPORT_SYMBOL_GPL(qsfp_mem_groups);
 
-void qsfp_check_hotplug(struct work_struct *work)
+static void qsfp_check_hotplug(struct work_struct *work)
 {
 	struct delayed_work *dwork;
 	struct qsfp *qsfp;
