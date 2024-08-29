@@ -92,4 +92,5 @@ void dfl_driver_unregister(struct dfl_driver *dfl_drv);
 		      dfl_driver_unregister)
 
 void *dfh_find_param(struct dfl_device *dfl_dev, int param_id, size_t *pcount);
+struct device *dfl_dev_get_base_dev(struct dfl_device *dfl_dev);
 #endif /* __LINUX_DFL_H */

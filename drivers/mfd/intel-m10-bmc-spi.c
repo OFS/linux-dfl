@@ -4,6 +4,7 @@
  *
  * Copyright (C) 2018-2020 Intel Corporation. All rights reserved.
  */
+#define DEBUG
 #include <linux/bitfield.h>
 #include <linux/dev_printk.h>
 #include <linux/init.h>
@@ -23,6 +24,20 @@ static const struct regmap_access_table m10bmc_access_table = {
 	.yes_ranges	= m10bmc_regmap_range,
 	.n_yes_ranges	= ARRAY_SIZE(m10bmc_regmap_range),
 };
+
+static void m10bmc_init_cells_platdata(struct intel_m10bmc_platdata *pdata,
+			   struct mfd_cell *cells, int n_cell)
+{
+	int i;
+
+	for (i = 0; i < n_cell; i++) {
+		if (!strcmp(cells[i].name, "n3000bmc-retimer")) {
+			cells[i].platform_data = pdata->retimer;
+			cells[i].pdata_size =
+				pdata->retimer ? sizeof(*pdata->retimer) : 0;
+		}
+	}
+}
 
 static struct regmap_config intel_m10bmc_regmap_config = {
 	.reg_bits = 32,
@@ -60,7 +75,8 @@ static int check_m10bmc_version(struct intel_m10bmc *ddata)
 
 static int intel_m10_bmc_spi_probe(struct spi_device *spi)
 {
-	const struct spi_device_id *id = spi_get_device_id(spi);
+	struct intel_m10bmc_platdata *pdata = dev_get_platdata(&spi->dev);
+        const struct spi_device_id *id = spi_get_device_id(spi);
 	const struct intel_m10bmc_platform_info *info;
 	struct device *dev = &spi->dev;
 	struct intel_m10bmc *ddata;
@@ -72,6 +88,7 @@ static int intel_m10_bmc_spi_probe(struct spi_device *spi)
 
 	info = (struct intel_m10bmc_platform_info *)id->driver_data;
 	ddata->dev = dev;
+	m10bmc_init_cells_platdata(pdata, info->cells, info->n_cells);
 
 	ddata->regmap = devm_regmap_init_spi_avmm(spi, &intel_m10bmc_regmap_config);
 	if (IS_ERR(ddata->regmap)) {
