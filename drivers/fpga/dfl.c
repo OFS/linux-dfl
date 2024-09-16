@@ -918,7 +918,7 @@ err_free_id:
  */
 static int feature_dev_register(struct dfl_feature_dev_data *fdata)
 {
-	struct dfl_feature_platform_data pdata = { 0 };
+	struct dfl_feature_platform_data pdata = {};
 	struct platform_device *fdev;
 	struct dfl_feature *feature;
 	int ret;
