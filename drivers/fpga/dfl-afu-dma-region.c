@@ -149,10 +149,9 @@ static int afu_dma_region_add(struct dfl_feature_dev_data *fdata,
 			      struct dfl_afu_dma_region *region)
 {
 	struct dfl_afu *afu = dfl_fpga_fdata_get_private(fdata);
-	struct device *dev = &fdata->dev->dev;
 	struct rb_node **new, *parent = NULL;
 
-	dev_dbg(dev, "add region (iova = %llx)\n", region->iova);
+	dev_dbg(&fdata->dev->dev, "add region (iova = %llx)\n", region->iova);
 
 	new = &afu->dma_regions.rb_node;
 
@@ -190,10 +189,9 @@ static int afu_dma_region_add(struct dfl_feature_dev_data *fdata,
 static void afu_dma_region_remove(struct dfl_feature_dev_data *fdata,
 				  struct dfl_afu_dma_region *region)
 {
-	struct device *dev = &fdata->dev->dev;
 	struct dfl_afu *afu;
 
-	dev_dbg(dev, "del region (iova = %llx)\n", region->iova);
+	dev_dbg(&fdata->dev->dev, "del region (iova = %llx)\n", region->iova);
 
 	afu = dfl_fpga_fdata_get_private(fdata);
 	rb_erase(&region->node, &afu->dma_regions);
