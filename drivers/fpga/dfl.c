@@ -156,8 +156,7 @@ static LIST_HEAD(dfl_port_ops_list);
  *
  * Please note that must dfl_fpga_port_ops_put after use the port_ops.
  */
-struct dfl_fpga_port_ops *
-dfl_fpga_port_ops_get(struct dfl_feature_dev_data *fdata)
+struct dfl_fpga_port_ops *dfl_fpga_port_ops_get(struct dfl_feature_dev_data *fdata)
 {
 	struct dfl_fpga_port_ops *ops = NULL;
 
@@ -930,8 +929,7 @@ static int feature_dev_register(struct dfl_feature_dev_data *fdata)
 	fdata->dev = fdev;
 
 	fdev->dev.parent = &fdata->dfl_cdev->region->dev;
-	fdev->dev.devt = dfl_get_devt(dfl_devs[fdata->type].devt_type,
-				      fdev->id);
+	fdev->dev.devt = dfl_get_devt(dfl_devs[fdata->type].devt_type, fdev->id);
 
 	dfl_fpga_dev_for_each_feature(fdata, feature)
 		feature->dev = fdev;
@@ -1790,8 +1788,7 @@ EXPORT_SYMBOL_GPL(dfl_fpga_feature_devs_remove);
  */
 struct dfl_feature_dev_data *
 __dfl_fpga_cdev_find_port_data(struct dfl_fpga_cdev *cdev, void *data,
-			       int (*match)(struct dfl_feature_dev_data *,
-					    void *))
+			       int (*match)(struct dfl_feature_dev_data *, void *))
 {
 	struct dfl_feature_dev_data *fdata;
 
@@ -1858,7 +1855,6 @@ int dfl_fpga_cdev_release_port(struct dfl_fpga_cdev *cdev, int port_id)
 
 	feature_dev_unregister(fdata);
 	cdev->released_port_num++;
-
 unlock_exit:
 	mutex_unlock(&cdev->lock);
 	return ret;
@@ -1901,7 +1897,6 @@ int dfl_fpga_cdev_assign_port(struct dfl_fpga_cdev *cdev, int port_id)
 	mutex_unlock(&fdata->lock);
 
 	cdev->released_port_num--;
-
 unlock_exit:
 	mutex_unlock(&cdev->lock);
 	return ret;

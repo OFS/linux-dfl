@@ -361,8 +361,7 @@ static void dfl_fme_destroy_regions(struct dfl_feature_dev_data *fdata)
 static int pr_mgmt_init(struct platform_device *pdev,
 			struct dfl_feature *feature)
 {
-	struct dfl_feature_dev_data *fdata =
-			to_dfl_feature_dev_data(&pdev->dev);
+	struct dfl_feature_dev_data *fdata = to_dfl_feature_dev_data(&pdev->dev);
 	struct dfl_fme_region *fme_region;
 	struct dfl_fme_bridge *fme_br;
 	struct platform_device *mgr;
@@ -431,8 +430,7 @@ unlock:
 static void pr_mgmt_uinit(struct platform_device *pdev,
 			  struct dfl_feature *feature)
 {
-	struct dfl_feature_dev_data *fdata =
-			to_dfl_feature_dev_data(&pdev->dev);
+	struct dfl_feature_dev_data *fdata = to_dfl_feature_dev_data(&pdev->dev);
 
 	mutex_lock(&fdata->lock);
 

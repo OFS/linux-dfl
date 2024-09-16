@@ -230,8 +230,7 @@ struct dfl_fpga_port_ops {
 
 void dfl_fpga_port_ops_add(struct dfl_fpga_port_ops *ops);
 void dfl_fpga_port_ops_del(struct dfl_fpga_port_ops *ops);
-struct dfl_fpga_port_ops *
-	dfl_fpga_port_ops_get(struct dfl_feature_dev_data *fdata);
+struct dfl_fpga_port_ops *dfl_fpga_port_ops_get(struct dfl_feature_dev_data *fdata);
 void dfl_fpga_port_ops_put(struct dfl_fpga_port_ops *ops);
 int dfl_fpga_check_port_id(struct dfl_feature_dev_data *fdata, void *pport_id);
 
@@ -598,13 +597,11 @@ void dfl_fpga_feature_devs_remove(struct dfl_fpga_cdev *cdev);
 
 struct dfl_feature_dev_data *
 __dfl_fpga_cdev_find_port_data(struct dfl_fpga_cdev *cdev, void *data,
-			       int (*match)(struct dfl_feature_dev_data *,
-					    void *));
+			       int (*match)(struct dfl_feature_dev_data *, void *));
 
 static inline struct dfl_feature_dev_data *
 dfl_fpga_cdev_find_port_data(struct dfl_fpga_cdev *cdev, void *data,
-			     int (*match)(struct dfl_feature_dev_data *,
-					  void *))
+			     int (*match)(struct dfl_feature_dev_data *, void *))
 {
 	struct dfl_feature_dev_data *fdata;
 
