@@ -852,8 +852,10 @@ binfo_create_feature_dev_data(struct build_feature_devs_info *binfo)
 			feature->params = devm_kmemdup(binfo->dev,
 						       finfo->params, finfo->param_size,
 						       GFP_KERNEL);
-			if (!feature->params)
-				return ERR_PTR(-ENOMEM);
+			if (!feature->params) {
+				ret = -ENOMEM;
+				goto err_free_id;
+			}
 
 			feature->param_size = finfo->param_size;
 		}
