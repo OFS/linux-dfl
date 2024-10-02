@@ -1447,9 +1447,9 @@ static int do_dfl_entry(const char *filename, void *symval, char *alias)
 	guid_t null_guid = {0};
 	DEF_FIELD(symval, dfl_device_id, type);
 	DEF_FIELD(symval, dfl_device_id, feature_id);
-	DEF_FIELD(symval, dfl_device_id, guid);
+	DEF_FIELD_ADDR(symval, dfl_device_id, guid);
 
-	guid_cmp_val = memcmp(&null_guid, &guid, sizeof(guid_t));
+	guid_cmp_val = memcmp(&null_guid, guid, sizeof(guid_t));
 
 	if (feature_id == 0 && guid_cmp_val == 0) {
 		warn("Invalid dfl Device ID for in '%s'\n", filename);
@@ -1463,7 +1463,7 @@ static int do_dfl_entry(const char *filename, void *symval, char *alias)
 
 	if (guid_cmp_val) {
 		strcat(alias + strlen(alias), "g{");
-		add_guid(alias, guid);
+		add_guid(alias, *guid);
 		strcat(alias + strlen(alias), "}");
 	}
 	add_wildcard(alias);
