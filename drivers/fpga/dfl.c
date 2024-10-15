@@ -789,6 +789,13 @@ static void dfl_fpga_cdev_add_priv_feat_data(struct dfl_fpga_cdev *cdev,
 	mutex_unlock(&cdev->lock);
 }
 
+static void dfl_id_free_action(void *arg)
+{
+	struct dfl_feature_dev_data *fdata = arg;
+
+	dfl_id_free(fdata->type, fdata->pdev_id);
+}
+
 static struct dfl_feature_dev_data *
 binfo_create_feature_dev_data(struct build_feature_devs_info *binfo)
 {
@@ -819,6 +826,10 @@ binfo_create_feature_dev_data(struct build_feature_devs_info *binfo)
 	fdata->pdev_id = dfl_id_alloc(type, binfo->dev);
 	if (fdata->pdev_id < 0)
 		return ERR_PTR(fdata->pdev_id);
+
+	ret = devm_add_action_or_reset(binfo->dev, dfl_id_free_action, fdata);
+	if (ret)
+		return ERR_PTR(ret);
 
 	fdata->pdev_name = dfl_devs[type].name;
 	fdata->num = binfo->feature_num;
@@ -851,10 +862,8 @@ binfo_create_feature_dev_data(struct build_feature_devs_info *binfo)
 			feature->params = devm_kmemdup(binfo->dev,
 						       finfo->params, finfo->param_size,
 						       GFP_KERNEL);
-			if (!feature->params) {
-				ret = -ENOMEM;
-				goto err_free_id;
-			}
+			if (!feature->params)
+				return ERR_PTR(-ENOMEM);
 
 			feature->param_size = finfo->param_size;
 		}
@@ -872,10 +881,8 @@ binfo_create_feature_dev_data(struct build_feature_devs_info *binfo)
 			feature->ioaddr =
 				devm_ioremap_resource(binfo->dev,
 						      &finfo->mmio_res);
-			if (IS_ERR(feature->ioaddr)) {
-				ret = PTR_ERR(feature->ioaddr);
-				goto err_free_id;
-			}
+			if (IS_ERR(feature->ioaddr))
+				return feature->ioaddr;
 		} else {
 			feature->resource_index = res_idx;
 			fdata->resources[res_idx++] = finfo->mmio_res;
@@ -884,10 +891,9 @@ binfo_create_feature_dev_data(struct build_feature_devs_info *binfo)
 		if (finfo->nr_irqs) {
 			ctx = devm_kcalloc(binfo->dev, finfo->nr_irqs,
 					   sizeof(*ctx), GFP_KERNEL);
-			if (!ctx) {
-				ret = -ENOMEM;
-				goto err_free_id;
-			}
+			if (!ctx)
+				return ERR_PTR(-ENOMEM);
+
 			for (i = 0; i < finfo->nr_irqs; i++)
 				ctx[i].irq =
 					binfo->irq_table[finfo->irq_base + i];
@@ -903,11 +909,6 @@ binfo_create_feature_dev_data(struct build_feature_devs_info *binfo)
 	fdata->resource_num = res_idx;
 
 	return fdata;
-
-err_free_id:
-	dfl_id_free(type, fdata->pdev_id);
-
-	return ERR_PTR(ret);
 }
 
 /*
@@ -1660,7 +1661,6 @@ static int remove_feature_dev(struct device *dev, void *data)
 	struct dfl_feature_dev_data *fdata = to_dfl_feature_dev_data(dev);
 
 	feature_dev_unregister(fdata);
-	dfl_id_free(fdata->type, fdata->pdev_id);
 
 	return 0;
 }
